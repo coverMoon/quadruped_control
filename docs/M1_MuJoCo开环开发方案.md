@@ -27,11 +27,11 @@ M1 完成时应满足：
 M1 固定使用资产仓库中的 black MuJoCo 模型：
 
 ```text
-源仓库：../URDF
+源仓库：XJTURoboCon_quadruped_assets
 源提交：22c120bad450a81af2c4d6fcbf221262e2884928
-主体模型：../URDF/mujoco/black/black_description.xml
-平地场景：../URDF/mujoco/black/scene.xml
-网格目录：../URDF/mujoco/black/assets/
+主体模型：mujoco/black/black_description.xml
+平地场景：mujoco/black/scene.xml
+网格目录：mujoco/black/assets/
 ```
 
 文件校验值（本仓库 `assets/robots/black/mujoco/` 内的文件；`black_description.xml`
@@ -118,13 +118,13 @@ submit(CommandFrame)
   ↓
 计算并写入 12 个执行器力矩
   ↓
-执行一个或多个 mj_step
+MujocoRobotIO::step() 调用一次 mj_step
   ↓
 生成新的 StateFrame
 ```
 
 `submit()` 只校验并保存最新命令，不在调用内部偷偷推进物理仿真。物理步进只能由明确的
-MuJoCo 专用函数触发，以便测试程序准确控制仿真时间。
+`MujocoRobotIO::step()` 触发，每次调用执行一个物理步长，以便测试程序准确控制仿真时间。
 
 ### 4.2 三种必要控制模式
 
@@ -134,8 +134,10 @@ MuJoCo 专用函数触发，以便测试程序准确控制仿真时间。
   `tau = kp * (target_position - position) + kd * (target_velocity - velocity)
   + feedforward_effort`。
 
-计算结果还要受机器人控制配置中的力矩上限和 MuJoCo 执行器范围限制。M1 尚未确定正式
-控制器限值时，可以先使用模型的执行器范围，但必须在代码和测试中明确这个临时来源。
+计算结果同时受 `RobotModel` 的 `max_effort` 和 MuJoCo 执行器 `ctrlrange` 限制，
+取两者交集作为有效范围。最终力矩还会经过有限值检查，非有限值会触发 Fault。
+M1 尚未确定正式控制器限值时，`RobotModel` 中的力矩上限可以临时使用与模型执行器范围
+相同的数值，但必须在代码和测试中明确这个临时来源。
 
 `Velocity` 和 `Torque` 可以在上述三种模式稳定后补充，不得因此延迟 M1 验收。
 

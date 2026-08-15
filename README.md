@@ -18,10 +18,11 @@
 
 ## 当前阶段
 
-当前 M0 已完成，正在进行 M1 的 MuJoCo 开环仿真。公共数据结构、`RobotModel`、
-`RobotIO` 和基础校验已经完成并通过测试；MuJoCo 版本和 black 平地基准模型也已经确定。
+当前 M1 的 MuJoCo 开环仿真已完成，准备进入 M2。公共数据结构、`RobotModel`、
+`RobotIO`、基础校验、`MujocoRobotIO`、无界面运行入口和可重复性测试已经全部完成并通过测试；
+MuJoCo 版本和 black 平地基准模型也已经确定。
 
-M0 只确定模块之间传递什么数据以及怎样检查数据。M1 开始增加无界面的
+M0 只确定模块之间传递什么数据以及怎样检查数据。M1 增加了无界面的
 MuJoCo 物理仿真，仍不包含运动状态机、策略推理和 ROS 2 适配器。
 
 M1 固定使用 MuJoCo 3.9.0。依赖安装在仓库本地的 `.deps/` 目录，不依赖
@@ -57,8 +58,20 @@ Python 或 Conda 环境。首次使用时运行：
 ./scripts/build.sh --mujoco
 ```
 
-当前 MuJoCo 适配器尚未实现，该参数会先验证并启用 MuJoCo 3.9.0 依赖。
-后续的 MujocoRobotIO 和无界面测试也使用同一参数构建。
+该参数会启用 MuJoCo 3.9.0 依赖，构建 `quadruped_mujoco` 后端、全部 MuJoCo 测试
+和 `apps/mujoco_headless/` 无界面程序。首次使用前运行：
+
+```bash
+./scripts/setup_mujoco.sh
+```
+
+运行无界面仿真：
+
+```bash
+./scripts/run_mujoco_headless.sh --duration 2.0
+```
+
+该脚本可从任意当前目录启动。
 
 也可以手动执行：
 
@@ -72,8 +85,12 @@ ctest --test-dir build/default --output-on-failure
 
 ```text
 quadruped_control/
+├── apps/
+│   └── mujoco_headless/              最小无界面 MuJoCo 仿真入口
 ├── assets/
 │   └── robots/black/mujoco/          固定版本的仿真模型和网格
+├── backends/
+│   └── mujoco/                       MuJoCo 模型加载与 RobotIO 实现
 ├── cmake/                            CMake 依赖查找模块
 ├── configs/
 │   └── robots/                       机器人结构配置
@@ -114,9 +131,7 @@ compile_commands.json                  指向编译数据库的符号链接
 
 ```text
 motion/                                 MotionRuntime、状态机和策略运行
-backends/mujoco/                        MujocoRobotIO 和物理仿真
 adapters/ros2/                          ROS 2 消息转换和外围接口
-apps/mujoco_sim/                        完整仿真程序的组装与启动入口
 ```
 
 这些模块可以依赖 `core`，但 `core` 不能反向依赖它们。没有开始实现的模块暂时不创建空目录。
