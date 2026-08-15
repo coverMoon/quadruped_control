@@ -6,7 +6,7 @@
 
 ## 来源
 
-- 源仓库：`../URDF`（机器人模型资产仓库）
+- 源仓库：`XJTURoboCon_quadruped_assets`（机器人模型资产仓库-private）
 - 源提交：`22c120bad450a81af2c4d6fcbf221262e2884928`
 - 原路径：`mujoco/black/`
 
