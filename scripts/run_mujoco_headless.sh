@@ -14,7 +14,7 @@ then
     exit 1
 fi
 
-if [[ ! -f "${exe}" ]]
+if [[ ! -x "${exe}" ]]
 then
     echo "未找到无界面程序，请先运行 ./scripts/build.sh --mujoco。" >&2
     exit 1

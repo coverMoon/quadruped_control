@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <string>
@@ -68,8 +69,9 @@ bool parse_double(const char* text, double& out)
 {
     try
     {
-        const double value = std::stod(text);
-        if (!std::isfinite(value))
+        std::size_t parsed_length = 0;
+        const double value = std::stod(text, &parsed_length);
+        if (parsed_length != std::string(text).size() || !std::isfinite(value))
         {
             return false;
         }
@@ -123,7 +125,11 @@ bool parse_args(int argc, char** argv, Options& options)
             return false;
         }
     }
+    return true;
+}
 
+bool validate_options(const Options& options)
+{
     if (options.duration_seconds <= 0.0)
     {
         std::cerr << "仿真时长必须大于 0\n";
@@ -143,18 +149,33 @@ void print_summary(double sim_time, std::uint64_t sequence, qc::RobotIOState sta
               << "s] seq=" << sequence << " state=" << static_cast<int>(state) << '\n';
 }
 
+bool scene_file_exists(const std::string& path)
+{
+    std::ifstream file(path);
+    return file.is_open();
+}
+
 bool run_headless(const Options& options)
 {
-    auto created = qm::MujocoRobotIO::create(options.scene_path, make_black_model(), kStartupId);
-    if (!created.ok())
+    if (!scene_file_exists(options.scene_path))
     {
-        std::cerr << "创建 MuJoCo 后端失败: " << created.error_message << '\n';
+        std::cerr << "未找到场景文件：" << options.scene_path
+                  << "。请检查 --scene 参数，或恢复仓库内 black 模型。\n";
         return false;
     }
 
-    if (!created.io->reset(kSessionId).ok())
+    auto created = qm::MujocoRobotIO::create(options.scene_path, make_black_model(), kStartupId);
+    if (!created.ok())
     {
-        std::cerr << "reset 失败\n";
+        std::cerr << "创建 MuJoCo 后端失败: " << created.error_message
+                  << "。请检查场景文件和 RobotModel 是否匹配。\n";
+        return false;
+    }
+
+    const auto reset_result = created.io->reset(kSessionId);
+    if (!reset_result.ok())
+    {
+        std::cerr << "reset 失败: " << reset_result.error_message << '\n';
         return false;
     }
 
@@ -169,7 +190,11 @@ bool run_headless(const Options& options)
         }
 
         qc::StateFrame state;
-        created.io->read_latest(state);
+        if (created.io->read_latest(state) != qc::RobotIOCode::Ok)
+        {
+            std::cerr << "读取最新状态失败\n";
+            return false;
+        }
         const double sim_time = static_cast<double>(state.header.timestamp_ns) / 1.0e9;
 
         if (sim_time >= next_summary_time)
@@ -192,7 +217,7 @@ bool run_headless(const Options& options)
 int main(int argc, char** argv)
 {
     Options options;
-    if (!parse_args(argc, argv, options))
+    if (!parse_args(argc, argv, options) || !validate_options(options))
     {
         print_usage(argv[0]);
         return 1;
