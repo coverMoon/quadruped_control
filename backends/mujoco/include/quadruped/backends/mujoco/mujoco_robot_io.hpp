@@ -101,7 +101,7 @@ private:
     }
 
     // 从当前 mjData 重新生成并发布最新状态，序号使用当前 sequence_ 并自增。
-    // 仅供 reset 和后续 M1-4 的步进内部复用；session_id 由内部调用方给出，
+    // 仅供 reset() 和 step() 内部复用；session_id 由内部调用方给出，
     // 外部无法经由公共 API 调用。失败时不修改已发布的上一份状态，
     // 并把后端状态置为 Fault，返回可读原因（空串表示成功）。
     std::string refresh_latest_state(std::uint64_t session_id);

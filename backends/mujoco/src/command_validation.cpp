@@ -40,17 +40,6 @@ CommandValidationResult validate_mujoco_command(
         return {core::RobotIOCode::Rejected, "command sequence is not strictly increasing"};
     }
 
-    // 本阶段只支持三种必要控制模式；Velocity/Torque 明确拒绝。
-    for (std::size_t i = 0; i < robot_model.joint_count; ++i)
-    {
-        const auto mode = frame.joints[i].mode;
-        if (mode != core::ControlMode::Disabled && mode != core::ControlMode::Damping &&
-            mode != core::ControlMode::JointImpedance)
-        {
-            return {core::RobotIOCode::Rejected, "unsupported control mode in this phase"};
-        }
-    }
-
     if (data == nullptr)
     {
         return {core::RobotIOCode::Fault, "mjData is not available"};
@@ -63,9 +52,22 @@ CommandValidationResult validate_mujoco_command(
         return {core::RobotIOCode::Fault, "simulation time conversion failed"};
     }
 
+    // 先由核心校验捕获字段、枚举和数值错误，返回 InvalidFrame；
+    // 合法但不支持的模式（Velocity/Torque）在后一步按阶段能力拒绝。
     if (const auto validation = core::validate(frame, robot_model, now_ns); !validation)
     {
         return {core::RobotIOCode::InvalidFrame, validation.message};
+    }
+
+    // 本阶段只支持三种必要控制模式；Velocity/Torque 明确拒绝。
+    for (std::size_t i = 0; i < robot_model.joint_count; ++i)
+    {
+        const auto mode = frame.joints[i].mode;
+        if (mode != core::ControlMode::Disabled && mode != core::ControlMode::Damping &&
+            mode != core::ControlMode::JointImpedance)
+        {
+            return {core::RobotIOCode::Rejected, "unsupported control mode in this phase"};
+        }
     }
 
     return {core::RobotIOCode::Ok, {}};

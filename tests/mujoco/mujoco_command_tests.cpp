@@ -156,6 +156,12 @@ void test_submit_rejects_nan_and_invalid_mode()
 
     auto torque_command = qtest::make_command(3, qc::ControlMode::Torque);
     qtest::expect(created.io->submit(torque_command) == qc::RobotIOCode::Rejected, "Torque 模式被拒绝");
+
+    auto invalid_mode_command = qtest::make_command(4, qc::ControlMode::Disabled);
+    invalid_mode_command.joints[0].mode = static_cast<qc::ControlMode>(255);
+    qtest::expect(
+        created.io->submit(invalid_mode_command) == qc::RobotIOCode::InvalidFrame,
+        "非法控制模式返回 InvalidFrame");
 }
 
 void test_rejected_command_does_not_replace_valid()

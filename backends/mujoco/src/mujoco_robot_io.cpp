@@ -257,7 +257,6 @@ std::string MujocoRobotIO::refresh_latest_state(const std::uint64_t session_id)
     frame.header.model_id = robot_model_.model_id;
     frame.header.calibration_id = robot_model_.calibration_id;
     frame.joint_count = robot_model_.joint_count;
-    // M1-3 没有主动命令和物理步进，安全状态固定为阻尼。
     // reset 时还没有主动命令，安全状态固定为阻尼；
     // step() 成功后会根据实际命令使用情况覆盖该字段。
     frame.safety_state = core::SafetyState::Damping;
