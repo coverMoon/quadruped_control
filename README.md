@@ -4,7 +4,7 @@
 
 ## 当前实现
 
-仓库目前包含一个独立的 C++17 核心库：
+仓库目前包含一个独立的 C++17 核心库，以及可选的 MuJoCo 仿真后端：
 
 - 固定最大 16 关节的公共数据结构；
 - `StateFrame`、`CommandFrame`、`BaseCommand` 和模式请求；
@@ -12,9 +12,12 @@
 - `RobotIO` 统一接口；
 - 模型、帧、时间、控制模式和数值合法性检查；
 - black 的关节顺序参考配置；
-- 核心接口单元测试。
+- 核心接口单元测试；
+- `backends/mujoco/` 中的 `MujocoRobotIO`，支持模型加载、reset、命令执行和显式单物理步进；
+- `tests/mujoco/` 中的 MuJoCo 自动测试，覆盖状态生成、命令校验、三种控制模式、安全路径和可重复性；
+- `apps/mujoco_headless/` 中的最小无界面运行入口。
 
-核心库不依赖 ROS 2、Torch、MuJoCo 或电机 SDK。
+核心库 `core/` 不依赖 ROS 2、Torch、MuJoCo 或电机 SDK。所有 MuJoCo 类型和路径只在 `backends/mujoco/`、`apps/mujoco_headless/` 和 `tests/mujoco/` 中出现。
 
 ## 当前阶段
 
@@ -26,13 +29,7 @@ M0 只确定模块之间传递什么数据以及怎样检查数据。M1 增加�
 MuJoCo 物理仿真，仍不包含运动状态机、策略推理和 ROS 2 适配器。
 
 M1 固定使用 MuJoCo 3.9.0。依赖安装在仓库本地的 `.deps/` 目录，不依赖
-Python 或 Conda 环境。首次使用时运行：
-
-```bash
-./scripts/setup_mujoco.sh
-```
-
-## 构建和测试
+Python 或 Conda 环境。
 
 编译时运行：
 
@@ -59,7 +56,7 @@ Python 或 Conda 环境。首次使用时运行：
 ```
 
 该参数会启用 MuJoCo 3.9.0 依赖，构建 `quadruped_mujoco` 后端、全部 MuJoCo 测试
-和 `apps/mujoco_headless/` 无界面程序。首次使用前运行：
+和 `apps/mujoco_headless/` 无界面程序。首次使用 MuJoCo 模块前运行：
 
 ```bash
 ./scripts/setup_mujoco.sh

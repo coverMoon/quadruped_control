@@ -136,8 +136,14 @@ MujocoRobotIO::step() 调用一次 mj_step
 
 计算结果同时受 `RobotModel` 的 `max_effort` 和 MuJoCo 执行器 `ctrlrange` 限制，
 取两者交集作为有效范围。最终力矩还会经过有限值检查，非有限值会触发 Fault。
-M1 尚未确定正式控制器限值时，`RobotModel` 中的力矩上限可以临时使用与模型执行器范围
-相同的数值，但必须在代码和测试中明确这个临时来源。
+
+M1 尚未确定正式控制器限值。当前实现和测试临时使用：
+
+- `RobotModel::joint_limits.max_effort = 40.0`；
+- black 模型执行器 `ctrlrange="-33.5 33.5"`。
+
+因此当前有效输出范围为 `[-33.5, 33.5]`。这些都不是已经确认的实机控制限制，
+正式限制将在后续控制器配置中单独确定。
 
 `Velocity` 和 `Torque` 可以在上述三种模式稳定后补充，不得因此延迟 M1 验收。
 
