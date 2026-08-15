@@ -5,9 +5,9 @@
 
 #include "quadruped/backends/mujoco/mujoco_robot_io.hpp"
 
+#include "sim_time.hpp"
 #include "state_frame_fill.hpp"
 
-#include <cmath>
 #include <string>
 #include <utility>
 
@@ -16,27 +16,21 @@ namespace quadruped::backends::mujoco
 namespace
 {
 
-// 秒到纳秒的换算比例，用于把 MuJoCo 的 double 仿真时间转成 int64 单调纳秒。
-constexpr double kNanosecondsPerSecond = 1.0e9;
-
-// int64 纳秒能表示的仿真秒数上限，即 (2^63 - 1) / 1e9，约 292 年。
-// 超过该值时秒到纳秒的转换会溢出，必须在取整前拒绝。
-constexpr double kMaxSimulationSeconds = 9.223372036854775807e9;
-
-// 把 MuJoCo 仿真时间（秒）转换为单调纳秒。
-// 取整规则：四舍五入到最近的整数纳秒；时间必须有限且非负，转换不得溢出 int64。
-bool seconds_to_nanoseconds(const double seconds, core::Nanoseconds& out_ns)
+// 把时间转换失败分类映射为可读错误文本。
+std::string sim_time_error_message(const SimTimeError error)
 {
-    if (!std::isfinite(seconds) || seconds < 0.0)
+    switch (error)
     {
-        return false;
+    case SimTimeError::NonFinite:
+        return "MuJoCo simulation time is not finite";
+    case SimTimeError::Negative:
+        return "MuJoCo simulation time is negative";
+    case SimTimeError::Overflow:
+        return "MuJoCo simulation time exceeds the int64 nanosecond range";
+    case SimTimeError::None:
+        break;
     }
-    if (seconds > kMaxSimulationSeconds)
-    {
-        return false;
-    }
-    out_ns = static_cast<core::Nanoseconds>(std::llround(seconds * kNanosecondsPerSecond));
-    return true;
+    return {};
 }
 
 }  // 匿名命名空间
@@ -108,9 +102,12 @@ MujocoRobotIO::ResetResult MujocoRobotIO::reset(const std::uint64_t session_id)
     mj_forward(model, data);
 
     // 每个新会话的状态序号从 1 开始。
+    // 刷新失败时恢复原序号，保证当前已建立会话内已发布帧的序号仍然单调。
+    const std::uint64_t previous_sequence = sequence_;
     sequence_ = 1;
     if (const std::string error = refresh_latest_state(session_id); !error.empty())
     {
+        sequence_ = previous_sequence;
         result.code = core::RobotIOCode::Fault;
         result.error_message = error;
         return result;
@@ -147,6 +144,16 @@ core::RobotIOStatus MujocoRobotIO::status() const noexcept
     return status_;
 }
 
+std::string MujocoRobotIO::refresh_for_test()
+{
+    // 会话未建立时拒绝，保证 reset 之前不存在任何可发布状态的路径。
+    if (session_id_ == 0)
+    {
+        return "no established session; reset must succeed before refreshing state";
+    }
+    return refresh_latest_state(session_id_);
+}
+
 std::string MujocoRobotIO::refresh_latest_state(const std::uint64_t session_id)
 {
     const mjData* data = model_.raw_data();
@@ -157,10 +164,11 @@ std::string MujocoRobotIO::refresh_latest_state(const std::uint64_t session_id)
     }
 
     core::Nanoseconds timestamp_ns{0};
-    if (!seconds_to_nanoseconds(data->time, timestamp_ns))
+    if (const SimTimeError error = seconds_to_nanoseconds(data->time, timestamp_ns);
+        error != SimTimeError::None)
     {
         status_.state = core::RobotIOState::Fault;
-        return "MuJoCo simulation time is not finite and non-negative";
+        return sim_time_error_message(error);
     }
 
     core::StateFrame frame;

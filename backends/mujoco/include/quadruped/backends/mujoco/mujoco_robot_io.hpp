@@ -80,10 +80,11 @@ public:
         return model_.raw_data();
     }
 
-    // 从当前 mjData 重新生成并发布最新状态，序号使用当前 sequence_ 并自增。
-    // 供 reset 与后续 M1-4 的步进复用；失败时不修改已发布的上一份状态，
-    // 并把后端状态置为 Fault，返回可读原因（空串表示成功）。
-    std::string refresh_latest_state(std::uint64_t session_id);
+    // 仅供测试在注入异常 mjData 后触发一次状态刷新的最小入口。
+    // 帧的 session_id 只能来自当前已建立的会话，调用方不能指定；
+    // 会话未建立（尚未成功 reset）时直接失败，不会发布任何状态。
+    // 正式运行代码不得调用。
+    std::string refresh_for_test();
 
 private:
     // 只能通过 create() 完成全部检查后构造。
@@ -94,6 +95,12 @@ private:
     {
         status_.state = core::RobotIOState::Paused;
     }
+
+    // 从当前 mjData 重新生成并发布最新状态，序号使用当前 sequence_ 并自增。
+    // 仅供 reset 和后续 M1-4 的步进内部复用；session_id 由内部调用方给出，
+    // 外部无法经由公共 API 调用。失败时不修改已发布的上一份状态，
+    // 并把后端状态置为 Fault，返回可读原因（空串表示成功）。
+    std::string refresh_latest_state(std::uint64_t session_id);
 
     core::RobotModel robot_model_{};
     MujocoModel model_;

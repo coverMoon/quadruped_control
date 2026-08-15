@@ -149,7 +149,7 @@ void test_nan_injection_faults()
 
     // 在测试范围内直接修改 mjData 制造 NaN，正式运行代码不得这样做。
     io.raw_data()->qpos[qpos_address] = std::nan("");
-    expect(!io.refresh_latest_state(1).empty(), "注入 NaN 后刷新失败并返回错误文本");
+    expect(!io.refresh_for_test().empty(), "注入 NaN 后刷新失败并返回错误文本");
     expect(io.status().state == qc::RobotIOState::Fault, "刷新失败后状态进入 Fault");
 
     qc::StateFrame after;

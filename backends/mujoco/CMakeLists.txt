@@ -4,6 +4,7 @@
 add_library(quadruped_mujoco
     src/mujoco_model.cpp
     src/mujoco_robot_io.cpp
+    src/sim_time.cpp
     src/state_frame_fill.cpp
 )
 

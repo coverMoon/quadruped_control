@@ -13,13 +13,17 @@ add_executable(quadruped_mujoco_fault_tests
     mujoco_fault_tests.cpp
 )
 
+add_executable(quadruped_mujoco_time_tests
+    mujoco_time_tests.cpp
+)
+
 # 正式模型和错误 fixture 的路径在构建期固定传入，测试不依赖运行时当前目录。
 set(QUADRUPED_TEST_COMPILE_DEFS
     QUADRUPED_BLACK_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/black/mujoco/scene.xml"
     QUADRUPED_MUJOCO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
 )
 
-foreach(target quadruped_mujoco_tests quadruped_mujoco_state_tests quadruped_mujoco_fault_tests)
+foreach(target quadruped_mujoco_tests quadruped_mujoco_state_tests quadruped_mujoco_fault_tests quadruped_mujoco_time_tests)
     target_link_libraries(${target} PRIVATE quadruped::mujoco)
     target_compile_features(${target} PRIVATE cxx_std_17)
     target_compile_definitions(${target} PRIVATE ${QUADRUPED_TEST_COMPILE_DEFS})
