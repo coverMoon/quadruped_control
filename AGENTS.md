@@ -112,6 +112,7 @@ modules.
 ## Build and test
 
 - Run `./scripts/build.sh` after source or build-system changes.
+- Run `./scripts/build.sh --mujoco` for MuJoCo backend changes.
 - Use `./scripts/build.sh --clean` when verifying changes to CMake configuration.
 - Add or update tests for validation rules and public-interface behavior.
 - Tests in M0 must not require network access or a third-party test framework.

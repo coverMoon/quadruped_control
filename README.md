@@ -51,12 +51,21 @@ Python 或 Conda 环境。首次使用时运行：
 ./scripts/build.sh --no-test
 ```
 
+构建需要 MuJoCo 的 M1 模块：
+
+```bash
+./scripts/build.sh --mujoco
+```
+
+当前 MuJoCo 适配器尚未实现，该参数会先验证并启用 MuJoCo 3.9.0 依赖。
+后续的 MujocoRobotIO 和无界面测试也使用同一参数构建。
+
 也可以手动执行：
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
-ctest --test-dir build --output-on-failure
+cmake -S . -B build/default -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/default
+ctest --test-dir build/default --output-on-failure
 ```
 
 ## 仓库目录
@@ -78,7 +87,8 @@ quadruped_control/
 运行构建后还会生成：
 
 ```text
-build/                                 CMake 缓存、目标文件和测试程序
+build/default/                         默认配置的缓存、目标文件和测试程序
+build/mujoco/                          MuJoCo 配置的缓存、目标文件和测试程序
 compile_commands.json                  指向编译数据库的符号链接
 .deps/                                 脚本安装的固定版本第三方依赖
 ```
