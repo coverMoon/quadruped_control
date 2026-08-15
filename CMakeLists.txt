@@ -19,6 +19,10 @@ endif()
 
 add_subdirectory(core)
 
+if(QUADRUPED_ENABLE_MUJOCO)
+    add_subdirectory(backends/mujoco)
+endif()
+
 include(CTest)
 if(BUILD_TESTING)
     add_subdirectory(tests)

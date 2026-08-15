@@ -15,3 +15,7 @@ elseif(MSVC)
 endif()
 
 add_test(NAME quadruped_core_tests COMMAND quadruped_core_tests)
+
+if(QUADRUPED_ENABLE_MUJOCO)
+    add_subdirectory(mujoco)
+endif()

@@ -1,0 +1,22 @@
+<!-- 测试 fixture：故意只保留 j1，RobotModel 请求的 j2 在模型中不存在。 -->
+<mujoco model="missing_joint">
+  <worldbody>
+    <body name="base" pos="0 0 1">
+      <freejoint/>
+      <site name="imu" pos="0 0 0"/>
+      <geom type="box" size="0.1 0.1 0.05" mass="1"/>
+      <body name="link1" pos="0.1 0 0">
+        <joint name="j1" axis="0 1 0"/>
+        <geom type="capsule" size="0.02 0.1" mass="0.1"/>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor joint="j1"/>
+  </actuator>
+  <sensor>
+    <framequat name="imu_quat" objtype="site" objname="imu"/>
+    <gyro name="imu_gyro" site="imu"/>
+    <accelerometer name="imu_acc" site="imu"/>
+  </sensor>
+</mujoco>
