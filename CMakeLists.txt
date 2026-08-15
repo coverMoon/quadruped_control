@@ -10,6 +10,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(QUADRUPED_ENABLE_MUJOCO "构建需要 MuJoCo 的仿真模块" OFF)
+
+if(QUADRUPED_ENABLE_MUJOCO)
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+    find_package(mujoco 3.9.0 EXACT REQUIRED MODULE)
+endif()
+
 add_subdirectory(core)
 
 include(CTest)

@@ -18,10 +18,18 @@
 
 ## 当前阶段
 
-当前处于 M0。公共数据结构、`RobotModel`、`RobotIO` 和基础校验已经完成并通过测试。
+当前 M0 已完成，正在进行 M1 的 MuJoCo 仿真准备。公共数据结构、
+`RobotModel`、`RobotIO` 和基础校验已经完成并通过测试。
 
-这一阶段只确定模块之间传递什么数据以及怎样检查数据，不包含运动状态机、策略推理、
-物理仿真和 ROS 2 适配器。
+M0 只确定模块之间传递什么数据以及怎样检查数据。M1 开始增加无界面的
+MuJoCo 物理仿真，仍不包含运动状态机、策略推理和 ROS 2 适配器。
+
+M1 固定使用 MuJoCo 3.9.0。依赖安装在仓库本地的 `.deps/` 目录，不依赖
+Python 或 Conda 环境。首次使用时运行：
+
+```bash
+./scripts/setup_mujoco.sh
+```
 
 ## 构建和测试
 
@@ -55,6 +63,7 @@ ctest --test-dir build --output-on-failure
 
 ```text
 quadruped_control/
+├── cmake/                            CMake 依赖查找模块
 ├── configs/
 │   └── robots/                       机器人结构配置
 ├── core/
@@ -71,13 +80,15 @@ quadruped_control/
 ```text
 build/                                 CMake 缓存、目标文件和测试程序
 compile_commands.json                  指向编译数据库的符号链接
+.deps/                                 脚本安装的固定版本第三方依赖
 ```
 
-这两项都是本地生成内容，已经被 `.gitignore` 排除，不应提交。
+这些都是本地生成内容，已经被 `.gitignore` 排除，不应提交。
 
 ## 文件存放规则
 
 - 仓库根目录只放工程级说明和构建入口，不在根目录堆放模块源码或零散脚本。
+- `cmake/` 放自定义依赖查找模块，不放业务源码。
 - `core/include/quadruped/core/` 只放其他模块可以使用的公共头文件。公共头文件不能引入 ROS 2、Torch、MuJoCo 或电机 SDK。
 - `core/src/` 放核心库的实现，不把只在一个 `.cpp` 中使用的辅助函数暴露到公共头文件。
 - `configs/robots/` 放机器人固有信息，例如关节名称、顺序、功能角色和机械限制。控制器参数和策略参数以后分别放入 `configs/controllers/` 与 `configs/policies/`，不能混入机器人配置。

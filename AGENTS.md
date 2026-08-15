@@ -3,9 +3,9 @@
 ## Scope
 
 This repository implements the quadruped and wheel-legged robot control system.
-The current M0 code is the dependency-free C++ core. Add ROS 2, Torch, MuJoCo,
-hardware SDKs, and application assembly only in their own modules when those
-stages begin.
+M0 is the dependency-free C++ core. M1 adds MuJoCo only to its own backend;
+ROS 2, Torch, hardware SDKs, and application assembly belong to their own later
+modules.
 
 ## Dependency boundaries
 
@@ -120,6 +120,8 @@ stages begin.
 ## Change discipline
 
 - Keep generated files and unrelated historical code out of this repository.
+- Install pinned third-party binaries under `.deps/`; never commit that directory
+  or hard-code a Python/Conda package path in CMake.
 - Keep build, run, maintenance, and development helper scripts in `scripts/`.
 - Keep design documents and their diagram sources/assets in `docs/`.
 - Do not copy black and blackW implementations into separate source trees; use

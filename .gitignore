@@ -1,6 +1,7 @@
 /build/
 /cmake-build-*/
 /compile_commands.json
+/.deps/
 __pycache__/
 *.py[cod]
 .vscode/
