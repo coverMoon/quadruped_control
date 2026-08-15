@@ -97,29 +97,35 @@ void expect_state_close(
     }
 }
 
-void test_deterministic_run()
+void test_deterministic_across_resets()
 {
-    auto first = qtest::create_ready(kBlackScenePath, 1);
-    auto second = qtest::create_ready(kBlackScenePath, 1);
-    if (!first.ok() || !second.ok())
+    auto created = qtest::create_ready(kBlackScenePath, 1);
+    if (!created.ok())
     {
         return;
     }
+    qm::MujocoRobotIO& io = *created.io;
 
-    auto frame = make_impedance_command(1);
-    qtest::expect(first.io->submit(frame) == qc::RobotIOCode::Ok, "第一次运行提交命令");
-    qtest::expect(second.io->submit(frame) == qc::RobotIOCode::Ok, "第二次运行提交命令");
+    auto first_frame = make_impedance_command(1);
+    qtest::expect(io.submit(first_frame) == qc::RobotIOCode::Ok, "首次 reset 后提交命令");
 
     constexpr std::size_t kSteps = 50;
-    qtest::expect(run_steps(*first.io, kSteps), "第一次运行推进");
-    qtest::expect(run_steps(*second.io, kSteps), "第二次运行推进");
+    qtest::expect(run_steps(io, kSteps), "首次 reset 后推进");
 
     qc::StateFrame first_state;
-    qc::StateFrame second_state;
-    qtest::expect(first.io->read_latest(first_state) == qc::RobotIOCode::Ok, "第一次运行读取状态");
-    qtest::expect(second.io->read_latest(second_state) == qc::RobotIOCode::Ok, "第二次运行读取状态");
+    qtest::expect(io.read_latest(first_state) == qc::RobotIOCode::Ok, "首次运行读取状态");
 
-    expect_state_close(second_state, first_state, "两次独立运行");
+    qtest::expect(io.reset(2).ok(), "同一后端第二次 reset");
+
+    auto second_frame = make_impedance_command(1);
+    second_frame.header.session_id = 2;
+    qtest::expect(io.submit(second_frame) == qc::RobotIOCode::Ok, "第二次 reset 后提交命令");
+    qtest::expect(run_steps(io, kSteps), "第二次 reset 后推进");
+
+    qc::StateFrame second_state;
+    qtest::expect(io.read_latest(second_state) == qc::RobotIOCode::Ok, "第二次运行读取状态");
+
+    expect_state_close(second_state, first_state, "同一后端两次 reset");
 }
 
 void test_damping_does_not_accelerate()
@@ -160,51 +166,14 @@ void test_damping_does_not_accelerate()
         const int qvel_address = reference.model->joint_mappings()[i].qvel_address;
         const double after = io.raw_data()->qvel[qvel_address];
         qtest::expect(
-            after <= kInitialVelocity + kDeterminismTolerance,
-            "Damping 不会使正向速度加速");
+            std::abs(after) <= std::abs(kInitialVelocity) + kDeterminismTolerance,
+            "Damping 不会增大速度幅值");
         const int actuator_id = reference.model->joint_mappings()[i].actuator_id;
         qtest::expect_close(
             io.raw_data()->ctrl[actuator_id],
             -kDampingKd * kInitialVelocity,
             kDeterminismTolerance,
             "Damping 力矩方向与速度相反");
-    }
-}
-
-void run_impedance_direction_check(
-    const qm::MujocoModel& reference,
-    const double delta,
-    const std::string& direction)
-{
-    auto created = qtest::create_ready(kBlackScenePath, 1);
-    if (!created.ok())
-    {
-        return;
-    }
-    qm::MujocoRobotIO& io = *created.io;
-
-    constexpr double kKp = 50.0;
-    auto frame = qtest::make_command(1, qc::ControlMode::JointImpedance);
-    double before[12] = {};
-    for (std::size_t i = 0; i < qtest::make_black_model().joint_count; ++i)
-    {
-        const int qpos_address = reference.joint_mappings()[i].qpos_address;
-        before[i] = io.raw_data()->qpos[qpos_address];
-        frame.joints[i].kp = kKp;
-        frame.joints[i].target_position = before[i] + delta;
-    }
-
-    qtest::expect(io.submit(frame) == qc::RobotIOCode::Ok, direction + "目标命令提交");
-    qtest::expect(io.step() == qc::RobotIOCode::Ok, direction + "目标单步");
-
-    for (std::size_t i = 0; i < qtest::make_black_model().joint_count; ++i)
-    {
-        const int qpos_address = reference.joint_mappings()[i].qpos_address;
-        const double after = io.raw_data()->qpos[qpos_address];
-        const double change = after - before[i];
-        qtest::expect(
-            change * delta >= -1e-9,
-            direction + "阻抗方向与目标偏移一致");
     }
 }
 
@@ -217,9 +186,48 @@ void test_joint_impedance_direction()
         return;
     }
 
-    // 正负目标分别从初始姿态独立运行，避免惯性干扰单步方向判断。
-    run_impedance_direction_check(*reference.model, 0.1, "正向");
-    run_impedance_direction_check(*reference.model, -0.1, "负向");
+    auto positive = qtest::create_ready(kBlackScenePath, 1);
+    auto negative = qtest::create_ready(kBlackScenePath, 1);
+    if (!positive.ok() || !negative.ok())
+    {
+        return;
+    }
+
+    constexpr double kKp = 50.0;
+    constexpr double kDelta = 0.1;
+    auto positive_frame = qtest::make_command(1, qc::ControlMode::JointImpedance);
+    auto negative_frame = qtest::make_command(1, qc::ControlMode::JointImpedance);
+    for (std::size_t i = 0; i < qtest::make_black_model().joint_count; ++i)
+    {
+        const int qpos_address = reference.model->joint_mappings()[i].qpos_address;
+        const double position = positive.io->raw_data()->qpos[qpos_address];
+        positive_frame.joints[i].kp = kKp;
+        positive_frame.joints[i].target_position = position + kDelta;
+        negative_frame.joints[i].kp = kKp;
+        negative_frame.joints[i].target_position = position - kDelta;
+    }
+
+    qtest::expect(positive.io->submit(positive_frame) == qc::RobotIOCode::Ok, "正向目标提交");
+    qtest::expect(negative.io->submit(negative_frame) == qc::RobotIOCode::Ok, "负向目标提交");
+    qtest::expect(positive.io->step() == qc::RobotIOCode::Ok, "正向目标单步");
+    qtest::expect(negative.io->step() == qc::RobotIOCode::Ok, "负向目标单步");
+
+    for (std::size_t i = 0; i < qtest::make_black_model().joint_count; ++i)
+    {
+        const int qpos_address = reference.model->joint_mappings()[i].qpos_address;
+        const int actuator_id = reference.model->joint_mappings()[i].actuator_id;
+        const double positive_after = positive.io->raw_data()->qpos[qpos_address];
+        const double negative_after = negative.io->raw_data()->qpos[qpos_address];
+        qtest::expect(
+            positive_after > negative_after - 1e-9,
+            "正向目标最终位置大于负向目标");
+        qtest::expect(
+            positive.io->raw_data()->ctrl[actuator_id] > 0.0,
+            "正向目标产生正力矩");
+        qtest::expect(
+            negative.io->raw_data()->ctrl[actuator_id] < 0.0,
+            "负向目标产生负力矩");
+    }
 }
 
 void test_long_run_stays_finite()
@@ -270,7 +278,7 @@ void test_long_run_stays_finite()
 
 int main()
 {
-    test_deterministic_run();
+    test_deterministic_across_resets();
     test_damping_does_not_accelerate();
     test_joint_impedance_direction();
     test_long_run_stays_finite();
