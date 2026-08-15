@@ -72,6 +72,8 @@ ctest --test-dir build/default --output-on-failure
 
 ```text
 quadruped_control/
+├── assets/
+│   └── robots/black/mujoco/          固定版本的仿真模型和网格
 ├── cmake/                            CMake 依赖查找模块
 ├── configs/
 │   └── robots/                       机器人结构配置
@@ -98,6 +100,7 @@ compile_commands.json                  指向编译数据库的符号链接
 ## 文件存放规则
 
 - 仓库根目录只放工程级说明和构建入口，不在根目录堆放模块源码或零散脚本。
+- `assets/robots/` 放固定版本的仿真模型和网格，并附来源说明；不存放构建产物。
 - `cmake/` 放自定义依赖查找模块，不放业务源码。
 - `core/include/quadruped/core/` 只放其他模块可以使用的公共头文件。公共头文件不能引入 ROS 2、Torch、MuJoCo 或电机 SDK。
 - `core/src/` 放核心库的实现，不把只在一个 `.cpp` 中使用的辅助函数暴露到公共头文件。

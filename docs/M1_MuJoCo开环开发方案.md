@@ -34,11 +34,12 @@ M1 固定使用资产仓库中的 black MuJoCo 模型：
 网格目录：../URDF/mujoco/black/assets/
 ```
 
-文件校验值：
+文件校验值（本仓库 `assets/robots/black/mujoco/` 内的文件；`black_description.xml`
+在导入时清理了行尾空白，因此与源提交的 `ea3eb8e1…` 不同，模型语义不变）：
 
 ```text
 black_description.xml
-SHA-256 ea3eb8e10dfe7dbc779ac8e1db0aab3fb12ce7e6aae6fa27a08ed1ad42cebd0d
+SHA-256 688e67eb9f3b04b3cb6bf7304ca977859828ec7ee214c0223b7241545e3c1539
 
 scene.xml
 SHA-256 1e83bd6a0e1f2c9bcfbd4240ba3c0a541e7ff436859572caedc3d4bdc2242431
