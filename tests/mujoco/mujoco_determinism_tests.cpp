@@ -195,6 +195,7 @@ void test_joint_impedance_direction()
 
     constexpr double kKp = 50.0;
     constexpr double kDelta = 0.1;
+    constexpr double kMinimumPositionSeparation = 1.0e-9;
     auto positive_frame = qtest::make_command(1, qc::ControlMode::JointImpedance);
     auto negative_frame = qtest::make_command(1, qc::ControlMode::JointImpedance);
     for (std::size_t i = 0; i < qtest::make_black_model().joint_count; ++i)
@@ -219,8 +220,8 @@ void test_joint_impedance_direction()
         const double positive_after = positive.io->raw_data()->qpos[qpos_address];
         const double negative_after = negative.io->raw_data()->qpos[qpos_address];
         qtest::expect(
-            positive_after > negative_after - 1e-9,
-            "正向目标最终位置大于负向目标");
+            positive_after - negative_after > kMinimumPositionSeparation,
+            "正向目标最终位置显著大于负向目标");
         qtest::expect(
             positive.io->raw_data()->ctrl[actuator_id] > 0.0,
             "正向目标产生正力矩");
