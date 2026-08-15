@@ -1,0 +1,116 @@
+/**
+ * @file mujoco_robot_io.hpp
+ * @brief 定义基于 MuJoCo 的 RobotIO 后端，负责 reset 和生成 StateFrame。
+ */
+
+#pragma once
+
+#include "quadruped/backends/mujoco/mujoco_model.hpp"
+#include "quadruped/core/robot_io.hpp"
+#include "quadruped/core/robot_model.hpp"
+#include "quadruped/core/types.hpp"
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+
+namespace quadruped::backends::mujoco
+{
+
+// 基于 MuJoCo 的 RobotIO 后端。
+// 当前阶段（M1-3）只实现 reset 和 StateFrame 生成，不实现命令执行和物理步进；
+// submit() 一律拒绝，将在 M1-4 中被真正的命令校验与力矩计算替换。
+class MujocoRobotIO final : public core::RobotIO
+{
+public:
+    // create() 的返回结果：成功时 io 非空，失败时 error_message 含有可读原因。
+    struct CreateResult
+    {
+        std::unique_ptr<MujocoRobotIO> io{};
+        std::string error_message{};
+
+        [[nodiscard]] bool ok() const noexcept
+        {
+            return io != nullptr;
+        }
+    };
+
+    // reset() 的返回结果：成功时 code 为 Ok，失败时 code 与 error_message 说明原因。
+    struct ResetResult
+    {
+        core::RobotIOCode code{core::RobotIOCode::Fault};
+        std::string error_message{};
+
+        [[nodiscard]] bool ok() const noexcept
+        {
+            return code == core::RobotIOCode::Ok;
+        }
+    };
+
+    MujocoRobotIO(const MujocoRobotIO&) = delete;
+    MujocoRobotIO& operator=(const MujocoRobotIO&) = delete;
+    ~MujocoRobotIO() override = default;
+
+    // 加载场景并按值保存一份 RobotModel 副本，保证生命周期独立于调用方对象。
+    // startup_id 为 0 时拒绝创建；加载失败时返回空 io 和可读原因。
+    static CreateResult create(
+        const std::string& scene_path,
+        const core::RobotModel& robot_model,
+        std::uint64_t startup_id);
+
+    // 重置到 XML 中名为 default_pose 的 keyframe，并生成新会话的第一份 StateFrame。
+    // session_id 必须非零；已建立会话后重复使用同一 session_id 会被拒绝。
+    ResetResult reset(std::uint64_t session_id);
+
+    // RobotIO 接口实现。
+    core::RobotIOCode read_latest(core::StateFrame& frame) override;
+    core::RobotIOCode submit(const core::CommandFrame& frame) override;
+    core::RobotIOStatus status() const noexcept override;
+
+    // 非拥有的 MuJoCo 数据访问，指针生命周期与本对象一致。
+    // 仅用于测试注入异常数据；正式运行代码不得依赖外部直接修改 mjData。
+    mjData* raw_data() noexcept
+    {
+        return model_.raw_data();
+    }
+
+    const mjData* raw_data() const noexcept
+    {
+        return model_.raw_data();
+    }
+
+    // 从当前 mjData 重新生成并发布最新状态，序号使用当前 sequence_ 并自增。
+    // 供 reset 与后续 M1-4 的步进复用；失败时不修改已发布的上一份状态，
+    // 并把后端状态置为 Fault，返回可读原因（空串表示成功）。
+    std::string refresh_latest_state(std::uint64_t session_id);
+
+private:
+    // 只能通过 create() 完成全部检查后构造。
+    MujocoRobotIO(core::RobotModel robot_model, MujocoModel model, std::uint64_t startup_id)
+        : robot_model_(std::move(robot_model)),
+          model_(std::move(model)),
+          startup_id_(startup_id)
+    {
+        status_.state = core::RobotIOState::Paused;
+    }
+
+    core::RobotModel robot_model_{};
+    MujocoModel model_;
+
+    // 程序每次启动生成的非零标识，写入每帧 header；0 表示尚未初始化。
+    std::uint64_t startup_id_{0};
+
+    // 当前已建立的会话编号；0 表示尚未 reset，此时没有可用状态。
+    std::uint64_t session_id_{0};
+
+    // 下一个待发布帧的序号，会话内单调递增；每次 reset 开始时重置为 1。
+    std::uint64_t sequence_{0};
+
+    core::StateFrame latest_state_{};
+    bool has_state_{false}; // 是否已经生成过至少一份完整状态。
+    bool latest_read_{false}; // 最新状态是否已经被读取过，用于统计丢帧。
+    core::RobotIOStatus status_{};
+};
+
+}  // 命名空间 quadruped::backends::mujoco

@@ -9,6 +9,7 @@
 
 #include <filesystem>
 #include <string>
+#include <system_error>
 #include <utility>
 
 namespace quadruped::backends::mujoco
@@ -178,7 +179,15 @@ LoadResult MujocoModel::load(const std::string& scene_path, const core::RobotMod
     LoadResult result;
 
     // 先检查路径存在，把文件缺失和 XML 解析错误分开报告。
-    if (!std::filesystem::exists(scene_path))
+    // 使用带 std::error_code 的重载，避免底层文件系统错误抛出异常。
+    std::error_code path_error;
+    const bool path_exists = std::filesystem::exists(scene_path, path_error);
+    if (path_error)
+    {
+        result.error_message = "cannot check scene file path: " + path_error.message();
+        return result;
+    }
+    if (!path_exists)
     {
         result.error_message = "scene file does not exist: " + scene_path;
         return result;

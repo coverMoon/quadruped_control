@@ -93,8 +93,9 @@ struct LoadResult
 class MujocoModel
 {
 public:
+    // 只允许移动构造，禁止移动赋值，避免已建好的映射被静默替换。
     MujocoModel(MujocoModel&&) noexcept = default;
-    MujocoModel& operator=(MujocoModel&&) noexcept = default;
+    MujocoModel& operator=(MujocoModel&&) = delete;
     MujocoModel(const MujocoModel&) = delete;
     MujocoModel& operator=(const MujocoModel&) = delete;
     ~MujocoModel() = default;

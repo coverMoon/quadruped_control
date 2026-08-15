@@ -3,6 +3,8 @@
 
 add_library(quadruped_mujoco
     src/mujoco_model.cpp
+    src/mujoco_robot_io.cpp
+    src/state_frame_fill.cpp
 )
 
 add_library(quadruped::mujoco ALIAS quadruped_mujoco)
