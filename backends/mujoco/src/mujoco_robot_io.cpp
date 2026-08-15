@@ -5,9 +5,12 @@
 
 #include "quadruped/backends/mujoco/mujoco_robot_io.hpp"
 
+#include "command_validation.hpp"
+#include "joint_control.hpp"
 #include "sim_time.hpp"
 #include "state_frame_fill.hpp"
 
+#include <cmath>
 #include <string>
 #include <utility>
 
@@ -31,6 +34,12 @@ std::string sim_time_error_message(const SimTimeError error)
         break;
     }
     return {};
+}
+
+// 判断当前保存的命令是否仍可用于本步；未保存或已过期均视为无效。
+bool command_is_active(const core::CommandFrame& command, bool has_command, core::Nanoseconds now_ns)
+{
+    return has_command && now_ns <= command.expires_at_ns;
 }
 
 }  // 匿名命名空间
@@ -101,6 +110,11 @@ MujocoRobotIO::ResetResult MujocoRobotIO::reset(const std::uint64_t session_id)
     mj_resetDataKeyframe(model, data, key_id);
     mj_forward(model, data);
 
+    // 新会话必须清除上一会话的命令，防止旧命令跨会话执行。
+    has_command_ = false;
+    latest_command_ = {};
+    status_.latest_command_sequence = 0;
+
     // 每个新会话的状态序号从 1 开始。
     // 刷新失败时恢复原序号，保证当前已建立会话内已发布帧的序号仍然单调。
     const std::uint64_t previous_sequence = sequence_;
@@ -114,7 +128,7 @@ MujocoRobotIO::ResetResult MujocoRobotIO::reset(const std::uint64_t session_id)
     }
 
     session_id_ = session_id;
-    status_.state = core::RobotIOState::Paused;
+    status_.state = core::RobotIOState::Ready;
     result.code = core::RobotIOCode::Ok;
     return result;
 }
@@ -130,13 +144,83 @@ core::RobotIOCode MujocoRobotIO::read_latest(core::StateFrame& frame)
     return core::RobotIOCode::Ok;
 }
 
-core::RobotIOCode MujocoRobotIO::submit(const core::CommandFrame&)
+core::RobotIOCode MujocoRobotIO::submit(const core::CommandFrame& frame)
 {
-    // M1-3 尚未实现命令执行：任何命令都直接拒绝，不保存为已接受命令，
-    // 不修改 latest_command_sequence，也不推进物理仿真。
-    // 该阶段性行为将在 M1-4 中被真正的命令校验与力矩计算替换。
-    ++status_.rejected_command_frames;
-    return core::RobotIOCode::Rejected;
+    if (status_.state == core::RobotIOState::Fault)
+    {
+        ++status_.rejected_command_frames;
+        return core::RobotIOCode::Fault;
+    }
+
+    const auto result = validate_mujoco_command(
+        frame,
+        robot_model_,
+        session_id_,
+        startup_id_,
+        status_.latest_command_sequence,
+        model_.raw_data());
+    if (result.code != core::RobotIOCode::Ok)
+    {
+        ++status_.rejected_command_frames;
+        return result.code;
+    }
+
+    latest_command_ = frame;
+    has_command_ = true;
+    status_.latest_command_sequence = frame.header.sequence;
+    return core::RobotIOCode::Ok;
+}
+
+core::RobotIOCode MujocoRobotIO::step()
+{
+    if (status_.state == core::RobotIOState::Fault)
+    {
+        return core::RobotIOCode::Fault;
+    }
+    if (session_id_ == 0)
+    {
+        return core::RobotIOCode::Rejected;
+    }
+
+    const mjModel* model = model_.raw_model();
+    mjData* data = model_.raw_data();
+    if (model == nullptr || data == nullptr)
+    {
+        status_.state = core::RobotIOState::Fault;
+        return core::RobotIOCode::Fault;
+    }
+
+    core::Nanoseconds now_ns{0};
+    if (const SimTimeError error = seconds_to_nanoseconds(data->time, now_ns);
+        error != SimTimeError::None)
+    {
+        status_.state = core::RobotIOState::Fault;
+        return core::RobotIOCode::Fault;
+    }
+
+    const bool active = command_is_active(latest_command_, has_command_, now_ns);
+    if (const std::string error = apply_joint_commands(data, model_, robot_model_, latest_command_, active);
+        !error.empty())
+    {
+        status_.state = core::RobotIOState::Fault;
+        return core::RobotIOCode::Fault;
+    }
+
+    mj_step(model, data);
+
+    if (const std::string error = refresh_latest_state(session_id_); !error.empty())
+    {
+        status_.state = core::RobotIOState::Fault;
+        return core::RobotIOCode::Fault;
+    }
+
+    // 命令序号仅在成功生成状态后写入 StateFrame，submit 不直接修改上一状态。
+    latest_state_.last_accepted_command_sequence = status_.latest_command_sequence;
+    latest_state_.effective_command_sequence = active ? latest_command_.header.sequence : 0;
+    // 仿真中无内部安全故障时允许主动控制。
+    latest_state_.safety_state = core::SafetyState::ControlEnabled;
+    status_.state = core::RobotIOState::Ready;
+    return core::RobotIOCode::Ok;
 }
 
 core::RobotIOStatus MujocoRobotIO::status() const noexcept

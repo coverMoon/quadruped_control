@@ -68,6 +68,11 @@ public:
     core::RobotIOCode submit(const core::CommandFrame& frame) override;
     core::RobotIOStatus status() const noexcept override;
 
+    // MuJoCo 后端专用的显式单物理步接口。
+    // 应用当前最新有效命令（或 Disabled 回退）、调用一次 mj_step、
+    // 从步进后的 mjData 生成新的 StateFrame。失败时进入 Fault，不发布不完整状态。
+    core::RobotIOCode step();
+
     // 非拥有的 MuJoCo 数据访问，指针生命周期与本对象一致。
     // 仅用于测试注入异常数据；正式运行代码不得依赖外部直接修改 mjData。
     mjData* raw_data() noexcept
@@ -118,6 +123,10 @@ private:
     bool has_state_{false}; // 是否已经生成过至少一份完整状态。
     bool latest_read_{false}; // 最新状态是否已经被读取过，用于统计丢帧。
     core::RobotIOStatus status_{};
+
+    // 最近一次成功 submit 的完整命令；没有成功接受的命令时 has_command_ 为 false。
+    core::CommandFrame latest_command_{};
+    bool has_command_{false};
 };
 
 }  // 命名空间 quadruped::backends::mujoco

@@ -249,7 +249,7 @@ void test_submit_rejected()
     expect(created.io->submit(command) == qc::RobotIOCode::Rejected, "submit 返回 Rejected");
     expect(created.io->status().rejected_command_frames == 1, "rejected_command_frames 加一");
     expect(created.io->status().latest_command_sequence == 0, "latest_command_sequence 保持 0");
-    expect(created.io->status().state == qc::RobotIOState::Paused, "submit 后仍为 Paused");
+    expect(created.io->status().state == qc::RobotIOState::Ready, "submit 后变为 Ready");
 }
 
 }  // 匿名命名空间

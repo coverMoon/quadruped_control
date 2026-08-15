@@ -2,6 +2,8 @@
 # 作用：构建 MuJoCo 后端库，提供模型加载和名称映射。
 
 add_library(quadruped_mujoco
+    src/command_validation.cpp
+    src/joint_control.cpp
     src/mujoco_model.cpp
     src/mujoco_robot_io.cpp
     src/sim_time.cpp
