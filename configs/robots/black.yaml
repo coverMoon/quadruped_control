@@ -1,0 +1,23 @@
+# M0 参考配置；quadruped_core 暂不负责加载 YAML。
+name: black
+model_version: 1
+# 由 `./scripts/generate_id.py model black 1` 生成。
+model_id: 0x008A1E56CD69E8F4
+# 0 表示当前配置用于仿真，不绑定具体实机的零点和传感器标定。
+calibration_id: 0
+joints:
+  # role 是控制系统中的用途，不是 URDF/MJCF 里的源关节类型。
+  - {name: FL_hip_joint,   role: leg, position_limited: true}
+  - {name: FL_thigh_joint, role: leg, position_limited: true}
+  - {name: FL_calf_joint,  role: leg, position_limited: true}
+  - {name: FR_hip_joint,   role: leg, position_limited: true}
+  - {name: FR_thigh_joint, role: leg, position_limited: true}
+  - {name: FR_calf_joint,  role: leg, position_limited: true}
+  - {name: RL_hip_joint,   role: leg, position_limited: true}
+  - {name: RL_thigh_joint, role: leg, position_limited: true}
+  - {name: RL_calf_joint,  role: leg, position_limited: true}
+  - {name: RR_hip_joint,   role: leg, position_limited: true}
+  - {name: RR_thigh_joint, role: leg, position_limited: true}
+  - {name: RR_calf_joint,  role: leg, position_limited: true}
+
+# 位置、速度、力矩和增益限制，将在确定唯一的 MuJoCo 模型和控制器配置后补全。

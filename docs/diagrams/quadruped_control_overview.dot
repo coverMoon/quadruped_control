@@ -1,0 +1,42 @@
+digraph Overview {
+  graph [rankdir=LR, bgcolor="white", pad=0.25, nodesep=0.45, ranksep=0.7,
+         splines=ortho, fontname="Noto Sans CJK SC", fontsize=18,
+         label="控制系统总览", labelloc=t, labeljust=l];
+  node [shape=box, style="rounded,filled", fillcolor="white", color="#64748b",
+        fontname="Noto Sans CJK SC", fontsize=12, margin="0.18,0.12"];
+  edge [color="#64748b", fontname="Noto Sans CJK SC", fontsize=10,
+        arrowsize=0.75, penwidth=1.4];
+
+  inputs [label="手柄 / 导航 / 上位机\nROS 2 外围模块", fillcolor="#f8fafc"];
+  motion [label="MotionRuntime\n运动状态机 + RL 策略", fillcolor="#dbeafe",
+          color="#2563eb", penwidth=2];
+  robotio [label="RobotIO\n统一机器人接口", fillcolor="#fef3c7",
+           color="#d97706", penwidth=2];
+
+  subgraph cluster_impl {
+    label="RobotIO 的不同实现（运行时选择一种）";
+    color="#cbd5e1"; style="rounded,dashed";
+    real [label="真实机器人", fillcolor="#dcfce7", color="#16a34a"];
+    sim [label="MuJoCo 仿真", fillcolor="#ede9fe", color="#7c3aed"];
+    replay [label="日志回放", fillcolor="#f1f5f9"];
+    test [label="假数据测试", fillcolor="#f1f5f9"];
+  }
+
+  hardware [label="Motor + IMU", shape=cylinder, fillcolor="#fee2e2",
+            color="#dc2626"];
+  tools [label="日志 / RViz / UI\n姿态镜像 / 影子仿真",
+         style="rounded,filled,dashed", fillcolor="#f8fafc"];
+
+  inputs -> motion [label="机体命令 / 模式请求"];
+  motion -> robotio [dir=both, label="关节命令 / 机器人状态",
+                     color="#2563eb", fontcolor="#1d4ed8"];
+  robotio -> real;
+  robotio -> sim;
+  robotio -> replay;
+  robotio -> test;
+  real -> hardware [dir=both, color="#dc2626"];
+  real -> tools [style=dashed, label="只读副本"];
+  sim -> tools [style=dashed, label="只读副本"];
+
+  {rank=same; real; sim; replay; test;}
+}

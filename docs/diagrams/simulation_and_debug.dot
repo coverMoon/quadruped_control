@@ -1,0 +1,45 @@
+digraph SimulationDebug {
+  graph [rankdir=LR, bgcolor="white", pad=0.25, nodesep=0.5, ranksep=0.75,
+         splines=ortho, fontname="Noto Sans CJK SC", fontsize=18,
+         label="仿真、回放与实机检查", labelloc=t, labeljust=l];
+  node [shape=box, style="rounded,filled", fillcolor="white", color="#64748b",
+        fontname="Noto Sans CJK SC", fontsize=12, margin="0.18,0.12"];
+  edge [color="#64748b", fontname="Noto Sans CJK SC", fontsize=10,
+        arrowsize=0.75, penwidth=1.4];
+
+  subgraph cluster_mirror {
+    label="1. 实机姿态镜像：检查映射和零点"; color="#bfdbfe"; style="rounded";
+    real_state [label="实机 StateFrame", fillcolor="#dcfce7", color="#16a34a"];
+    mirror [label="姿态镜像程序\n直接设置 qpos / qvel", fillcolor="#f8fafc"];
+    sim_pose [label="MuJoCo 姿态显示", fillcolor="#ede9fe", color="#7c3aed"];
+    real_state -> mirror -> sim_pose;
+  }
+
+  subgraph cluster_shadow {
+    label="2. 影子仿真：比较动态响应"; color="#c4b5fd"; style="rounded";
+    requested [label="MotionRuntime\n请求命令", fillcolor="#dbeafe", color="#2563eb"];
+    runtime [label="RobotRuntime\n安全检查和限幅", fillcolor="#dcfce7", color="#16a34a"];
+    effective [label="实际命令帧", fillcolor="#fef3c7", color="#d97706"];
+    motor [label="真实电机", shape=cylinder, fillcolor="#fee2e2", color="#dc2626"];
+    mujoco [label="MuJoCo", fillcolor="#ede9fe", color="#7c3aed"];
+    compare [label="对比实机与仿真状态", fillcolor="#f8fafc"];
+    requested -> runtime -> effective;
+    effective -> motor;
+    effective -> mujoco;
+    motor -> compare [label="实机状态"];
+    mujoco -> compare [label="仿真状态"];
+  }
+
+  subgraph cluster_replay {
+    label="3. 日志回放：复现问题"; color="#cbd5e1"; style="rounded";
+    log [label="历史 StateFrame", shape=folder, fillcolor="#f1f5f9"];
+    replay [label="回放程序", fillcolor="#f8fafc"];
+    motion2 [label="MotionRuntime", fillcolor="#dbeafe", color="#2563eb"];
+    result [label="记录新 CommandFrame\n与历史结果比较", fillcolor="#f8fafc"];
+    log -> replay -> motion2 -> result;
+  }
+
+  warning [label="所有调试分支只读\n不能取得实机控制权", shape=note,
+           fillcolor="#fff7ed", color="#ea580c"];
+  compare -> warning [style=dashed, arrowhead=none];
+}

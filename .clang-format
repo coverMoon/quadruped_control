@@ -1,0 +1,20 @@
+# 文件：.clang-format
+# 作用：统一仓库内 C/C++ 代码的排版规则。
+
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: c++17
+BreakBeforeBraces: Allman
+ColumnLimit: 100
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+PointerAlignment: Left
+ReferenceAlignment: Left
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+SortIncludes: CaseSensitive
