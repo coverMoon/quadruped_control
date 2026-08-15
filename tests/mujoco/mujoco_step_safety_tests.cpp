@@ -37,11 +37,11 @@ void test_actuator_ctrlrange_clamping()
     }
     qm::MujocoRobotIO& io = *created.io;
 
-    // feedforward=15 超过 black 执行器 ctrlrange [-10, 10]，但不超过 RobotModel max_effort=40。
+    // feedforward=40 在 RobotModel max_effort=40 范围内，但超过 black 执行器 ctrlrange 上限 33.5。
     auto frame = qtest::make_command(1, qc::ControlMode::JointImpedance);
     for (std::size_t i = 0; i < frame.joint_count; ++i)
     {
-        frame.joints[i].feedforward_effort = 15.0;
+        frame.joints[i].feedforward_effort = 40.0;
     }
     qtest::expect(io.submit(frame) == qc::RobotIOCode::Ok, "大前馈命令提交");
     qtest::expect(io.step() == qc::RobotIOCode::Ok, "大前馈单步");
@@ -50,10 +50,9 @@ void test_actuator_ctrlrange_clamping()
     for (std::size_t i = 0; i < qtest::make_black_model().joint_count; ++i)
     {
         const int actuator_id = reference.model->joint_mappings()[i].actuator_id;
-        const double ctrl_min = reference.model->raw_model()->actuator_ctrlrange[2 * actuator_id];
         const double ctrl_max = reference.model->raw_model()->actuator_ctrlrange[2 * actuator_id + 1];
-        qtest::expect(data->ctrl[actuator_id] >= ctrl_min, "控制量不低于 actuator ctrlrange 下限");
-        qtest::expect(data->ctrl[actuator_id] <= ctrl_max, "控制量不高于 actuator ctrlrange 上限");
+        qtest::expect_close(
+            data->ctrl[actuator_id], ctrl_max, 1e-12, "控制量被 actuator ctrlrange 上限限幅");
     }
 }
 
@@ -207,6 +206,74 @@ void test_compute_fault_keeps_last_valid_state()
     qtest::expect(after.header.sequence == before.header.sequence, "上一份状态序号未被覆盖");
 }
 
+void test_nan_without_command_faults()
+{
+    auto reference = qm::MujocoModel::load(kBlackScenePath, qtest::make_black_model());
+    if (!reference.ok())
+    {
+        qtest::expect(false, "参考模型加载失败");
+        return;
+    }
+
+    auto created = qtest::create_ready(kBlackScenePath, 1);
+    if (!created.ok())
+    {
+        return;
+    }
+    qm::MujocoRobotIO& io = *created.io;
+
+    qc::StateFrame before;
+    qtest::expect(io.read_latest(before) == qc::RobotIOCode::Ok, "故障前读取有效状态");
+
+    const int qpos_address = reference.model->joint_mappings()[0].qpos_address;
+    io.raw_data()->qpos[qpos_address] = std::numeric_limits<double>::quiet_NaN();
+    qtest::expect(io.step() == qc::RobotIOCode::Fault, "无命令 NaN 注入后 step 返回 Fault");
+    qtest::expect(io.status().state == qc::RobotIOState::Fault, "后端进入 Fault");
+
+    qc::StateFrame after;
+    qtest::expect(io.read_latest(after) == qc::RobotIOCode::Ok, "Fault 后上一份状态仍可读");
+    qtest::expect(after.header.sequence == before.header.sequence, "无命令时上一份状态序号未被覆盖");
+    qtest::expect(after.header.timestamp_ns == before.header.timestamp_ns, "无命令 Fault 后时间不推进");
+}
+
+void test_nan_with_expired_command_faults()
+{
+    auto reference = qm::MujocoModel::load(kBlackScenePath, qtest::make_black_model());
+    if (!reference.ok())
+    {
+        qtest::expect(false, "参考模型加载失败");
+        return;
+    }
+
+    auto created = qtest::create_ready(kBlackScenePath, 1);
+    if (!created.ok())
+    {
+        return;
+    }
+    qm::MujocoRobotIO& io = *created.io;
+
+    // 有效期 1 ns：第一步使用命令，第二步已过期，此时注入 NaN 必须被检测到。
+    auto frame = qtest::make_command(1, qc::ControlMode::JointImpedance, 0, 1);
+    for (std::size_t i = 0; i < frame.joint_count; ++i)
+    {
+        frame.joints[i].feedforward_effort = 1.0;
+    }
+    qtest::expect(io.submit(frame) == qc::RobotIOCode::Ok, "过期故障测试命令提交");
+    qtest::expect(io.step() == qc::RobotIOCode::Ok, "过期故障测试第一步");
+
+    qc::StateFrame before;
+    qtest::expect(io.read_latest(before) == qc::RobotIOCode::Ok, "故障前读取有效状态");
+
+    const int qpos_address = reference.model->joint_mappings()[0].qpos_address;
+    io.raw_data()->qpos[qpos_address] = std::numeric_limits<double>::quiet_NaN();
+    qtest::expect(io.step() == qc::RobotIOCode::Fault, "过期命令 NaN 注入后 step 返回 Fault");
+    qtest::expect(io.status().state == qc::RobotIOState::Fault, "后端进入 Fault");
+
+    qc::StateFrame after;
+    qtest::expect(io.read_latest(after) == qc::RobotIOCode::Ok, "Fault 后上一份状态仍可读");
+    qtest::expect(after.header.sequence == before.header.sequence, "过期命令时上一份状态序号未被覆盖");
+}
+
 }  // namespace
 
 int main()
@@ -216,6 +283,8 @@ int main()
     test_expired_command_falls_back_to_disabled();
     test_new_session_clears_old_command();
     test_compute_fault_keeps_last_valid_state();
+    test_nan_without_command_faults();
+    test_nan_with_expired_command_faults();
 
     if (qtest::failures != 0)
     {

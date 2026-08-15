@@ -22,6 +22,22 @@ constexpr double kInt64ExclusiveBoundNs = 9223372036854775808.0;
 
 }  // 匿名命名空间
 
+std::string sim_time_error_message(const SimTimeError error)
+{
+    switch (error)
+    {
+    case SimTimeError::NonFinite:
+        return "MuJoCo simulation time is not finite";
+    case SimTimeError::Negative:
+        return "MuJoCo simulation time is negative";
+    case SimTimeError::Overflow:
+        return "MuJoCo simulation time exceeds the int64 nanosecond range";
+    case SimTimeError::None:
+        break;
+    }
+    return {};
+}
+
 SimTimeError seconds_to_nanoseconds(const double seconds, core::Nanoseconds& out_ns)
 {
     // NaN 与任何比较都为 false，因此必须先显式拒绝非有限输入，

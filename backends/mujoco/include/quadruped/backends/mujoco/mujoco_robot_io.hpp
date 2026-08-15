@@ -19,8 +19,7 @@ namespace quadruped::backends::mujoco
 {
 
 // 基于 MuJoCo 的 RobotIO 后端。
-// 当前阶段（M1-3）只实现 reset 和 StateFrame 生成，不实现命令执行和物理步进；
-// submit() 一律拒绝，将在 M1-4 中被真正的命令校验与力矩计算替换。
+// 当前阶段（M1-4）实现 reset、StateFrame 生成、命令校验与显式单物理步进。
 class MujocoRobotIO final : public core::RobotIO
 {
 public:

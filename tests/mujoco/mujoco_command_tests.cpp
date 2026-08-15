@@ -189,6 +189,23 @@ void test_rejected_counter_accurate()
     qtest::expect(created.io->status().rejected_command_frames == 3, "连续拒绝计数正确");
 }
 
+void test_internal_fault_does_not_count_as_rejected()
+{
+    auto created = qtest::create_ready(kBlackScenePath, 1);
+    if (!created.ok())
+    {
+        return;
+    }
+    qtest::expect(created.io->status().rejected_command_frames == 0, "初始拒绝计数为 0");
+
+    // 注入非法仿真时间，使 validate_mujoco_command 返回 Fault。
+    created.io->raw_data()->time = std::numeric_limits<double>::quiet_NaN();
+    auto frame = qtest::make_command(1, qc::ControlMode::Damping);
+    qtest::expect(created.io->submit(frame) == qc::RobotIOCode::Fault, "仿真时间 NaN 返回 Fault");
+    qtest::expect(created.io->status().state == qc::RobotIOState::Fault, "后端进入 Fault");
+    qtest::expect(created.io->status().rejected_command_frames == 0, "内部故障不计入拒绝计数");
+}
+
 }  // namespace
 
 int main()
@@ -203,6 +220,7 @@ int main()
     test_submit_rejects_nan_and_invalid_mode();
     test_rejected_command_does_not_replace_valid();
     test_rejected_counter_accurate();
+    test_internal_fault_does_not_count_as_rejected();
 
     if (qtest::failures != 0)
     {

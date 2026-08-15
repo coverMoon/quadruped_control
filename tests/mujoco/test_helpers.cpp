@@ -27,6 +27,13 @@ void expect_close(
     const double tolerance,
     const std::string& description)
 {
+    if (!std::isfinite(actual) || !std::isfinite(expected) ||
+        !std::isfinite(tolerance) || tolerance < 0.0)
+    {
+        std::cerr << "FAIL: " << description << "（实际/期望/容差包含非有限值）\n";
+        ++failures;
+        return;
+    }
     if (std::abs(actual - expected) > tolerance)
     {
         std::cerr << "FAIL: " << description << "（期望 " << expected

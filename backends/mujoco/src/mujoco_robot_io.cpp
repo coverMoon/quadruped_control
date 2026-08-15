@@ -19,23 +19,6 @@ namespace quadruped::backends::mujoco
 namespace
 {
 
-// 把时间转换失败分类映射为可读错误文本。
-std::string sim_time_error_message(const SimTimeError error)
-{
-    switch (error)
-    {
-    case SimTimeError::NonFinite:
-        return "MuJoCo simulation time is not finite";
-    case SimTimeError::Negative:
-        return "MuJoCo simulation time is negative";
-    case SimTimeError::Overflow:
-        return "MuJoCo simulation time exceeds the int64 nanosecond range";
-    case SimTimeError::None:
-        break;
-    }
-    return {};
-}
-
 // 判断当前保存的命令是否仍可用于本步；未保存或已过期均视为无效。
 bool command_is_active(const core::CommandFrame& command, bool has_command, core::Nanoseconds now_ns)
 {
@@ -148,6 +131,7 @@ core::RobotIOCode MujocoRobotIO::submit(const core::CommandFrame& frame)
 {
     if (status_.state == core::RobotIOState::Fault)
     {
+        // 后端已处于 Fault 时再次提交属于运行状态不允许，计入拒绝计数。
         ++status_.rejected_command_frames;
         return core::RobotIOCode::Fault;
     }
@@ -161,7 +145,16 @@ core::RobotIOCode MujocoRobotIO::submit(const core::CommandFrame& frame)
         model_.raw_data());
     if (result.code != core::RobotIOCode::Ok)
     {
-        ++status_.rejected_command_frames;
+        // 内部故障（mjData 不可用、仿真时间转换失败等）锁存 Fault 状态，
+        // 不计入因校验或过期导致的拒绝计数。
+        if (result.code == core::RobotIOCode::Fault)
+        {
+            status_.state = core::RobotIOState::Fault;
+        }
+        else
+        {
+            ++status_.rejected_command_frames;
+        }
         return result.code;
     }
 
@@ -265,6 +258,8 @@ std::string MujocoRobotIO::refresh_latest_state(const std::uint64_t session_id)
     frame.header.calibration_id = robot_model_.calibration_id;
     frame.joint_count = robot_model_.joint_count;
     // M1-3 没有主动命令和物理步进，安全状态固定为阻尼。
+    // reset 时还没有主动命令，安全状态固定为阻尼；
+    // step() 成功后会根据实际命令使用情况覆盖该字段。
     frame.safety_state = core::SafetyState::Damping;
     frame.last_accepted_command_sequence = 0;
     frame.effective_command_sequence = 0;

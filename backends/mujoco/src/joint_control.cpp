@@ -73,11 +73,6 @@ std::string apply_joint_commands(
         data->ctrl[i] = 0.0;
     }
 
-    if (!command_active)
-    {
-        return {};
-    }
-
     for (std::size_t i = 0; i < robot_model.joint_count; ++i)
     {
         const auto& mapping = model.joint_mappings()[i];
@@ -89,12 +84,19 @@ std::string apply_joint_commands(
                 robot_model.joints[i].name + "\"";
         }
 
+        // 无论命令是否有效，步进前都必须检查关节状态有限，防止无命令或过期回退时
+        // 把 NaN/Inf 状态交给 mj_step 处理。
         const double position = data->qpos[mapping.qpos_address];
         const double velocity = data->qvel[mapping.qvel_address];
         if (!std::isfinite(position) || !std::isfinite(velocity))
         {
             return "joint state is not finite for joint \"" +
                 robot_model.joints[i].name + "\"";
+        }
+
+        if (!command_active)
+        {
+            continue;
         }
 
         double effort = compute_joint_effort(command.joints[i], position, velocity);

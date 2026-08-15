@@ -7,6 +7,8 @@
 
 #include "quadruped/core/types.hpp"
 
+#include <string>
+
 namespace quadruped::backends::mujoco
 {
 
@@ -23,5 +25,8 @@ enum class SimTimeError
 // 返回 SimTimeError::None 时 out_ns 被写入；任何失败都不会修改 out_ns，
 // 也保证不会发生越界 llround 或未定义行为。
 SimTimeError seconds_to_nanoseconds(double seconds, core::Nanoseconds& out_ns);
+
+// 返回 SimTimeError 的可读描述；None 时返回空串。
+std::string sim_time_error_message(SimTimeError error);
 
 }  // 命名空间 quadruped::backends::mujoco
