@@ -1,6 +1,6 @@
 /**
  * @file mujoco_robot_io.hpp
- * @brief 定义基于 MuJoCo 的 RobotIO 后端，负责 reset 和生成 StateFrame。
+ * @brief 定义基于 MuJoCo 的 RobotIO 后端，负责 reset、命令执行、物理步进和 StateFrame 生成。
  */
 
 #pragma once

@@ -17,7 +17,10 @@
 - `tests/mujoco/` 中的 MuJoCo 自动测试，覆盖状态生成、命令校验、三种控制模式、安全路径和可重复性；
 - `apps/mujoco_headless/` 中的最小无界面运行入口。
 
-核心库 `core/` 不依赖 ROS 2、Torch、MuJoCo 或电机 SDK。所有 MuJoCo 类型和路径只在 `backends/mujoco/`、`apps/mujoco_headless/` 和 `tests/mujoco/` 中出现。
+核心库 `core/` 不依赖 ROS 2、Torch、MuJoCo 或电机 SDK。MuJoCo C++ API 类型
+只存在于 MuJoCo 后端 `backends/mujoco/` 及其直接使用方 `apps/mujoco_headless/`
+和 `tests/mujoco/` 中；依赖查找、安装脚本和模型资产分别放在 `cmake/`、
+`scripts/` 和 `assets/` 中。
 
 ## 当前阶段
 
