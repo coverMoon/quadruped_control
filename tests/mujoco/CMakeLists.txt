@@ -33,6 +33,10 @@ add_executable(quadruped_mujoco_step_safety_tests
     mujoco_step_safety_tests.cpp
 )
 
+add_executable(quadruped_mujoco_determinism_tests
+    mujoco_determinism_tests.cpp
+)
+
 # 测试共用辅助函数，只在本目录使用。
 add_library(quadruped_mujoco_test_helpers STATIC
     test_helpers.cpp
@@ -46,7 +50,7 @@ set(QUADRUPED_TEST_COMPILE_DEFS
     QUADRUPED_MUJOCO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
 )
 
-foreach(target quadruped_mujoco_tests quadruped_mujoco_state_tests quadruped_mujoco_fault_tests quadruped_mujoco_time_tests quadruped_mujoco_command_tests quadruped_mujoco_step_tests quadruped_mujoco_step_state_tests quadruped_mujoco_step_safety_tests)
+foreach(target quadruped_mujoco_tests quadruped_mujoco_state_tests quadruped_mujoco_fault_tests quadruped_mujoco_time_tests quadruped_mujoco_command_tests quadruped_mujoco_step_tests quadruped_mujoco_step_state_tests quadruped_mujoco_step_safety_tests quadruped_mujoco_determinism_tests)
     target_link_libraries(${target} PRIVATE quadruped::mujoco quadruped_mujoco_test_helpers)
     target_compile_features(${target} PRIVATE cxx_std_17)
     target_compile_definitions(${target} PRIVATE ${QUADRUPED_TEST_COMPILE_DEFS})
