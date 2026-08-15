@@ -23,6 +23,8 @@ if(QUADRUPED_ENABLE_MUJOCO)
     add_subdirectory(backends/mujoco)
 endif()
 
+add_subdirectory(apps)
+
 include(CTest)
 if(BUILD_TESTING)
     add_subdirectory(tests)
