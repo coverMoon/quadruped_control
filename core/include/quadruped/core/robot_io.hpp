@@ -60,7 +60,7 @@ public:
     virtual RobotIOCode read_latest(StateFrame& frame) = 0;
 
     // 提交一份完整命令。更新的有效命令可以覆盖尚未执行的旧命令；实现必须在使用前
-    // 检查模型、会话、序号、有效期和数值范围。
+    // 检查关节数量与限制、会话、序号、有效期和数值范围。
     virtual RobotIOCode submit(const CommandFrame& frame) = 0;
 
     // 返回无需阻塞即可取得的后端状态快照。

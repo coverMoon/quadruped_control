@@ -46,8 +46,6 @@ inline std::string make_robot_yaml()
 {
     std::string yaml =
         "name: test_quadruped\n"
-        "model_id: 0x1234\n"
-        "calibration_id: 0\n"
         "joints:\n";
     constexpr const char* names[2] = {"joint_a", "joint_b"};
     for (const char* name : names)

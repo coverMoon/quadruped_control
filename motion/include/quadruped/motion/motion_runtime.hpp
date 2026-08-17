@@ -197,10 +197,6 @@ private:
     std::uint64_t startup_id_{0};
     std::uint64_t session_id_{0};
 
-    // 本帧 CommandFrame 使用的执行侧标识，随最新状态更新。
-    std::uint64_t command_model_id_{0};
-    std::uint64_t command_calibration_id_{0};
-
     // 会话内单调递增的命令序号；新会话从 1 重新开始。
     std::uint64_t command_sequence_{0};
 

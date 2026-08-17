@@ -33,8 +33,6 @@ qc::RobotModel make_model()
     // 再由单个用例只修改待验证字段。
     qc::RobotModel model;
     model.name = "test_quadruped";
-    model.model_id = 0x1234;
-    model.calibration_id = 0x42;
     model.joint_count = 12;
 
     constexpr const char* names[12] = {
@@ -69,22 +67,20 @@ qc::RobotModel make_model()
     return model;
 }
 
-qc::FrameHeader make_header(const qc::RobotModel& model, qc::Nanoseconds timestamp_ns)
+qc::FrameHeader make_header(qc::Nanoseconds timestamp_ns)
 {
     qc::FrameHeader header;
     header.startup_id = 1;
     header.session_id = 2;
     header.sequence = 3;
     header.timestamp_ns = timestamp_ns;
-    header.model_id = model.model_id;
-    header.calibration_id = model.calibration_id;
     return header;
 }
 
 qc::StateFrame make_state(const qc::RobotModel& model, qc::Nanoseconds timestamp_ns)
 {
     qc::StateFrame frame;
-    frame.header = make_header(model, timestamp_ns);
+    frame.header = make_header(timestamp_ns);
     frame.joint_count = model.joint_count;
     for (std::size_t i = 0; i < frame.joint_count; ++i)
     {
@@ -98,7 +94,7 @@ qc::StateFrame make_state(const qc::RobotModel& model, qc::Nanoseconds timestamp
 qc::CommandFrame make_command(const qc::RobotModel& model, qc::Nanoseconds timestamp_ns)
 {
     qc::CommandFrame frame;
-    frame.header = make_header(model, timestamp_ns);
+    frame.header = make_header(timestamp_ns);
     // 测试命令默认在生成后的 5 ms 内有效。
     frame.expires_at_ns = timestamp_ns + 5'000'000;
     frame.joint_count = model.joint_count;
@@ -168,12 +164,6 @@ void test_state_frame()
     expect(
         qc::validate(frame, model, 1'000).error == qc::ValidationError::InvalidTimestamp,
         "StateFrame from the future is rejected");
-
-    frame = make_state(model, 1'000);
-    frame.header.model_id += 1;
-    expect(
-        qc::validate(frame, model, 1'000).error == qc::ValidationError::ModelMismatch,
-        "StateFrame for another model is rejected");
 
     frame = make_state(model, 1'000);
     frame.joints[5].velocity = std::numeric_limits<double>::quiet_NaN();

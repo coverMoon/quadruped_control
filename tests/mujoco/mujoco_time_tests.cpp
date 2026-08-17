@@ -35,7 +35,6 @@ qc::RobotModel make_black_model()
 {
     qc::RobotModel model;
     model.name = "black";
-    model.model_id = 0x008A1E56CD69E8F4;
     model.joint_count = 12;
     constexpr const char* names[12] = {
         "FL_hip_joint", "FL_thigh_joint", "FL_calf_joint",

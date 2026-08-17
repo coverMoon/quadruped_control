@@ -63,7 +63,7 @@ void expect_getup_command_fields(const motion_test::FakeRobotIO& io)
         "起立目标速度和前馈力矩应为 0");
 }
 
-// 初始 Passive 应提交显式 Disabled 命令，并复制执行侧的会话和模型标识。
+// 初始 Passive 应提交显式 Disabled 命令，并复制执行侧的启动与会话标识。
 void test_initial_passive()
 {
     auto created = motion_test::make_runtime();
@@ -84,7 +84,6 @@ void test_initial_passive()
     const auto& command = io.submitted.back();
     expect(command.header.startup_id == 1, "命令应复制执行侧 startup_id");
     expect(command.header.session_id == 1, "命令应复制执行侧 session_id");
-    expect(command.header.model_id == model.model_id, "命令应复制执行侧 model_id");
     expect(command.header.sequence == 1, "新会话命令序号应从 1 开始");
     expect(command.expires_at_ns == 10'000'000, "命令有效期应为 now 加 10 ms");
     expect(command.joint_count == model.joint_count, "命令关节数应与模型一致");

@@ -21,7 +21,6 @@ void test_load_real_configs()
         return;
     }
     expect(robot.model.name == "black", "black 配置名称应为 black");
-    expect(robot.model.model_id == 0x008A1E56CD69E8F4, "black model_id 应保持稳定");
     expect(robot.model.joint_count == 12, "black 应有 12 个关节");
     expect(robot.model.joints[0].name == "FL_hip_joint", "第一个关节应为 FL_hip_joint");
     expect(robot.model.joints[11].name == "RR_calf_joint", "最后一个关节应为 RR_calf_joint");
@@ -32,42 +31,7 @@ void test_load_real_configs()
     expect(robot.model.joints[0].limits.max_kp == 100.0, "black KP 上限应为 100");
 }
 
-// 加载 model_id 为指定字面量的最小配置，返回解析结果；失败时记录断言并返回 0。
-std::uint64_t load_model_id_literal(const std::string& literal, const std::string& description)
-{
-    std::string yaml = config_test::make_robot_yaml();
-    const auto pos = yaml.find("model_id: 0x1234");
-    yaml.replace(pos, std::strlen("model_id: 0x1234"), "model_id: " + literal);
-    const auto result = quadruped::config::load_robot_model(
-        config_test::write_temp_config("qc_id_literal.yaml", yaml));
-    expect(result.ok(), description + "（应加载成功）");
-    return result.ok() ? result.model.model_id : 0;
-}
-
-// 严格无符号整数字面量：前导零按十进制，仅 0x/0X 前缀按十六进制。
-void test_model_id_literals()
-{
-    expect(load_model_id_literal("010", "前导零的十进制") == 10,
-        "model_id: 010 应解析为十进制 10");
-    expect(load_model_id_literal("08", "前导零且含 8 的十进制") == 8,
-        "model_id: 08 应解析为十进制 8");
-    expect(load_model_id_literal("0x10", "0x 前缀十六进制") == 16,
-        "model_id: 0x10 应解析为十六进制 16");
-    expect(load_model_id_literal("0X1A", "0X 前缀十六进制") == 26,
-        "model_id: 0X1A 应解析为十六进制 26");
-
-    config_test::expect_robot_rejected(
-        {"qc_robot_space_neg.yaml", "model_id: 0x1234", "model_id: \" -1\"",
-            "带前导空白的负数 model_id 应拒绝"});
-    config_test::expect_robot_rejected(
-        {"qc_robot_hex_space.yaml", "model_id: 0x1234", "model_id: \"0x 10\"",
-            "十六进制数字部分带空格应拒绝"});
-    config_test::expect_robot_rejected(
-        {"qc_robot_hex_tab.yaml", "model_id: 0x1234", "model_id: \"0x\\t10\"",
-            "十六进制数字部分带 Tab 应拒绝"});
-}
-
-// 缺字段、未知角色、非法和负数 model_id 等标量字段错误应拒绝加载。
+// 缺字段和未知角色等标量字段错误应拒绝加载。
 void test_robot_rejections_scalars()
 {
     const auto missing = quadruped::config::load_robot_model("qc_no_such_file.yaml");
@@ -77,15 +41,6 @@ void test_robot_rejections_scalars()
         {"qc_robot_missing_kp.yaml", ", max_kp: 100.0", "", "缺少 max_kp 字段应拒绝"});
     config_test::expect_robot_rejected(
         {"qc_robot_bad_role.yaml", "role: leg", "role: wing", "未知关节角色应拒绝"});
-    config_test::expect_robot_rejected(
-        {"qc_robot_bad_id.yaml", "model_id: 0x1234", "model_id: black",
-            "非数值 model_id 应拒绝"});
-    config_test::expect_robot_rejected(
-        {"qc_robot_neg_id.yaml", "model_id: 0x1234", "model_id: -1",
-            "负数 model_id 应拒绝"});
-    config_test::expect_robot_rejected(
-        {"qc_robot_neg_calib.yaml", "calibration_id: 0", "calibration_id: -1",
-            "负数 calibration_id 应拒绝"});
 }
 
 // 关节名称、有限值和范围等结构错误应拒绝加载。
@@ -118,7 +73,6 @@ void test_root_node_rejections()
 int main()
 {
     test_load_real_configs();
-    test_model_id_literals();
     test_robot_rejections_scalars();
     test_robot_rejections_structure();
     test_root_node_rejections();

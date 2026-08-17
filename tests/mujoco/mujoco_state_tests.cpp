@@ -51,7 +51,6 @@ qc::RobotModel make_black_model()
 {
     qc::RobotModel model;
     model.name = "black";
-    model.model_id = 0x008A1E56CD69E8F4;
     model.joint_count = 12;
     constexpr const char* names[12] = {
         "FL_hip_joint", "FL_thigh_joint", "FL_calf_joint",
@@ -69,13 +68,13 @@ qc::RobotModel make_black_model()
 }
 
 // 校验 header 的关键字段。
-void verify_header(const qc::StateFrame& frame, const qc::RobotModel& robot,
-    const std::uint64_t startup_id, const std::uint64_t session_id)
+void verify_header(
+    const qc::StateFrame& frame,
+    const std::uint64_t startup_id,
+    const std::uint64_t session_id)
 {
     expect(frame.header.startup_id == startup_id, "header.startup_id 与创建时一致");
     expect(frame.header.session_id == session_id, "header.session_id 与 reset 一致");
-    expect(frame.header.model_id == robot.model_id, "header.model_id 来自 RobotModel");
-    expect(frame.header.calibration_id == robot.calibration_id, "header.calibration_id 来自 RobotModel");
     expect(frame.header.sequence == 1, "当前会话第一帧 sequence=1");
     expect(frame.header.timestamp_ns == 0, "reset 后仿真时间为 0 ns");
     expect(frame.joint_count == 12, "joint_count 为 12");
@@ -173,7 +172,7 @@ void test_black_reset_produces_valid_state()
     expect(io.read_latest(frame) == qc::RobotIOCode::Ok, "reset 后 read_latest 返回 Ok");
     expect(io.status().dropped_state_frames == 0, "首次生成状态不记为丢帧");
 
-    verify_header(frame, robot, kStartupId, kSessionId);
+    verify_header(frame, kStartupId, kSessionId);
     verify_joint_states(frame, robot, *reference.model, key_id);
     verify_imu(frame);
 

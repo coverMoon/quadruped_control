@@ -85,8 +85,6 @@ qc::CommandFrame make_command(
     frame.header.session_id = 1;
     frame.header.sequence = sequence;
     frame.header.timestamp_ns = static_cast<qc::Nanoseconds>(timestamp_ns);
-    frame.header.model_id = 0x008A1E56CD69E8F4;
-    frame.header.calibration_id = 0;
     frame.expires_at_ns = static_cast<qc::Nanoseconds>(expires_at_ns);
     frame.joint_count = 12;
     for (std::size_t i = 0; i < frame.joint_count; ++i)

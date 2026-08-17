@@ -38,7 +38,6 @@ qc::RobotModel make_black_model()
 {
     qc::RobotModel model;
     model.name = "black";
-    model.model_id = 0x008A1E56CD69E8F4;
     model.joint_count = 12;
 
     constexpr const char* names[12] = {
@@ -61,7 +60,6 @@ qc::RobotModel make_fixture_model()
 {
     qc::RobotModel model;
     model.name = "fixture";
-    model.model_id = 0x1;
     model.joint_count = 2;
 
     constexpr const char* names[2] = {"j1", "j2"};

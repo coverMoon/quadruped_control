@@ -27,8 +27,6 @@ enum class ValidationError : std::uint8_t
     InvalidJointRole,
     InvalidJointLimits,
     SchemaMismatch,
-    ModelMismatch,
-    CalibrationMismatch,
     InvalidTimestamp,
     Expired,
     InvalidControlMode,

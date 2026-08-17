@@ -123,10 +123,7 @@ RobotModelLoadResult load_robot_model(const std::string& path)
     auto& model = result.model;
     std::string& error = result.error_message;
     detail::FieldReader reader(root, error);
-    if (!reader.required("name", model.name) ||
-        !reader.uint64("model_id", model.model_id) ||
-        !reader.uint64("calibration_id", model.calibration_id) ||
-        !load_joints(root, model, error))
+    if (!reader.required("name", model.name) || !load_joints(root, model, error))
     {
         return result;
     }

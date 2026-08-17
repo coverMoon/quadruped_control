@@ -238,8 +238,6 @@ std::string MujocoRobotIO::refresh_latest_state(const std::uint64_t session_id)
     frame.header.session_id = session_id;
     frame.header.sequence = sequence_;
     frame.header.timestamp_ns = timestamp_ns;
-    frame.header.model_id = robot_model_.model_id;
-    frame.header.calibration_id = robot_model_.calibration_id;
     frame.joint_count = robot_model_.joint_count;
     // reset 时还没有主动命令，安全状态固定为阻尼；
     // step() 成功后会根据实际命令使用情况覆盖该字段。

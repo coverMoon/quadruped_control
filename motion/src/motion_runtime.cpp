@@ -80,8 +80,6 @@ bool MotionRuntime::track_session(const core::StateFrame& state)
     // 新会话：回到 Passive，清空未完成请求、rest_pose，命令序号从 1 重新开始。
     startup_id_ = state.header.startup_id;
     session_id_ = state.header.session_id;
-    command_model_id_ = state.header.model_id;
-    command_calibration_id_ = state.header.calibration_id;
     command_sequence_ = 0;
     latest_request_id_ = 0;
     active_request_id_ = 0;
@@ -128,8 +126,6 @@ core::RobotIOCode MotionRuntime::submit_command(
     command.header.session_id = session_id_;
     command.header.sequence = ++command_sequence_;
     command.header.timestamp_ns = submission.now_ns;
-    command.header.model_id = command_model_id_;
-    command.header.calibration_id = command_calibration_id_;
     // 单调时间加有效期在极端输入下可能溢出；溢出时按最长可表示时间处理。
     command.expires_at_ns = (submission.now_ns > INT64_MAX - config_.command_validity_ns)
         ? INT64_MAX

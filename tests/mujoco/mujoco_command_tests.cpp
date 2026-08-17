@@ -73,15 +73,7 @@ void test_submit_rejects_header_mismatch()
     bad_schema.header.schema_version = 999;
     qtest::expect(created.io->submit(bad_schema) == qc::RobotIOCode::InvalidFrame, "schema 错误返回 InvalidFrame");
 
-    auto bad_model = qtest::make_command(2, qc::ControlMode::Damping);
-    bad_model.header.model_id = 0x1234;
-    qtest::expect(created.io->submit(bad_model) == qc::RobotIOCode::InvalidFrame, "model_id 错误返回 InvalidFrame");
-
-    auto bad_calibration = qtest::make_command(3, qc::ControlMode::Damping);
-    bad_calibration.header.calibration_id = 0xABCD;
-    qtest::expect(created.io->submit(bad_calibration) == qc::RobotIOCode::InvalidFrame, "calibration_id 错误返回 InvalidFrame");
-
-    auto bad_count = qtest::make_command(4, qc::ControlMode::Damping);
+    auto bad_count = qtest::make_command(2, qc::ControlMode::Damping);
     bad_count.joint_count = 11;
     qtest::expect(created.io->submit(bad_count) == qc::RobotIOCode::InvalidFrame, "joint_count 错误返回 InvalidFrame");
 }

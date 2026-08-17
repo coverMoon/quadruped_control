@@ -91,8 +91,6 @@ inline qc::RobotModel make_test_model()
 {
     qc::RobotModel model;
     model.name = "test_quadruped";
-    model.model_id = 0x1234;
-    model.calibration_id = 0;
     model.joint_count = 12;
     constexpr const char* names[12] = {
         "FL_hip_joint", "FL_thigh_joint", "FL_calf_joint",
@@ -153,8 +151,6 @@ inline qc::StateFrame make_state(
     state.header.session_id = 1;
     state.header.sequence = 1;
     state.header.timestamp_ns = 0;
-    state.header.model_id = model.model_id;
-    state.header.calibration_id = model.calibration_id;
     state.joint_count = model.joint_count;
     for (std::size_t i = 0; i < model.joint_count; ++i)
     {

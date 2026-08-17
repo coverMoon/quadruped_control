@@ -23,10 +23,11 @@ modules.
 - Timestamps are monotonic nanoseconds, not wall-clock timestamps.
 - High-rate joint frames use fixed-capacity storage with `kMaxJoints == 16`.
 - Every joint command has an explicit `ControlMode`; do not infer a mode from gains.
-- Reject mismatched model IDs, calibration IDs, joint counts, expired commands,
-  unknown enum values, and NaN/Inf before using a frame.
-- Keep joint order explicit and validate names at startup. Do not infer the robot
-  model from array length.
+- Reject mismatched joint counts, expired commands, unknown enum values, and NaN/Inf
+  before using a frame.
+- Keep joint order explicit and validate the robot name and ordered joint names at startup.
+  Do not infer the robot model from array length or carry model/calibration IDs in high-rate frames.
+- Keep hardware calibration on the final execution side; motion code only uses normalized joint data.
 - Treat `JointRole` as the normalized functional role. Do not infer it from an
   URDF/MJCF joint type, joint name, or an unusually large position range.
 - Record whether a joint has position limits explicitly. Wheels normally use
@@ -95,7 +96,7 @@ modules.
   loop indices, temporary values, or standard-library operations one by one.
 - Public data structures should document every field whose meaning cannot be fully
   inferred from its name. Clearly distinguish similar fields such as online/valid,
-  generated/applied sequence, and model/calibration identifiers.
+  generated/applied sequence, and startup/session identifiers.
 - Public interfaces should document behavior that callers cannot infer from the
   signature, especially units, lifetime, latest-value semantics, and failure rules.
 - Do not keep commented-out code. Delete it and rely on Git history.

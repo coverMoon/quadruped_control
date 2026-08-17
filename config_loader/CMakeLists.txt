@@ -1,5 +1,5 @@
 # 文件：CMakeLists.txt
-# 作用：构建启动期 YAML 配置加载库 quadruped_config。
+# 作用：构建启动期 YAML 配置加载库 quadruped_config，源码目录与配置数据目录明确区分。
 
 find_package(yaml-cpp REQUIRED)
 

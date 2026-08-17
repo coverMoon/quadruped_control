@@ -105,11 +105,6 @@ struct FrameHeader
     // 生成完整帧时的单调时钟时间，单位为 ns。
     Nanoseconds timestamp_ns{0};
 
-    // 机器人结构版本 ID，必须与 RobotModel 完全一致。
-    std::uint64_t model_id{0};
-
-    // 具体实机的标定版本 ID；仿真中允许为 0。
-    std::uint64_t calibration_id{0};
 };
 
 // 一个统一关节在 StateFrame 生成时的反馈状态。

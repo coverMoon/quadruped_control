@@ -1,16 +1,10 @@
 # 文件：black.yaml
 # 作用：定义 black 机器人的结构版本、统一关节顺序和机械/控制限制。
 name: black
-model_version: 1
-# 项目明确分配的稳定编号；已有配置和通信协议继续沿用该值。
-model_id: 0x008A1E56CD69E8F4
-# 0 表示当前配置用于仿真，不绑定具体实机的零点和传感器标定。
-calibration_id: 0
 joints:
   # role 是控制系统中的用途，不是 URDF/MJCF 里的源关节类型。
+  # role: 参见 core/include/quadruped/code/types.hpp 中的 enum class JointRole。
   # 位置限制单位为 rad，速度为 rad/s，力矩为 N·m，增益为 N·m/rad 和 N·m·s/rad。
-  # 位置限制取 MuJoCo 模型声明的 ±10：Disabled 自然落地的小腿姿态可达约 ±3 rad，
-  # 更紧的限制会使起立首条命令被校验拒绝；实机限制待有硬件数据后再收紧。
   - {name: FL_hip_joint,   role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
   - {name: FL_thigh_joint, role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
   - {name: FL_calf_joint,  role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}

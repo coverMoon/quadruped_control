@@ -14,7 +14,7 @@
 - black 的关节顺序参考配置；
 - 核心接口单元测试；
 - `backends/mujoco/` 中的 `MujocoRobotIO`，支持模型加载、reset、命令执行和显式单物理步进；
-- `config/` 中的启动期 YAML 配置加载，统一提供 black 的 `RobotModel` 和 `ControllerConfig`；
+- `config_loader/` 中的启动期 YAML 配置加载，统一提供 black 的 `RobotModel` 和 `ControllerConfig`；
 - `motion/` 中不依赖外部框架的 `MotionRuntime`，实现
   `Passive → GetUp → Stand → GetDown → Passive` 基础运动闭环；
 - `tests/mujoco/` 中的 MuJoCo 自动测试，覆盖状态生成、命令校验、三种控制模式、安全路径和可重复性；
@@ -22,7 +22,7 @@
 - `apps/mujoco_sim/` 中带 GLFW 界面的交互仿真程序，支持按键起立、趴下、被动、重置和暂停。
 
 核心库 `core/` 不依赖 ROS 2、Torch、MuJoCo 或电机 SDK。`motion/` 只依赖 `core/`，
-YAML 配置加载只存在于启动期模块 `config/`。MuJoCo C++ API 类型
+YAML 配置加载只存在于启动期模块 `config_loader/`。MuJoCo C++ API 类型
 只存在于 MuJoCo 后端 `backends/mujoco/` 及其直接使用方 `apps/mujoco_headless/`、
 `apps/mujoco_sim/` 和 `tests/mujoco/` 中；依赖查找、安装脚本和模型资产分别放在
 `cmake/`、`scripts/` 和 `assets/` 中。
@@ -115,7 +115,7 @@ quadruped_control/
 ├── backends/
 │   └── mujoco/                       MuJoCo 模型加载与 RobotIO 实现
 ├── cmake/                            CMake 依赖查找模块
-├── config/                           启动期 YAML 配置加载
+├── config_loader/                    启动期 YAML 配置加载代码
 ├── configs/
 │   ├── controllers/                  控制器参数配置
 │   └── robots/                       机器人结构配置
@@ -147,6 +147,7 @@ compile_commands.json                  指向编译数据库的符号链接
 - `cmake/` 放自定义依赖查找模块，不放业务源码。
 - `core/include/quadruped/core/` 只放其他模块可以使用的公共头文件。公共头文件不能引入 ROS 2、Torch、MuJoCo 或电机 SDK。
 - `core/src/` 放核心库的实现，不把只在一个 `.cpp` 中使用的辅助函数暴露到公共头文件。
+- `config_loader/` 是读取和校验 YAML 的 C++ 代码模块，不存放具体机器人或控制器参数。
 - `configs/robots/` 放机器人固有信息，例如关节名称、顺序、功能角色和机械限制。控制器参数和策略参数以后分别放入 `configs/controllers/` 与 `configs/policies/`，不能混入机器人配置。
 - `docs/` 放设计文档，文档使用的架构图源文件和图片统一放在 `docs/diagrams/`。
 - `scripts/` 放编译、运行、维护和开发辅助脚本。脚本应能从任意工作目录启动，不能假定调用者当前位于仓库根目录。
@@ -162,11 +163,12 @@ adapters/ros2/                          ROS 2 消息转换和外围接口
 
 这些模块可以依赖 `core`，但 `core` 不能反向依赖它们。没有开始实现的模块暂时不创建空目录。
 
-## ID 分配
+## 机器人匹配与标定边界
 
-`model_id` 和实机使用的 `calibration_id` 是项目明确分配的非零 64 位编号，不从名称、
-序列号或其他字段推导。编号一旦用于配置或通信协议就保持稳定；新增机器人型号和标定
-记录时，应在对应配置中明确填写尚未使用的编号。
+当前单进程应用只加载一份 `RobotModel`，并把它同时交给 MotionRuntime 和后端；MuJoCo
+后端在启动时按有序关节名称检查模型、执行器和传感器。未来控制器与后端独立运行时，
+应在建立控制会话前核对数据格式、机器人名称和有序关节名称，匹配成功后再使用启动编号
+和会话编号识别重启与旧帧。机器人身份和标定编号不进入高频状态帧或命令帧。
 
-`model_id` 用于拒绝发给其他机器人结构版本的帧。`calibration_id: 0` 只用于仿真或
-不需要实机标定的情况，实机标定编号由具体实机配置明确分配。
+电机零点、方向、减速比和传感器标定归最终执行侧管理。MotionRuntime 只使用统一关节
+顺序下的归一化 SI 数据，不加载也不选择具体实机的标定记录。

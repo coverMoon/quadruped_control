@@ -98,24 +98,11 @@ bool is_finite(double value)
     return std::isfinite(value);
 }
 
-ValidationResult validate_header(
-    const FrameHeader& header,
-    const RobotModel& model,
-    Nanoseconds now_ns)
+ValidationResult validate_header(const FrameHeader& header, Nanoseconds now_ns)
 {
     if (header.schema_version != kFrameSchemaVersion)
     {
         return failure(ValidationError::SchemaMismatch, "frame schema version does not match");
-    }
-    if (header.model_id != model.model_id)
-    {
-        return failure(ValidationError::ModelMismatch, "frame model_id does not match RobotModel");
-    }
-    if (header.calibration_id != model.calibration_id)
-    {
-        return failure(
-            ValidationError::CalibrationMismatch,
-            "frame calibration_id does not match RobotModel");
     }
     if (header.timestamp_ns < 0 || now_ns < 0 || header.timestamp_ns > now_ns)
     {
@@ -144,10 +131,6 @@ ValidationResult validate(const RobotModel& model)
     if (model.name.empty())
     {
         return failure(ValidationError::InvalidName, "robot name must not be empty");
-    }
-    if (model.model_id == 0)
-    {
-        return failure(ValidationError::InvalidIdentifier, "model_id must not be zero");
     }
     if (model.joint_count == 0 || model.joint_count > kMaxJoints)
     {
@@ -265,7 +248,7 @@ ValidationResult validate(const ControllerConfig& config, const RobotModel& mode
 
 ValidationResult validate(const StateFrame& frame, const RobotModel& model, Nanoseconds now_ns)
 {
-    if (const auto result = validate_header(frame.header, model, now_ns); !result)
+    if (const auto result = validate_header(frame.header, now_ns); !result)
     {
         return result;
     }
@@ -320,7 +303,7 @@ ValidationResult validate(const StateFrame& frame, const RobotModel& model, Nano
 
 ValidationResult validate(const CommandFrame& frame, const RobotModel& model, Nanoseconds now_ns)
 {
-    if (const auto result = validate_header(frame.header, model, now_ns); !result)
+    if (const auto result = validate_header(frame.header, now_ns); !result)
     {
         return result;
     }
