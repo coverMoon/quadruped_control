@@ -5,6 +5,8 @@
 
 #include "test_helpers.hpp"
 
+#include "quadruped/config/robot_config.hpp"
+
 #include <cmath>
 
 namespace quadruped::backends::mujoco::test
@@ -44,23 +46,14 @@ void expect_close(
 
 qc::RobotModel make_black_model()
 {
-    qc::RobotModel model;
-    model.name = "black";
-    model.model_id = 0x008A1E56CD69E8F4;
-    model.joint_count = 12;
-    constexpr const char* names[12] = {
-        "FL_hip_joint", "FL_thigh_joint", "FL_calf_joint",
-        "FR_hip_joint", "FR_thigh_joint", "FR_calf_joint",
-        "RL_hip_joint", "RL_thigh_joint", "RL_calf_joint",
-        "RR_hip_joint", "RR_thigh_joint", "RR_calf_joint",
-    };
-    for (std::size_t i = 0; i < model.joint_count; ++i)
+    // RobotModel 统一来自启动期 YAML 配置，测试不再维护独立的关节顺序。
+    const auto loaded = quadruped::config::load_robot_model(QUADRUPED_ROBOT_CONFIG_PATH);
+    if (!loaded.ok())
     {
-        model.joints[i].name = names[i];
-        model.joints[i].role = qc::JointRole::Leg;
-        model.joints[i].limits = {true, -3.0, 3.0, 20.0, 40.0, 100.0, 10.0};
+        expect(false, "加载 black 机器人配置失败：" + loaded.error_message);
+        return {};
     }
-    return model;
+    return loaded.model;
 }
 
 MujocoRobotIO::CreateResult create_ready(
