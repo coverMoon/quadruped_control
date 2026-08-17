@@ -22,7 +22,7 @@ namespace quadruped::backends::mujoco
 // 最终控制量会同时受 RobotModel 的 max_effort 和 MuJoCo actuator ctrlrange 限制。
 // 返回空串表示成功，否则返回可读错误原因且不修改 mjData。
 std::string apply_joint_commands(
-    mjData* data,
+    mjData& data,
     const MujocoModel& model,
     const core::RobotModel& robot_model,
     const core::CommandFrame& command,

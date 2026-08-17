@@ -205,10 +205,6 @@ ValidationResult validate(const RobotModel& model)
 
 ValidationResult validate(const StateFrame& frame, const RobotModel& model, Nanoseconds now_ns)
 {
-    if (const auto result = validate(model); !result)
-    {
-        return result;
-    }
     if (const auto result = validate_header(frame.header, model, now_ns); !result)
     {
         return result;
@@ -264,10 +260,6 @@ ValidationResult validate(const StateFrame& frame, const RobotModel& model, Nano
 
 ValidationResult validate(const CommandFrame& frame, const RobotModel& model, Nanoseconds now_ns)
 {
-    if (const auto result = validate(model); !result)
-    {
-        return result;
-    }
     if (const auto result = validate_header(frame.header, model, now_ns); !result)
     {
         return result;

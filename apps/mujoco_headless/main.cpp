@@ -9,7 +9,6 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
-#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <string>
@@ -149,21 +148,8 @@ void print_summary(double sim_time, std::uint64_t sequence, qc::RobotIOState sta
               << "s] seq=" << sequence << " state=" << static_cast<int>(state) << '\n';
 }
 
-bool scene_file_exists(const std::string& path)
-{
-    std::ifstream file(path);
-    return file.is_open();
-}
-
 bool run_headless(const Options& options)
 {
-    if (!scene_file_exists(options.scene_path))
-    {
-        std::cerr << "未找到场景文件：" << options.scene_path
-                  << "。请检查 --scene 参数，或恢复仓库内 black 模型。\n";
-        return false;
-    }
-
     auto created = qm::MujocoRobotIO::create(options.scene_path, make_black_model(), kStartupId);
     if (!created.ok())
     {

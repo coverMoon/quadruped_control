@@ -64,13 +64,14 @@ struct ValidationResult
 // RobotModel 校验不依赖当前时间，主要检查名称、维度、重复关节和限制。
 [[nodiscard]] ValidationResult validate(const RobotModel& model);
 
+// frame 校验假定 model 已在启动时通过 validate(model)，不会重复检查稳定模型。
 // now_ns 与 frame 必须来自同一单调时钟，用于拒绝未来时间戳。
 [[nodiscard]] ValidationResult validate(
     const StateFrame& frame,
     const RobotModel& model,
     Nanoseconds now_ns);
 
-// 除公共帧字段外，还检查命令有效期、控制模式和 RobotModel 限制。
+// 除公共帧字段外，还检查命令有效期、控制模式和已校验 RobotModel 的限制。
 [[nodiscard]] ValidationResult validate(
     const CommandFrame& frame,
     const RobotModel& model,

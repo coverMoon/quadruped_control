@@ -136,18 +136,11 @@ adapters/ros2/                          ROS 2 消息转换和外围接口
 
 这些模块可以依赖 `core`，但 `core` 不能反向依赖它们。没有开始实现的模块暂时不创建空目录。
 
-## ID 生成
+## ID 分配
 
-模型 ID 由稳定的机器人名称和模型版本生成：
+`model_id` 和实机使用的 `calibration_id` 是项目明确分配的非零 64 位编号，不从名称、
+序列号或其他字段推导。编号一旦用于配置或通信协议就保持稳定；新增机器人型号和标定
+记录时，应在对应配置中明确填写尚未使用的编号。
 
-```bash
-./scripts/generate_id.py model black 1
-```
-
-实机标定 ID 由机器人名称、整机序列号和标定版本生成：
-
-```bash
-./scripts/generate_id.py calibration black BLACK-001 1
-```
-
-脚本使用 SHA-256 的前 64 位，输出可直接填写到 YAML 的十六进制值。相同输入始终产生相同 ID。`calibration_id: 0` 只用于仿真或不需要实机标定的情况。
+`model_id` 用于拒绝发给其他机器人结构版本的帧。`calibration_id: 0` 只用于仿真或
+不需要实机标定的情况，实机标定编号由具体实机配置明确分配。

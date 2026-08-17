@@ -41,53 +41,32 @@ double compute_joint_effort(
     }
 }
 
-// 检查力矩是否落在 [min, max] 范围内，并就地限幅；返回 false 表示输入非有限。
-bool clamp_effort(double& effort, double min_value, double max_value)
-{
-    if (!std::isfinite(effort))
-    {
-        return false;
-    }
-    effort = std::max(min_value, std::min(max_value, effort));
-    return true;
-}
-
 }  // namespace
 
 std::string apply_joint_commands(
-    mjData* data,
+    mjData& data,
     const MujocoModel& model,
     const core::RobotModel& robot_model,
     const core::CommandFrame& command,
     const bool command_active)
 {
     const mjModel* raw = model.raw_model();
-    if (raw == nullptr || data == nullptr)
-    {
-        return "MuJoCo model or data is not available";
-    }
 
+    // model、data 和关节映射已经在 MujocoRobotIO 创建时完成校验。
     // 先把所有执行器控制量置零，保证未被显式写入的执行器不会保持旧命令。
     for (int i = 0; i < raw->nu; ++i)
     {
-        data->ctrl[i] = 0.0;
+        data.ctrl[i] = 0.0;
     }
 
     for (std::size_t i = 0; i < robot_model.joint_count; ++i)
     {
         const auto& mapping = model.joint_mappings()[i];
-        if (mapping.qpos_address < 0 || mapping.qpos_address >= raw->nq ||
-            mapping.qvel_address < 0 || mapping.qvel_address >= raw->nv ||
-            mapping.actuator_id < 0 || mapping.actuator_id >= raw->nu)
-        {
-            return "joint mapping is out of range for joint \"" +
-                robot_model.joints[i].name + "\"";
-        }
 
         // 无论命令是否有效，步进前都必须检查关节状态有限，防止无命令或过期回退时
         // 把 NaN/Inf 状态交给 mj_step 处理。
-        const double position = data->qpos[mapping.qpos_address];
-        const double velocity = data->qvel[mapping.qvel_address];
+        const double position = data.qpos[mapping.qpos_address];
+        const double velocity = data.qvel[mapping.qvel_address];
         if (!std::isfinite(position) || !std::isfinite(velocity))
         {
             return "joint state is not finite for joint \"" +
@@ -113,13 +92,7 @@ std::string apply_joint_commands(
         const double ctrl_max = raw->actuator_ctrlrange[2 * actuator_id + 1];
         const double lower = std::max(ctrl_min, -max_effort);
         const double upper = std::min(ctrl_max, max_effort);
-        if (!clamp_effort(effort, lower, upper))
-        {
-            return "clamped effort is not finite for joint \"" +
-                robot_model.joints[i].name + "\"";
-        }
-
-        data->ctrl[actuator_id] = effort;
+        data.ctrl[actuator_id] = std::max(lower, std::min(upper, effort));
     }
     return {};
 }

@@ -1,7 +1,7 @@
 # M0 参考配置；quadruped_core 暂不负责加载 YAML。
 name: black
 model_version: 1
-# 由 `./scripts/generate_id.py model black 1` 生成。
+# 项目明确分配的稳定编号；已有配置和通信协议继续沿用该值。
 model_id: 0x008A1E56CD69E8F4
 # 0 表示当前配置用于仿真，不绑定具体实机的零点和传感器标定。
 calibration_id: 0

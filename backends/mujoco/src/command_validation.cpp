@@ -21,7 +21,7 @@ CommandValidationResult validate_mujoco_command(
     const std::uint64_t session_id,
     const std::uint64_t startup_id,
     const std::uint64_t latest_command_sequence,
-    const mjData* data)
+    const mjData& data)
 {
     if (session_id == 0)
     {
@@ -40,13 +40,8 @@ CommandValidationResult validate_mujoco_command(
         return {core::RobotIOCode::Rejected, "command sequence is not strictly increasing"};
     }
 
-    if (data == nullptr)
-    {
-        return {core::RobotIOCode::Fault, "mjData is not available"};
-    }
-
     core::Nanoseconds now_ns{0};
-    if (const SimTimeError error = seconds_to_nanoseconds(data->time, now_ns);
+    if (const SimTimeError error = seconds_to_nanoseconds(data.time, now_ns);
         error != SimTimeError::None)
     {
         return {core::RobotIOCode::Fault, "simulation time conversion failed"};

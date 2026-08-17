@@ -32,6 +32,6 @@ CommandValidationResult validate_mujoco_command(
     std::uint64_t session_id,
     std::uint64_t startup_id,
     std::uint64_t latest_command_sequence,
-    const mjData* data);
+    const mjData& data);
 
 }  // namespace quadruped::backends::mujoco

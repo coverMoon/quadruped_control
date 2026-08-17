@@ -23,7 +23,7 @@ constexpr std::size_t kMujocoErrorBufferSize = 1024;
 // 映射辅助函数的约定：返回空字符串表示成功，否则返回包含具体名称或编号的
 // 失败原因。所有检查只在加载时执行一次，物理步进路径不会重复构造映射。
 
-// 按名称为每个逻辑关节建立映射，拒绝缺失、非单自由度和重复关联的关节。
+// 按名称为每个逻辑关节建立映射，拒绝缺失或非单自由度关节。
 std::string map_joints(
     const mjModel& model,
     const core::RobotModel& robot_model,
@@ -51,16 +51,6 @@ std::string map_joints(
             qvel_address >= model.nv)
         {
             return "joint \"" + name + "\" has an out-of-range qpos or qvel address";
-        }
-
-        // 不同逻辑关节不能指向同一个 MuJoCo 关节。
-        for (std::size_t previous = 0; previous < i; ++previous)
-        {
-            if (mappings[previous].joint_id == joint_id)
-            {
-                return "joint \"" + name + "\" shares a MuJoCo joint with \"" +
-                    robot_model.joints[previous].name + "\"";
-            }
         }
 
         mappings[i] = JointMapping{i, joint_id, qpos_address, qvel_address, -1};

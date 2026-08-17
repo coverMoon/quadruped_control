@@ -56,7 +56,7 @@ struct RobotModel
     // 稳定的机器人型号名称，例如 black 或 blackw。
     std::string name{};
 
-    // 机器人结构版本的 64 位 ID，由 scripts/generate_id.py 生成。
+    // 项目为机器人结构版本明确分配的稳定 64 位 ID。
     std::uint64_t model_id{0};
 
     // 当前部署使用的标定 ID；仿真模型允许为 0。

@@ -34,18 +34,11 @@ std::string fill_joint_states(
     const MujocoModel& model,
     const core::RobotModel& robot_model)
 {
-    const mjModel* raw = model.raw_model();
     const mjData* data = model.raw_data();
 
     for (std::size_t i = 0; i < robot_model.joint_count; ++i)
     {
         const auto& mapping = model.joint_mappings()[i];
-        if (mapping.qpos_address < 0 || mapping.qpos_address >= raw->nq ||
-            mapping.qvel_address < 0 || mapping.qvel_address >= raw->nv)
-        {
-            return "joint address is out of range for joint \"" +
-                robot_model.joints[i].name + "\"";
-        }
 
         // qfrc_actuator 是传动作用到关节自由度后的广义力，对 hinge 关节即关节力矩；
         // 不直接把 ctrl 当成实际力矩，也不无条件使用 actuator_force。
@@ -73,16 +66,8 @@ std::string fill_joint_states(
 
 std::string fill_imu_state(core::StateFrame& frame, const MujocoModel& model)
 {
-    const mjModel* raw = model.raw_model();
     const mjData* data = model.raw_data();
     const auto& imu = model.imu_mapping();
-
-    if (imu.quat.data_address < 0 || imu.quat.data_address + 4 > raw->nsensordata ||
-        imu.gyro.data_address < 0 || imu.gyro.data_address + 3 > raw->nsensordata ||
-        imu.acc.data_address < 0 || imu.acc.data_address + 3 > raw->nsensordata)
-    {
-        return "IMU sensor address is out of range";
-    }
 
     // MuJoCo framequat 输出顺序固定为 w、x、y、z，与 StateFrame 一致，无需重排。
     for (std::size_t i = 0; i < 4; ++i)

@@ -71,13 +71,6 @@ MujocoRobotIO::ResetResult MujocoRobotIO::reset(const std::uint64_t session_id)
 
     const mjModel* model = model_.raw_model();
     mjData* data = model_.raw_data();
-    if (model == nullptr || data == nullptr)
-    {
-        status_.state = core::RobotIOState::Fault;
-        result.code = core::RobotIOCode::Fault;
-        result.error_message = "MuJoCo model or data is not available";
-        return result;
-    }
 
     // 按名称查找 default_pose keyframe，不假设它在 keyframe 数组中是第 0 个。
     const int key_id = mj_name2id(model, mjOBJ_KEY, "default_pose");
@@ -142,10 +135,10 @@ core::RobotIOCode MujocoRobotIO::submit(const core::CommandFrame& frame)
         session_id_,
         startup_id_,
         status_.latest_command_sequence,
-        model_.raw_data());
+        *model_.raw_data());
     if (result.code != core::RobotIOCode::Ok)
     {
-        // 内部故障（mjData 不可用、仿真时间转换失败等）锁存 Fault 状态，
+        // 内部故障（例如仿真时间转换失败）锁存 Fault 状态，
         // 不计入因校验或过期导致的拒绝计数。
         if (result.code == core::RobotIOCode::Fault)
         {
@@ -177,11 +170,6 @@ core::RobotIOCode MujocoRobotIO::step()
 
     const mjModel* model = model_.raw_model();
     mjData* data = model_.raw_data();
-    if (model == nullptr || data == nullptr)
-    {
-        status_.state = core::RobotIOState::Fault;
-        return core::RobotIOCode::Fault;
-    }
 
     core::Nanoseconds now_ns{0};
     if (const SimTimeError error = seconds_to_nanoseconds(data->time, now_ns);
@@ -192,7 +180,8 @@ core::RobotIOCode MujocoRobotIO::step()
     }
 
     const bool active = command_is_active(latest_command_, has_command_, now_ns);
-    if (const std::string error = apply_joint_commands(data, model_, robot_model_, latest_command_, active);
+    if (const std::string error = apply_joint_commands(
+            *data, model_, robot_model_, latest_command_, active);
         !error.empty())
     {
         status_.state = core::RobotIOState::Fault;
@@ -234,11 +223,6 @@ std::string MujocoRobotIO::refresh_for_test()
 std::string MujocoRobotIO::refresh_latest_state(const std::uint64_t session_id)
 {
     const mjData* data = model_.raw_data();
-    if (model_.raw_model() == nullptr || data == nullptr)
-    {
-        status_.state = core::RobotIOState::Fault;
-        return "MuJoCo model or data is not available";
-    }
 
     core::Nanoseconds timestamp_ns{0};
     if (const SimTimeError error = seconds_to_nanoseconds(data->time, timestamp_ns);

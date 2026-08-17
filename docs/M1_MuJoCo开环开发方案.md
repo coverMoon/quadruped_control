@@ -34,16 +34,8 @@ M1 固定使用资产仓库中的 black MuJoCo 模型：
 网格目录：mujoco/black/assets/
 ```
 
-文件校验值（本仓库 `assets/robots/black/mujoco/` 内的文件；`black_description.xml`
-在导入时清理了行尾空白，因此与源提交的 `ea3eb8e1…` 不同，模型语义不变）：
-
-```text
-black_description.xml
-SHA-256 688e67eb9f3b04b3cb6bf7304ca977859828ec7ee214c0223b7241545e3c1539
-
-scene.xml
-SHA-256 1e83bd6a0e1f2c9bcfbd4240ba3c0a541e7ff436859572caedc3d4bdc2242431
-```
+`black_description.xml` 在导入时清理了行尾空白，模型语义不变。导入来源由上述
+源提交和本仓库 Git 历史追踪。
 
 选择依据：
 
@@ -182,13 +174,13 @@ M1 尚未确定正式控制器限值。当前实现和测试临时使用：
 
 1. 创建 `assets/robots/black/mujoco/`；
 2. 从第 2 节固定的源提交复制主体 XML、平地场景和 XML 实际引用的网格；
-3. 增加简短来源说明，记录源仓库、提交、原路径和两个 XML 的 SHA-256；
+3. 增加简短来源说明，记录源仓库、提交和原路径；
 4. 不复制高度图和 `scene_terrain.xml`；
 5. 用 MuJoCo 3.9.0 从新路径加载 `scene.xml` 并至少推进一步；
 6. 将资源目录补入 README 的目录说明，但不展开到具体文件。
 
-验收：加载无警告失败；模型具有 12 个执行器和 18 个速度自由度；两个 XML 的校验值与
-本文一致；普通构建不需要 MuJoCo。
+验收：加载无警告失败；模型具有 12 个执行器和 18 个速度自由度；普通构建不需要
+MuJoCo。
 
 建议提交信息：`assets: add pinned black MuJoCo model`
 
@@ -336,7 +328,7 @@ git status --short
 
 遇到以下情况不要自行猜测：
 
-1. 固定源提交不存在，或者两个基准 XML 的 SHA-256 不一致；
+1. 固定源提交不存在，或者导入文件与该提交的模型语义不一致；
 2. 需要改变模型的关节方向、零点、惯量、传动比或执行器范围；
 3. `black.yaml` 与模型名称无法建立一一对应；
 4. 实现需要修改 `StateFrame`、`CommandFrame` 或通用 `RobotIO` 接口；

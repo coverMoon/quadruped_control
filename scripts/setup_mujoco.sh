@@ -8,6 +8,7 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly REPOSITORY_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 readonly MUJOCO_VERSION="3.9.0"
 readonly MUJOCO_ARCHIVE="mujoco-${MUJOCO_VERSION}-linux-x86_64.tar.gz"
+# 下载包来自外部网络，固定校验值用于拒绝损坏或被替换的依赖二进制。
 readonly MUJOCO_SHA256="d11f281540d0d1844e2923bf43b6fff5ad186ec55927a8dae0eb26b9e579eed2"
 readonly MUJOCO_URL="https://github.com/google-deepmind/mujoco/releases/download/${MUJOCO_VERSION}/${MUJOCO_ARCHIVE}"
 readonly DEPENDENCY_DIR="${REPOSITORY_ROOT}/.deps"
