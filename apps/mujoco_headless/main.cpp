@@ -4,6 +4,7 @@
  */
 
 #include "quadruped/backends/mujoco/mujoco_robot_io.hpp"
+#include "quadruped/config/robot_config.hpp"
 #include "quadruped/core/core.hpp"
 
 #include <cmath>
@@ -20,6 +21,7 @@ namespace
 {
 
 constexpr const char* kDefaultScenePath = QUADRUPED_DEFAULT_SCENE_PATH;
+constexpr const char* kDefaultRobotConfigPath = QUADRUPED_DEFAULT_ROBOT_CONFIG_PATH;
 constexpr double kDefaultDurationSeconds = 2.0;
 constexpr double kDefaultSummaryIntervalSeconds = 0.5;
 constexpr std::uint64_t kStartupId = 1;
@@ -31,27 +33,6 @@ struct Options
     double duration_seconds = kDefaultDurationSeconds;
     double summary_interval_seconds = kDefaultSummaryIntervalSeconds;
 };
-
-qc::RobotModel make_black_model()
-{
-    qc::RobotModel model;
-    model.name = "black";
-    model.model_id = 0x008A1E56CD69E8F4;
-    model.joint_count = 12;
-    constexpr const char* names[12] = {
-        "FL_hip_joint", "FL_thigh_joint", "FL_calf_joint",
-        "FR_hip_joint", "FR_thigh_joint", "FR_calf_joint",
-        "RL_hip_joint", "RL_thigh_joint", "RL_calf_joint",
-        "RR_hip_joint", "RR_thigh_joint", "RR_calf_joint",
-    };
-    for (std::size_t i = 0; i < model.joint_count; ++i)
-    {
-        model.joints[i].name = names[i];
-        model.joints[i].role = qc::JointRole::Leg;
-        model.joints[i].limits = {true, -3.0, 3.0, 20.0, 40.0, 100.0, 10.0};
-    }
-    return model;
-}
 
 void print_usage(const char* program)
 {
@@ -150,7 +131,15 @@ void print_summary(double sim_time, std::uint64_t sequence, qc::RobotIOState sta
 
 bool run_headless(const Options& options)
 {
-    auto created = qm::MujocoRobotIO::create(options.scene_path, make_black_model(), kStartupId);
+    // RobotModel 统一来自启动期 YAML 配置，避免应用各自维护一份关节顺序。
+    const auto model = quadruped::config::load_robot_model(kDefaultRobotConfigPath);
+    if (!model.ok())
+    {
+        std::cerr << "加载机器人配置失败: " << model.error_message << '\n';
+        return false;
+    }
+
+    auto created = qm::MujocoRobotIO::create(options.scene_path, model.model, kStartupId);
     if (!created.ok())
     {
         std::cerr << "创建 MuJoCo 后端失败: " << created.error_message

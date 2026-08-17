@@ -1,0 +1,43 @@
+# 文件：black.yaml
+# 作用：定义 black 基础运动控制的周期、插值周期数、目标姿态和固定增益。
+# 必须与 configs/robots/black.yaml 指定的 RobotModel 配合使用。
+name: black
+# 运动控制周期，单位为 ms。
+control_period_ms: 5
+# CommandFrame 从 timestamp 起的有效期，单位为 ms；取两个控制周期。
+command_validity_ms: 10
+# 起立第一段、第二段和趴下各自需要的成功控制周期数。
+getup_pre_cycles: 100
+getup_cycles: 100
+getdown_cycles: 500
+# 以下数组必须按 RobotModel 统一关节顺序给出；
+# joint_names 用于启动期核对顺序，防止数组与模型错位。
+joint_names:
+  - FL_hip_joint
+  - FL_thigh_joint
+  - FL_calf_joint
+  - FR_hip_joint
+  - FR_thigh_joint
+  - FR_calf_joint
+  - RL_hip_joint
+  - RL_thigh_joint
+  - RL_calf_joint
+  - RR_hip_joint
+  - RR_thigh_joint
+  - RR_calf_joint
+# 预起立姿态，单位为 rad。
+pre_getup_position: [0.0, 1.4, -2.2, 0.0, -1.4, 2.2, 0.0, 1.4, -2.2, 0.0, -1.4, 2.2]
+# 默认站姿，单位为 rad。
+stand_position: [0.0, 0.82, -1.5, 
+                 0.0, -0.82, 1.5, 
+                 0.0, 0.82, -1.5, 
+                 0.0, -0.82, 1.5]
+# 主动控制的固定位置增益和阻尼增益，单位分别为 N·m/rad 和 N·m·s/rad。
+fixed_kp: [80.0, 80.0, 80.0, 
+           80.0, 80.0, 80.0, 
+           80.0, 80.0, 80.0, 
+           80.0, 80.0, 80.0]
+fixed_kd: [3.0, 3.0, 3.0, 
+           3.0, 3.0, 3.0, 
+           3.0, 3.0, 3.0, 
+           3.0, 3.0, 3.0]

@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "quadruped/core/controller_config.hpp"
 #include "quadruped/core/robot_model.hpp"
 #include "quadruped/core/types.hpp"
 
@@ -36,6 +37,7 @@ enum class ValidationError : std::uint8_t
     InvalidModeRequest,
     NonFiniteValue,
     NegativeValue,
+    InvalidConfiguration,
 };
 
 // 所有 validate 重载共用的返回结果。
@@ -63,6 +65,10 @@ struct ValidationResult
 
 // RobotModel 校验不依赖当前时间，主要检查名称、维度、重复关节和限制。
 [[nodiscard]] ValidationResult validate(const RobotModel& model);
+
+// ControllerConfig 校验假定 model 已通过 validate(model)，
+// 检查周期、插值周期数、姿态和增益是否有限且不越过 RobotModel 限制。
+[[nodiscard]] ValidationResult validate(const ControllerConfig& config, const RobotModel& model);
 
 // frame 校验假定 model 已在启动时通过 validate(model)，不会重复检查稳定模型。
 // now_ns 与 frame 必须来自同一单调时钟，用于拒绝未来时间戳。

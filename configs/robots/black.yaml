@@ -1,4 +1,5 @@
-# M0 参考配置；quadruped_core 暂不负责加载 YAML。
+# 文件：black.yaml
+# 作用：定义 black 机器人的结构版本、统一关节顺序和机械/控制限制。
 name: black
 model_version: 1
 # 项目明确分配的稳定编号；已有配置和通信协议继续沿用该值。
@@ -7,17 +8,18 @@ model_id: 0x008A1E56CD69E8F4
 calibration_id: 0
 joints:
   # role 是控制系统中的用途，不是 URDF/MJCF 里的源关节类型。
-  - {name: FL_hip_joint,   role: leg, position_limited: true}
-  - {name: FL_thigh_joint, role: leg, position_limited: true}
-  - {name: FL_calf_joint,  role: leg, position_limited: true}
-  - {name: FR_hip_joint,   role: leg, position_limited: true}
-  - {name: FR_thigh_joint, role: leg, position_limited: true}
-  - {name: FR_calf_joint,  role: leg, position_limited: true}
-  - {name: RL_hip_joint,   role: leg, position_limited: true}
-  - {name: RL_thigh_joint, role: leg, position_limited: true}
-  - {name: RL_calf_joint,  role: leg, position_limited: true}
-  - {name: RR_hip_joint,   role: leg, position_limited: true}
-  - {name: RR_thigh_joint, role: leg, position_limited: true}
-  - {name: RR_calf_joint,  role: leg, position_limited: true}
-
-# 位置、速度、力矩和增益限制，将在确定唯一的 MuJoCo 模型和控制器配置后补全。
+  # 位置限制单位为 rad，速度为 rad/s，力矩为 N·m，增益为 N·m/rad 和 N·m·s/rad。
+  # 位置限制取 MuJoCo 模型声明的 ±10：Disabled 自然落地的小腿姿态可达约 ±3 rad，
+  # 更紧的限制会使起立首条命令被校验拒绝；实机限制待有硬件数据后再收紧。
+  - {name: FL_hip_joint,   role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: FL_thigh_joint, role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: FL_calf_joint,  role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: FR_hip_joint,   role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: FR_thigh_joint, role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: FR_calf_joint,  role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: RL_hip_joint,   role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: RL_thigh_joint, role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: RL_calf_joint,  role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: RR_hip_joint,   role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: RR_thigh_joint, role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: RR_calf_joint,  role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}

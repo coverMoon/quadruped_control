@@ -6,6 +6,7 @@
 #pragma once
 
 #include "quadruped/core/constants.hpp"
+#include "quadruped/core/controller_config.hpp"
 #include "quadruped/core/robot_io.hpp"
 #include "quadruped/core/robot_model.hpp"
 #include "quadruped/core/types.hpp"

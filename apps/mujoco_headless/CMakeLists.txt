@@ -7,6 +7,7 @@ add_executable(quadruped_mujoco_headless
 
 target_link_libraries(quadruped_mujoco_headless
     PRIVATE
+        quadruped::config
         quadruped::mujoco
 )
 
@@ -16,6 +17,7 @@ target_compile_features(quadruped_mujoco_headless PRIVATE cxx_std_17)
 target_compile_definitions(quadruped_mujoco_headless
     PRIVATE
         QUADRUPED_DEFAULT_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/black/mujoco/scene.xml"
+        QUADRUPED_DEFAULT_ROBOT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/robots/black.yaml"
 )
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")

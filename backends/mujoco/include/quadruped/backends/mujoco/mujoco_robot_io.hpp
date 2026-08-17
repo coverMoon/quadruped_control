@@ -72,8 +72,14 @@ public:
     // 从步进后的 mjData 生成新的 StateFrame。失败时进入 Fault，不发布不完整状态。
     core::RobotIOCode step();
 
-    // 非拥有的 MuJoCo 数据访问，指针生命周期与本对象一致。
-    // 仅用于测试注入异常数据；正式运行代码不得依赖外部直接修改 mjData。
+    // 非拥有的 MuJoCo 模型和数据访问，指针生命周期与本对象一致。
+    // 带界面应用只允许用于只读渲染，测试只允许注入异常数据；
+    // 正式运行代码不得依赖外部直接修改 mjModel 或 mjData。
+    const mjModel* raw_model() const noexcept
+    {
+        return model_.raw_model();
+    }
+
     mjData* raw_data() noexcept
     {
         return model_.raw_data();

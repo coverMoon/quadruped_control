@@ -203,6 +203,66 @@ ValidationResult validate(const RobotModel& model)
     return {};
 }
 
+ValidationResult validate(const ControllerConfig& config, const RobotModel& model)
+{
+    if (config.control_period_ns <= 0)
+    {
+        return failure(ValidationError::InvalidConfiguration, "control period must be positive");
+    }
+    if (config.command_validity_ns <= config.control_period_ns)
+    {
+        return failure(
+            ValidationError::InvalidConfiguration,
+            "command validity must be longer than one control period");
+    }
+    if (config.getup_pre_cycles == 0 || config.getup_cycles == 0 ||
+        config.getdown_cycles == 0)
+    {
+        return failure(
+            ValidationError::InvalidConfiguration,
+            "interpolation cycle counts must be positive");
+    }
+
+    for (std::size_t i = 0; i < model.joint_count; ++i)
+    {
+        const double pre_position = config.pre_getup_position[i];
+        const double stand_position = config.stand_position[i];
+        const double kp = config.fixed_kp[i];
+        const double kd = config.fixed_kd[i];
+        if (!is_finite(pre_position) || !is_finite(stand_position) || !is_finite(kp) ||
+            !is_finite(kd))
+        {
+            return failure(
+                ValidationError::NonFiniteValue,
+                "controller pose or gain is not finite",
+                i);
+        }
+        if (kp < 0.0 || kd < 0.0)
+        {
+            return failure(ValidationError::NegativeValue, "controller gain is negative", i);
+        }
+
+        const auto& limits = model.joints[i].limits;
+        if (limits.position_limited &&
+            (pre_position < limits.min_position || pre_position > limits.max_position ||
+             stand_position < limits.min_position || stand_position > limits.max_position))
+        {
+            return failure(
+                ValidationError::InvalidJointLimits,
+                "controller pose exceeds joint position limits",
+                i);
+        }
+        if (kp > limits.max_kp || kd > limits.max_kd)
+        {
+            return failure(
+                ValidationError::InvalidJointLimits,
+                "controller gain exceeds RobotModel limits",
+                i);
+        }
+    }
+    return {};
+}
+
 ValidationResult validate(const StateFrame& frame, const RobotModel& model, Nanoseconds now_ns)
 {
     if (const auto result = validate_header(frame.header, model, now_ns); !result)

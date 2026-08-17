@@ -18,6 +18,8 @@ if(QUADRUPED_ENABLE_MUJOCO)
 endif()
 
 add_subdirectory(core)
+add_subdirectory(config)
+add_subdirectory(motion)
 
 if(QUADRUPED_ENABLE_MUJOCO)
     add_subdirectory(backends/mujoco)
