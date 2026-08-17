@@ -14,22 +14,30 @@
 - black 的关节顺序参考配置；
 - 核心接口单元测试；
 - `backends/mujoco/` 中的 `MujocoRobotIO`，支持模型加载、reset、命令执行和显式单物理步进；
+- `config/` 中的启动期 YAML 配置加载，统一提供 black 的 `RobotModel` 和 `ControllerConfig`；
+- `motion/` 中不依赖外部框架的 `MotionRuntime`，实现
+  `Passive → GetUp → Stand → GetDown → Passive` 基础运动闭环；
 - `tests/mujoco/` 中的 MuJoCo 自动测试，覆盖状态生成、命令校验、三种控制模式、安全路径和可重复性；
-- `apps/mujoco_headless/` 中的最小无界面运行入口。
+- `apps/mujoco_headless/` 中的最小无界面运行入口；
+- `apps/mujoco_sim/` 中带 GLFW 界面的交互仿真程序，支持按键起立、趴下、被动、重置和暂停。
 
-核心库 `core/` 不依赖 ROS 2、Torch、MuJoCo 或电机 SDK。MuJoCo C++ API 类型
-只存在于 MuJoCo 后端 `backends/mujoco/` 及其直接使用方 `apps/mujoco_headless/`
-和 `tests/mujoco/` 中；依赖查找、安装脚本和模型资产分别放在 `cmake/`、
-`scripts/` 和 `assets/` 中。
+核心库 `core/` 不依赖 ROS 2、Torch、MuJoCo 或电机 SDK。`motion/` 只依赖 `core/`，
+YAML 配置加载只存在于启动期模块 `config/`。MuJoCo C++ API 类型
+只存在于 MuJoCo 后端 `backends/mujoco/` 及其直接使用方 `apps/mujoco_headless/`、
+`apps/mujoco_sim/` 和 `tests/mujoco/` 中；依赖查找、安装脚本和模型资产分别放在
+`cmake/`、`scripts/` 和 `assets/` 中。
 
 ## 当前阶段
 
-当前 M1 的 MuJoCo 开环仿真已完成，准备进入 M2。公共数据结构、`RobotModel`、
-`RobotIO`、基础校验、`MujocoRobotIO`、无界面运行入口和可重复性测试已经全部完成并通过测试；
-MuJoCo 版本和 black 平地基准模型也已经确定。
+M1 的 MuJoCo 开环仿真和 M2 的基础运动闭环已经完成。M2 已通过代码复审和用户界面验收
+（起立和趴下效果已由用户确认）：启动期 YAML 配置加载统一了 black 的 `RobotModel` 和
+`ControllerConfig`，`MotionRuntime` 不依赖 ROS 2、Torch 和 MuJoCo，带 GLFW 界面的
+MuJoCo 交互程序已完成 `Passive → GetUp → Stand → GetDown → Passive` 闭环。
 
-M0 只确定模块之间传递什么数据以及怎样检查数据。M1 增加了无界面的
-MuJoCo 物理仿真，仍不包含运动状态机、策略推理和 ROS 2 适配器。
+公共数据结构、`RobotModel`、`RobotIO`、基础校验、`MujocoRobotIO`、无界面运行入口和
+可重复性测试已经完成并通过测试。当前仍不包含 RL 策略推理和 ROS 2 适配器；
+下一步是 M3 RL 行走闭环。方案见
+[`docs/M2_基础运动闭环开发方案.md`](docs/M2_基础运动闭环开发方案.md)。
 
 M1 固定使用 MuJoCo 3.9.0。依赖安装在仓库本地的 `.deps/` 目录，不依赖
 Python 或 Conda 环境。
@@ -58,12 +66,20 @@ Python 或 Conda 环境。
 ./scripts/build.sh --mujoco
 ```
 
-该参数会启用 MuJoCo 3.9.0 依赖，构建 `quadruped_mujoco` 后端、全部 MuJoCo 测试
-和 `apps/mujoco_headless/` 无界面程序。首次使用 MuJoCo 模块前运行：
+该参数会启用 MuJoCo 3.9.0 依赖，构建 `quadruped_mujoco` 后端、全部 MuJoCo 测试、
+`apps/mujoco_headless/` 无界面程序和 `apps/mujoco_sim/` 带界面程序。
+首次使用 MuJoCo 模块前运行：
 
 ```bash
 ./scripts/setup_mujoco.sh
 ```
+
+系统依赖（Ubuntu/Debian 包名）：
+
+- 默认构建需要 yaml-cpp 开发包：`sudo apt install libyaml-cpp-dev`；
+- `--mujoco` 构建的带界面程序还需要 GLFW 3.3 和 OpenGL：
+  `sudo apt install libglfw3-dev libgl1-mesa-dev`；
+- MuJoCo 3.9.0 本身由 `setup_mujoco.sh` 安装到仓库本地 `.deps/`，不依赖 Python 或 Conda。
 
 运行无界面仿真：
 
@@ -71,7 +87,13 @@ Python 或 Conda 环境。
 ./scripts/run_mujoco_headless.sh --duration 2.0
 ```
 
-该脚本可从任意当前目录启动。
+运行带 GLFW 界面的交互仿真（按 0 起立、9 趴下、P 被动、R 重置、Space 暂停、Esc 退出）：
+
+```bash
+./scripts/run_mujoco_sim.sh
+```
+
+上述脚本均可从任意当前目录启动。
 
 也可以手动执行：
 
@@ -86,19 +108,23 @@ ctest --test-dir build/default --output-on-failure
 ```text
 quadruped_control/
 ├── apps/
-│   └── mujoco_headless/              最小无界面 MuJoCo 仿真入口
+│   ├── mujoco_headless/              最小无界面 MuJoCo 仿真入口
+│   └── mujoco_sim/                   带 GLFW 界面的交互式 MuJoCo 仿真
 ├── assets/
 │   └── robots/black/mujoco/          固定版本的仿真模型和网格
 ├── backends/
 │   └── mujoco/                       MuJoCo 模型加载与 RobotIO 实现
 ├── cmake/                            CMake 依赖查找模块
+├── config/                           启动期 YAML 配置加载
 ├── configs/
+│   ├── controllers/                  控制器参数配置
 │   └── robots/                       机器人结构配置
 ├── core/
 │   ├── include/quadruped/core/       核心库公共头文件
 │   └── src/                          核心库实现
 ├── docs/
 │   └── diagrams/                     架构图源文件和图片
+├── motion/                           MotionRuntime 与基础运动状态机
 ├── scripts/                          编译、运行和开发辅助脚本
 └── tests/                            自动测试
 ```
