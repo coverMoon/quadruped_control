@@ -113,6 +113,8 @@ core::ModeResult MotionRuntime::dispatch_request(
         return dispatch_getup(request, state_usable);
     case core::ModeRequestType::Stand:
         return dispatch_stand(request);
+    case core::ModeRequestType::StartBehavior:
+        return dispatch_start_behavior(request, state_usable);
     case core::ModeRequestType::GetDown:
         return dispatch_getdown(request, state_usable);
     default:
@@ -128,6 +130,15 @@ core::ModeResult MotionRuntime::dispatch_enter_passive(const core::ModeRequest& 
         abort_active_request("interrupted by enter passive");
     }
     mode_ = core::MotionMode::Passive;
+    status_.active_source = core::CommandSource::None;
+    status_.behavior_name.clear();
+    status_.behavior_phase.clear();
+    rl_control_cycle_ = 0;
+    rl_command_ = {};
+    if (rl_controller_ != nullptr)
+    {
+        rl_controller_->reset();
+    }
     return make_result(request.request_id, core::ModeResultState::Completed,
         "entered passive");
 }
@@ -145,6 +156,11 @@ core::ModeResult MotionRuntime::dispatch_getup(
     {
         return make_result(request.request_id, core::ModeResultState::Rejected,
             "already standing");
+    }
+    if (mode_ == core::MotionMode::Running)
+    {
+        return make_result(request.request_id, core::ModeResultState::Rejected,
+            "getup is not valid while a behavior is running");
     }
     if (!state_usable)
     {
@@ -208,6 +224,48 @@ core::ModeResult MotionRuntime::dispatch_getdown(
     return accept_getdown(request.request_id);
 }
 
+core::ModeResult MotionRuntime::dispatch_start_behavior(
+    const core::ModeRequest& request,
+    const bool state_usable)
+{
+    if (request.behavior_name != "rl_locomotion")
+    {
+        return make_result(request.request_id, core::ModeResultState::Rejected,
+            "unknown behavior");
+    }
+    if (rl_controller_ == nullptr || policy_ == nullptr)
+    {
+        return make_result(request.request_id, core::ModeResultState::Rejected,
+            "RL policy is not attached");
+    }
+    if (mode_ != core::MotionMode::Stand)
+    {
+        return make_result(request.request_id, core::ModeResultState::Rejected,
+            "RL behavior requires Stand mode");
+    }
+    if (!state_usable)
+    {
+        return make_result(request.request_id, core::ModeResultState::Rejected,
+            "no valid state");
+    }
+    if (std::string reason; !check_active_preconditions(reason))
+    {
+        return make_result(request.request_id, core::ModeResultState::Rejected,
+            reason.c_str());
+    }
+
+    rl_controller_->reset();
+    rl_control_cycle_ = 0;
+    rl_command_ = {};
+    mode_ = core::MotionMode::Running;
+    status_.behavior_name = request.behavior_name;
+    status_.behavior_phase = "starting";
+    status_.policy_name = policy_name_;
+    status_.policy_ready = true;
+    return make_result(request.request_id, core::ModeResultState::Accepted,
+        "RL behavior accepted");
+}
+
 core::ModeResult MotionRuntime::dispatch_unimplemented(const core::ModeRequest& request)
 {
     // M2 明确拒绝未实现请求，不创建占位实现。
@@ -240,6 +298,13 @@ core::ModeResult MotionRuntime::accept_getup(const std::uint64_t request_id)
 
 core::ModeResult MotionRuntime::accept_getdown(const std::uint64_t request_id)
 {
+    if (has_active_request_)
+    {
+        abort_active_request("interrupted by getdown");
+    }
+    status_.active_source = core::CommandSource::None;
+    status_.behavior_name.clear();
+    status_.behavior_phase.clear();
     interp_start_ = current_positions_;
     interp_target_ = rest_pose_;
     interp_total_cycles_ = config_.getdown_cycles;

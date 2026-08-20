@@ -1,0 +1,37 @@
+# 文件：configs/policies/black/obstacle.yaml
+# 作用：black 障碍 RL 策略 himloco_obstacle 的启动期配置。
+# 来源：rl_sar@4abccaa60d4c2242466f82c8ac8ff83f4cefe9b3
+#       src/rl_sar/policy/black/himloco_obstacle/config.yaml
+#       src/rl_sar/policy/black/base.yaml
+#       src/rl_sar/policy/black/policy_switch.yaml
+# 许可证：Apache-2.0
+
+name: obstacle
+robot_name: black
+model_path: assets/policies/black/obstacle/best.pt
+
+command_scale: [2.0, 2.0, 0.25]
+command_limits: [3.0, 1.0, 3.0]
+angular_velocity_scale: 0.25
+joint_position_scale: 1.0
+joint_velocity_scale: 0.05
+observation_clip: 100.0
+
+default_joint_positions:
+  [0.05, 0.8014, -1.527,
+   -0.05, -0.8014, 1.527,
+   -0.05, 0.8014, -1.527,
+    0.05, -0.8014, 1.527]
+
+kp: [45.0, 45.0, 45.0,
+        45.0, 45.0, 45.0,
+        45.0, 45.0, 45.0,
+        45.0, 45.0, 45.0]
+kd: [1.2, 1.2, 1.2,
+        1.2, 1.2, 1.2,
+        1.2, 1.2, 1.2,
+        1.2, 1.2, 1.2]
+
+action_scale: 0.25
+action_clip: 100.0
+max_position_jump: 1.0

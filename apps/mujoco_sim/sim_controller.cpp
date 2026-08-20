@@ -31,6 +31,7 @@ std::string SimController::reset_new_session()
     has_pending_request_ = false;
     next_control_ns_ = -1;
     last_output_ = {};
+    update_sequence_ = 0;
 
     // 立即同步新会话时间并刷新显示快照，避免暂停期间 reset 后把旧会话时间
     // 写入后续请求（旧时间会让请求在新会话中因“未来时间戳”被持续拒绝）。
@@ -49,10 +50,23 @@ std::string SimController::reset_new_session()
 
 void SimController::apply_input(const SimInput& input)
 {
+    base_command_.sequence = ++base_command_sequence_;
+    base_command_.timestamp_ns = latest_state_ns_;
+    base_command_.expires_at_ns = latest_state_ns_ + 100'000'000;
+    base_command_.source = qc::CommandSource::Test;
+    base_command_.priority = 1;
+    base_command_.vx = input.vx;
+    base_command_.vy = input.vy;
+    base_command_.wz = input.wz;
+
     qc::ModeRequestType type;
     if (input.getup)
     {
         type = qc::ModeRequestType::GetUp;
+    }
+    else if (input.start_rl)
+    {
+        type = qc::ModeRequestType::StartBehavior;
     }
     else if (input.getdown)
     {
@@ -71,6 +85,10 @@ void SimController::apply_input(const SimInput& input)
     pending_request_.request_id = next_request_id_++;
     pending_request_.timestamp_ns = latest_state_ns_;
     pending_request_.type = type;
+    if (type == qc::ModeRequestType::StartBehavior)
+    {
+        pending_request_.behavior_name = "rl_locomotion";
+    }
     has_pending_request_ = true;
 }
 
@@ -101,8 +119,11 @@ bool SimController::step()
     {
         qm::MotionUpdateInput input;
         input.now_ns = latest_state_ns_;
+        input.base_command = &base_command_;
         input.request = has_pending_request_ ? &pending_request_ : nullptr;
         last_output_ = runtime_.update(io_, input);
+        ++update_sequence_;
+        has_pending_request_ = false;
         next_control_ns_ += config_.control_period_ns;
     }
     return io_.step() == qc::RobotIOCode::Ok;

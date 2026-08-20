@@ -1,16 +1,25 @@
 /**
  * @file main.cpp
- * @brief 带 GLFW 界面的交互式 MuJoCo 仿真入口，是 M2 起立和趴下的人工验收入口。
+ * @brief 带 GLFW 界面的 MuJoCo 基础运动与 RL 行走入口。
  */
 
 #include "sim_controller.hpp"
 #include "sim_display.hpp"
 #include "sim_window.hpp"
+#include "terminal_input.hpp"
 
 #include "quadruped/backends/mujoco/mujoco_robot_io.hpp"
 #include "quadruped/config/robot_config.hpp"
+#include "quadruped/config/simulation_config.hpp"
 #include "quadruped/motion/motion_runtime.hpp"
 
+#if defined(QUADRUPED_WITH_TORCH)
+#include "quadruped/config/rl_config_loader.hpp"
+#include "quadruped/policy/torch_policy.hpp"
+#endif
+
+#include <atomic>
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -29,42 +38,17 @@ namespace
 constexpr const char* kDefaultScenePath = QUADRUPED_DEFAULT_SCENE_PATH;
 constexpr const char* kDefaultRobotConfigPath = QUADRUPED_DEFAULT_ROBOT_CONFIG_PATH;
 constexpr const char* kDefaultControllerConfigPath = QUADRUPED_DEFAULT_CONTROLLER_CONFIG_PATH;
+constexpr const char* kDefaultSimulationConfigPath = QUADRUPED_DEFAULT_SIMULATION_CONFIG_PATH;
+#if defined(QUADRUPED_WITH_TORCH)
+constexpr const char* kDefaultPolicyConfigPath = QUADRUPED_DEFAULT_POLICY_CONFIG_PATH;
+#endif
 
 // 程序启动标识固定为非零值；会话号由 SimController 从 1 开始递增。
 constexpr std::uint64_t kStartupId = 1;
 
-// 低频终端状态显示间隔和渲染帧间隔。
-constexpr double kTerminalStatusIntervalSeconds = 2.0;
-constexpr double kRenderIntervalSeconds = 1.0 / 60.0;
-
 struct Options
 {
     std::string scene_path = kDefaultScenePath;
-};
-
-// 按固定墙钟间隔触发的节流器，控制低频渲染和终端显示频率。
-class IntervalThrottle
-{
-public:
-    explicit IntervalThrottle(const double interval_seconds)
-        : interval_(std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-              std::chrono::duration<double>(interval_seconds)))
-    {
-    }
-
-    bool due(const std::chrono::steady_clock::time_point now)
-    {
-        if (now >= next_)
-        {
-            next_ = now + interval_;
-            return true;
-        }
-        return false;
-    }
-
-private:
-    std::chrono::steady_clock::duration interval_;
-    std::chrono::steady_clock::time_point next_{};
 };
 
 void print_usage(const char* program)
@@ -73,9 +57,8 @@ void print_usage(const char* program)
               << "\n选项:\n"
               << "  --scene <路径>  MuJoCo 场景 XML（默认 black 平地）\n"
               << "  -h, --help      显示本帮助\n"
-              << "\n按键:\n"
-              << "  0 起立  9 趴下  P 被动  R 重置  Space 暂停/继续  Esc 退出\n"
-              << "  鼠标左键拖动旋转视角，右键拖动平移，滚轮缩放\n";
+              << "\n机器人按键在启动程序的终端中输入，MuJoCo 窗口保留官方快捷键。\n"
+              << "W/S、A/D、Q/E 每次调整 0.1，Space 速度归零，H 显示完整帮助。\n";
 }
 
 bool parse_args(int argc, char** argv, Options& options)
@@ -106,74 +89,104 @@ bool parse_args(int argc, char** argv, Options& options)
     return true;
 }
 
-// 渲染和终端显示的低频节流状态。
-struct DisplayThrottles
-{
-    IntervalThrottle render{kRenderIntervalSeconds};
-    IntervalThrottle status{kTerminalStatusIntervalSeconds};
-};
-
-// 按节流间隔渲染窗口并打印终端状态。
-void update_display(
-    qsim::SimWindow& window,
-    qsim::SimController& controller,
-    DisplayThrottles& throttles)
-{
-    const auto now = std::chrono::steady_clock::now();
-    if (throttles.render.due(now))
-    {
-        window.render(controller.data(),
-            qsim::make_status_text(controller.last_output(), controller.sim_time()),
-            qsim::make_detail_text(controller.last_output(), controller.paused()));
-    }
-    if (throttles.status.due(now))
-    {
-        qsim::print_terminal_status(controller.last_output(), controller.sim_time());
-    }
-}
-
-// 主循环：统一调度输入、物理、控制和渲染；键盘回调只更新输入副本。
-int run_loop(
+// 物理线程拥有 RobotIO 和 MotionRuntime；主线程只运行官方 Simulate 界面。
+int run_physics_loop(
     qmj::MujocoRobotIO& io,
     qsim::SimController& controller,
-    qsim::SimWindow& window)
+    qsim::SimWindow& window,
+    qsim::TerminalInput& terminal,
+    const bool policy_ready,
+    const std::string& scene_path,
+    const quadruped::config::SimulationConfig& simulation_config)
 {
     using clock = std::chrono::steady_clock;
     const double physics_timestep = io.raw_model()->opt.timestep;
     const auto tick_duration = std::chrono::duration_cast<clock::duration>(
-        std::chrono::duration<double>(physics_timestep));
+        std::chrono::duration<double>(
+            physics_timestep / simulation_config.real_time_factor));
+    const auto visual_sync_duration = std::chrono::duration_cast<clock::duration>(
+        std::chrono::duration<double>(1.0 / simulation_config.visual_sync_hz));
 
-    DisplayThrottles throttles;
-    const auto loop_start = clock::now();
-    auto next_tick = loop_start;
+    qsim::TerminalStatusPrinter status_printer(terminal.interactive());
+    window.load(io.raw_model(), io.raw_data(), scene_path);
+    window.sync();
+
+    auto next_tick = clock::now();
+    auto next_visual_sync = next_tick;
+    std::uint64_t printed_update_sequence = 0;
     while (!window.should_close())
     {
-        window.poll_events();
-        const auto& input = window.input();
+        // 官方 Reset/Load key 会直接回拨 mjData 时间；同步重建后端和运动会话。
+        if (io.raw_data()->time + physics_timestep < controller.sim_time())
+        {
+            if (const std::string error = controller.reset_new_session(); !error.empty())
+            {
+                std::cerr << "界面 reset 后重建会话失败: " << error << '\n';
+                window.request_exit();
+                return 1;
+            }
+            status_printer.reset();
+            printed_update_sequence = 0;
+            next_tick = clock::now();
+            next_visual_sync = next_tick;
+        }
+        const bool velocity_enabled =
+            controller.last_output().status.mode == qc::MotionMode::Running &&
+            controller.last_output().status.behavior_name == "rl_locomotion";
+        const auto input = terminal.poll(velocity_enabled);
         if (input.quit)
         {
+            window.request_exit();
             break;
         }
         if (input.toggle_pause)
         {
             controller.toggle_pause();
+            std::cout << (controller.paused() ? "[仿真] 已暂停\n" : "[仿真] 已继续\n");
+        }
+        if (input.show_help)
+        {
+            status_printer.print_help(policy_ready);
+        }
+        if (input.command_changed)
+        {
+            status_printer.print_command(input);
+        }
+        if (input.command_rejected)
+        {
+            status_printer.print_command_rejected();
         }
         if (input.reset)
         {
             if (const std::string error = controller.reset_new_session(); !error.empty())
             {
                 std::cerr << "reset 失败: " << error << '\n';
+                window.request_exit();
                 return 1;
             }
+            status_printer.reset();
+            printed_update_sequence = 0;
         }
         controller.apply_input(input);
 
         if (!controller.paused() && !controller.step())
         {
             std::cerr << "仿真步进或控制失败，后端进入不可恢复状态\n";
+            window.request_exit();
             return 1;
         }
-        update_display(window, controller, throttles);
+        const auto now = clock::now();
+        if (now >= next_visual_sync)
+        {
+            window.sync();
+            next_visual_sync = now + visual_sync_duration;
+        }
+        if (!controller.paused() &&
+            controller.update_sequence() != printed_update_sequence)
+        {
+            status_printer.update(controller.last_output(), controller.sim_time());
+            printed_update_sequence = controller.update_sequence();
+        }
 
         next_tick += tick_duration;
         std::this_thread::sleep_until(next_tick);
@@ -183,6 +196,9 @@ int run_loop(
 
 int run(const Options& options)
 {
+    // basic 构建不会使用速度命令；RL 构建会用策略 YAML 覆盖这份保守默认值。
+    std::array<double, 3> command_limits{3.0, 1.0, 3.0};
+    bool policy_ready = false;
     const auto model = quadruped::config::load_robot_model(kDefaultRobotConfigPath);
     if (!model.ok())
     {
@@ -194,6 +210,13 @@ int run(const Options& options)
     if (!controller.ok())
     {
         std::cerr << "加载控制器配置失败: " << controller.error_message << '\n';
+        return 1;
+    }
+    const auto simulation_config =
+        quadruped::config::load_simulation_config(kDefaultSimulationConfigPath);
+    if (!simulation_config.ok())
+    {
+        std::cerr << "加载仿真配置失败: " << simulation_config.error_message << '\n';
         return 1;
     }
 
@@ -209,8 +232,36 @@ int run(const Options& options)
         std::cerr << "创建 MotionRuntime 失败: " << runtime.error_message << '\n';
         return 1;
     }
-    const qsim::WindowOptions window_options{1280, 720, "quadruped mujoco_sim"};
-    auto window = qsim::SimWindow::create(created.io->raw_model(), window_options);
+#if defined(QUADRUPED_WITH_TORCH)
+    const auto rl_config = quadruped::config::load_rl_config(
+        kDefaultPolicyConfigPath, QUADRUPED_PROJECT_SOURCE_DIR, model.model);
+    if (!rl_config.ok())
+    {
+        std::cerr << "加载 RL 配置失败: " << rl_config.error_message << '\n';
+        return 1;
+    }
+    auto policy = quadruped::policy::TorchPolicy::create(rl_config.config);
+    if (!policy.ok())
+    {
+        std::cerr << "加载 RL 策略失败: " << policy.error_message << '\n';
+        return 1;
+    }
+    std::string attach_error;
+    if (!runtime.runtime->attach_policy(rl_config.config, *policy.policy, attach_error))
+    {
+        std::cerr << "接入 RL 策略失败: " << attach_error << '\n';
+        return 1;
+    }
+    command_limits = rl_config.config.command_limits;
+    policy_ready = true;
+#endif
+    qsim::TerminalInput terminal(command_limits);
+    if (!terminal.interactive())
+    {
+        std::cerr << "标准输入不是交互式终端，终端键盘控制已禁用。\n";
+    }
+    qsim::print_terminal_help(policy_ready);
+    auto window = qsim::SimWindow::create(simulation_config.config.vsync);
     if (!window.ok())
     {
         std::cerr << "创建窗口失败: " << window.error_message << '\n';
@@ -223,7 +274,22 @@ int run(const Options& options)
         std::cerr << "reset 失败: " << error << '\n';
         return 1;
     }
-    return run_loop(*created.io, sim, *window.window);
+    std::atomic<int> physics_result{0};
+    std::thread physics_thread([&] {
+        physics_result.store(
+            run_physics_loop(
+                *created.io,
+                sim,
+                *window.window,
+                terminal,
+                policy_ready,
+                options.scene_path,
+                simulation_config.config));
+    });
+    window.window->render_loop();
+    window.window->request_exit();
+    physics_thread.join();
+    return physics_result.load();
 }
 
 }  // namespace

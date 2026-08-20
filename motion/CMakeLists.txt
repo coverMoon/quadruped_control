@@ -5,6 +5,7 @@ add_library(quadruped_motion
     src/motion_requests.cpp
     src/motion_results.cpp
     src/motion_runtime.cpp
+    src/rl_controller.cpp
 )
 
 add_library(quadruped::motion ALIAS quadruped_motion)

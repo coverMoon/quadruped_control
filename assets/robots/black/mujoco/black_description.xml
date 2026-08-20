@@ -1,6 +1,10 @@
 <mujoco model="black_description">
   <compiler angle="radian" meshdir="assets"/>
-  <option cone="elliptic" impratio="100"/>
+  <!--
+    timestep=0.002 表示物理引擎以 2 ms 步长积分，即 500 Hz。
+    gravity 使用世界坐标系，单位为 m/s^2；修改步长后应重新验证策略稳定性。
+  -->
+  <option timestep="0.002" gravity="0 0 -9.81" cone="elliptic" impratio="100"/>
 
   <default>
   <default class="black">

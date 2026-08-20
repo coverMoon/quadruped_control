@@ -1,7 +1,0 @@
-<!-- 测试 fixture：故意留下未闭合的 body 标签，用于验证非法 XML 返回 MuJoCo 解析错误。 -->
-<mujoco model="invalid">
-  <worldbody>
-    <body name="base" pos="0 0 1">
-      <geom type="box" size="0.1 0.1 0.05" mass="1"/>
-  </worldbody>
-</mujoco>

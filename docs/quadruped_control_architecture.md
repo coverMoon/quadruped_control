@@ -9,7 +9,6 @@
 
 - [`README.md`](README.md)：文档索引、状态和参考项目边界；
 - [`第一阶段仿真闭环开发说明.md`](第一阶段仿真闭环开发说明.md)；
-- [`M2_基础运动闭环开发方案.md`](M2_基础运动闭环开发方案.md)；
 - [`STM32H7 四足机器人下位机嵌入式开发指导.md`](STM32H7%20四足机器人下位机嵌入式开发指导.md)。
 
 ## 1. 这份文档解决的问题
@@ -361,7 +360,7 @@ Linux 和 STM32H7 的结构体对齐、编译器和字节顺序可能不同，�
 | Calibration | 某一台机器人独有的零点和传感器标定 |
 | MotorProfile | 电机单位、控制模式和允许范围 |
 | ControllerConfig | 控制周期、增益、输出和安全参数 |
-| PolicyManifest | 策略输入输出、关节顺序、缩放和模型版本 |
+| RlConfig | black 策略模型路径、缩放、默认姿态和增益 |
 | DeploymentConfig | 使用纯 Linux 还是 STM32H7，以及通信方式 |
 | BoardConfig | STM32 板级外设配置，仅供下位机使用 |
 

@@ -17,9 +17,13 @@
 - `config_loader/` 中的启动期 YAML 配置加载，统一提供 black 的 `RobotModel` 和 `ControllerConfig`；
 - `motion/` 中不依赖外部框架的 `MotionRuntime`，实现
   `Passive → GetUp → Stand → GetDown → Passive` 基础运动闭环；
-- `tests/mujoco/` 中的 MuJoCo 自动测试，覆盖状态生成、命令校验、三种控制模式、安全路径和可重复性；
+- `motion/` 中固定 black 数据布局的 `RlController`，直接实现与 `rl_sar` 一致的
+  45 维观测、6 帧历史和动作换算；
+- `policy/torch/` 中的轻量 `TorchPolicy`，只负责单个 TorchScript 模型的加载和 forward；
+- `tests/mujoco/` 中覆盖 RobotIO、MotionRuntime 和 MuJoCo 的无界面闭环测试；
 - `apps/mujoco_headless/` 中的最小无界面运行入口；
-- `apps/mujoco_sim/` 中带 GLFW 界面的交互仿真程序，支持按键起立、趴下、被动、重置和暂停。
+- `apps/mujoco_sim/` 中嵌入 MuJoCo 官方 Simulate 完整界面的交互仿真程序，支持起立、
+  RL 行走、趴下、被动、重置和暂停。
 
 核心库 `core/` 不依赖 ROS 2、Torch、MuJoCo 或电机 SDK。`motion/` 只依赖 `core/`，
 YAML 配置加载只存在于启动期模块 `config_loader/`。MuJoCo C++ API 类型
@@ -32,12 +36,12 @@ YAML 配置加载只存在于启动期模块 `config_loader/`。MuJoCo C++ API �
 M1 的 MuJoCo 开环仿真和 M2 的基础运动闭环已经完成。M2 已通过代码复审和用户界面验收
 （起立和趴下效果已由用户确认）：启动期 YAML 配置加载统一了 black 的 `RobotModel` 和
 `ControllerConfig`，`MotionRuntime` 不依赖 ROS 2、Torch 和 MuJoCo，带 GLFW 界面的
-MuJoCo 交互程序已完成 `Passive → GetUp → Stand → GetDown → Passive` 闭环。
+  MuJoCo 交互程序已完成 `Passive → GetUp → Stand → GetDown → Passive` 闭环。
 
-公共数据结构、`RobotModel`、`RobotIO`、基础校验、`MujocoRobotIO`、无界面运行入口和
-可重复性测试已经完成并通过测试。当前仍不包含 RL 策略推理和 ROS 2 适配器；
-下一步是 M3 RL 行走闭环。方案见
-[`docs/M2_基础运动闭环开发方案.md`](docs/M2_基础运动闭环开发方案.md)。
+公共数据结构、`RobotModel`、`RobotIO`、基础校验、`MujocoRobotIO` 和基础运动闭环已经
+完成。M3 的 black 固定 RL 数据路径和真实 TorchScript 推理已经接入 `MotionRuntime` 与
+MuJoCo：从 Stand 启动 `rl_locomotion` 后，每 4 个控制周期执行一次策略并提交关节阻抗命令；
+推理、观测或动作失败时回到 Passive。ROS 2 适配器尚未实现。
 
 M1 固定使用 MuJoCo 3.9.0。依赖安装在仓库本地的 `.deps/` 目录，不依赖
 Python 或 Conda 环境。
@@ -66,8 +70,14 @@ Python 或 Conda 环境。
 ./scripts/build.sh --mujoco
 ```
 
+构建 MuJoCo 和 LibTorch 策略模块：
+
+```bash
+./scripts/build.sh --rl
+```
+
 该参数会启用 MuJoCo 3.9.0 依赖，构建 `quadruped_mujoco` 后端、全部 MuJoCo 测试、
-`apps/mujoco_headless/` 无界面程序和 `apps/mujoco_sim/` 带界面程序。
+  `apps/mujoco_headless/` 无界面程序和 `apps/mujoco_sim/` 官方完整界面程序。
 首次使用 MuJoCo 模块前运行：
 
 ```bash
@@ -77,8 +87,8 @@ Python 或 Conda 环境。
 系统依赖（Ubuntu/Debian 包名）：
 
 - 默认构建需要 yaml-cpp 开发包：`sudo apt install libyaml-cpp-dev`；
-- `--mujoco` 构建的带界面程序还需要 GLFW 3.3 和 OpenGL：
-  `sudo apt install libglfw3-dev libgl1-mesa-dev`；
+- `--mujoco` 构建的带界面程序还需要 GLFW 3.3、OpenGL 和 libpng：
+  `sudo apt install libglfw3-dev libgl1-mesa-dev libpng-dev`；
 - MuJoCo 3.9.0 本身由 `setup_mujoco.sh` 安装到仓库本地 `.deps/`，不依赖 Python 或 Conda。
 
 运行无界面仿真：
@@ -87,11 +97,21 @@ Python 或 Conda 环境。
 ./scripts/run_mujoco_headless.sh --duration 2.0
 ```
 
-运行带 GLFW 界面的交互仿真（按 0 起立、9 趴下、P 被动、R 重置、Space 暂停、Esc 退出）：
+运行带 GLFW 界面的 RL 交互仿真：
 
 ```bash
 ./scripts/run_mujoco_sim.sh
 ```
+
+机器人按键在启动程序的终端中输入，MuJoCo 窗口只保留官方快捷键。按 `0` 起立，完成后按
+`1` 启动 RL；`W/S`、`A/D`、`Q/E` 每次把对应速度调整 `0.1`，`Space` 将三轴速度归零。
+`9` 趴下，`P` 进入被动，`R` 重置，`K` 暂停，`X` 退出。只运行不加载 LibTorch 的基础
+仿真可使用 `./scripts/run_mujoco_sim.sh --basic`。
+速度键只在 `rl_locomotion` 的 Running 模式生效；离开该模式会自动清零速度目标。
+
+当前实现状态、参考工程差距和 RL 时序分别见
+[`docs/current_status.md`](docs/current_status.md) 与
+[`docs/rl_mujoco_runtime.md`](docs/rl_mujoco_runtime.md)。
 
 上述脚本均可从任意当前目录启动。
 
@@ -118,13 +138,15 @@ quadruped_control/
 ├── config_loader/                    启动期 YAML 配置加载代码
 ├── configs/
 │   ├── controllers/                  控制器参数配置
+│   ├── policies/                     精简 RL 策略参数
 │   └── robots/                       机器人结构配置
 ├── core/
 │   ├── include/quadruped/core/       核心库公共头文件
 │   └── src/                          核心库实现
 ├── docs/
 │   └── diagrams/                     架构图源文件和图片
-├── motion/                           MotionRuntime 与基础运动状态机
+├── motion/                           MotionRuntime、RlController 与基础运动状态机
+├── policy/torch/                     单个 TorchScript 策略的推理适配器
 ├── scripts/                          编译、运行和开发辅助脚本
 └── tests/                            自动测试
 ```
@@ -148,16 +170,15 @@ compile_commands.json                  指向编译数据库的符号链接
 - `core/include/quadruped/core/` 只放其他模块可以使用的公共头文件。公共头文件不能引入 ROS 2、Torch、MuJoCo 或电机 SDK。
 - `core/src/` 放核心库的实现，不把只在一个 `.cpp` 中使用的辅助函数暴露到公共头文件。
 - `config_loader/` 是读取和校验 YAML 的 C++ 代码模块，不存放具体机器人或控制器参数。
-- `configs/robots/` 放机器人固有信息，例如关节名称、顺序、功能角色和机械限制。控制器参数和策略参数以后分别放入 `configs/controllers/` 与 `configs/policies/`，不能混入机器人配置。
+- `configs/robots/` 放机器人固有信息，例如关节名称、顺序、功能角色和机械限制。控制器参数和策略参数分别放入 `configs/controllers/` 与 `configs/policies/`，不能混入机器人配置。
 - `docs/` 放设计文档，文档使用的架构图源文件和图片统一放在 `docs/diagrams/`。
 - `scripts/` 放编译、运行、维护和开发辅助脚本。脚本应能从任意工作目录启动，不能假定调用者当前位于仓库根目录。
 - `tests/` 按被测模块组织测试。M0 测试不依赖网络和第三方测试框架。
 - 构建结果、日志、临时文件和编辑器生成文件不能放入源码目录，也不能提交到 Git。
 
-后续开始相应功能时，再按下面的位置创建目录：
+后续接入 ROS 2 时使用下面的位置：
 
 ```text
-motion/                                 MotionRuntime、状态机和策略运行
 adapters/ros2/                          ROS 2 消息转换和外围接口
 ```
 

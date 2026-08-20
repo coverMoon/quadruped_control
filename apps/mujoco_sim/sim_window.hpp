@@ -1,36 +1,22 @@
 /**
  * @file sim_window.hpp
- * @brief 定义 mujoco_sim 的 GLFW 窗口封装：渲染、相机控制和键盘输入快照。
+ * @brief 封装 MuJoCo 官方 Simulate 界面及线程安全的仿真控制输入。
  */
 
 #pragma once
-
-#include "sim_input.hpp"
 
 #include <mujoco/mujoco.h>
 
 #include <memory>
 #include <string>
 
-struct GLFWwindow;
-
 namespace quadruped::apps::mujoco_sim
 {
 
-// 窗口创建参数：尺寸和标题集中描述，避免 create() 参数过多。
-struct WindowOptions
-{
-    int width{1280};
-    int height{720};
-    const char* title{""};
-};
-
-// 单窗口的 MuJoCo 渲染和输入封装；键盘回调只记录边沿事件，
-// 不直接运行状态机或推进物理，物理和控制由主循环统一调度。
+// 官方 Simulate 在主线程渲染；物理线程通过 load、sync 和 take_input 与它交换数据。
 class SimWindow
 {
 public:
-    // create() 的返回结果：成功时 window 非空，失败时 error_message 含有可读原因。
     struct CreateResult
     {
         std::unique_ptr<SimWindow> window{};
@@ -46,51 +32,24 @@ public:
     SimWindow& operator=(const SimWindow&) = delete;
     ~SimWindow();
 
-    // 创建窗口并初始化 MuJoCo 渲染资源；model 必须长于窗口生命周期。
-    static CreateResult create(const mjModel* model, const WindowOptions& options);
+    // vsync 决定 GPU 换帧是否等待显示器刷新，不改变物理或控制频率。
+    static CreateResult create(bool vsync);
 
-    // 用户请求关闭窗口（关闭按钮或 Esc）时返回 true。
+    // load() 由物理线程调用，并等待主线程完成 OpenGL 资源装载。
+    void load(const mjModel* model, mjData* data, const std::string& displayed_filename);
+    void sync();
+
+    // render_loop() 必须在创建窗口的主线程调用，直至窗口关闭。
+    void render_loop();
+    void request_exit();
+
     [[nodiscard]] bool should_close() const;
-
-    // 处理窗口事件并刷新输入快照；每个主循环周期调用一次。
-    void poll_events();
-
-    // 本周期产生的按键边沿事件。
-    [[nodiscard]] const SimInput& input() const noexcept
-    {
-        return input_;
-    }
-
-    // 渲染当前 mjData 状态，并在左上角叠加一行状态文本和一行错误/提示文本。
-    void render(mjData* data, const std::string& status_text, const std::string& detail_text);
-
 private:
-    SimWindow(const mjModel* model, GLFWwindow* window);
+    class Impl;
 
-    // GLFW 回调入口，通过 window user pointer 转发到实例方法。
-    static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
-    static void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
-    static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos);
-    static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+    explicit SimWindow(std::unique_ptr<Impl> impl);
 
-    void handle_key(int key, int action);
-    void handle_mouse_move(double xpos, double ypos);
-
-    const mjModel* model_{nullptr};
-    GLFWwindow* window_{nullptr};
-
-    mjvCamera camera_{};
-    mjvOption option_{};
-    mjvScene scene_{};
-    mjrContext context_{};
-
-    SimInput input_{};
-
-    // 鼠标相机控制状态：记录按键按下状态和上一帧光标位置。
-    bool mouse_left_{false};
-    bool mouse_right_{false};
-    double last_cursor_x_{0.0};
-    double last_cursor_y_{0.0};
+    std::unique_ptr<Impl> impl_{};
 };
 
 }  // 命名空间 quadruped::apps::mujoco_sim

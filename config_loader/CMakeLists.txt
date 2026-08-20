@@ -5,7 +5,9 @@ find_package(yaml-cpp REQUIRED)
 
 add_library(quadruped_config
     src/controller_config_loader.cpp
+    src/rl_config_loader.cpp
     src/robot_model_loader.cpp
+    src/simulation_config_loader.cpp
 )
 
 add_library(quadruped::config ALIAS quadruped_config)
@@ -19,6 +21,7 @@ target_include_directories(quadruped_config
 target_link_libraries(quadruped_config
     PUBLIC
         quadruped::core
+        quadruped::motion
     PRIVATE
         yaml-cpp
 )

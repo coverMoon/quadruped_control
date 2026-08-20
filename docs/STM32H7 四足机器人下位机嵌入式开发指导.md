@@ -312,7 +312,7 @@ BSP / HAL
 | `MotorProfile` | 电机单位、模式能力、参数范围和安全退路 | 增加或更新电机 |
 | `BoardConfig` | H7 外设实例、引脚、DMA、内存区和时钟 | 更换控制板 |
 
-Linux 侧还可能有 `ControllerConfig`、`PolicyManifest` 和 `DeploymentConfig`，但它们不是 H7 板级配置的替代品。
+Linux 侧还可能有 `ControllerConfig`、`RlConfig` 和 `DeploymentConfig`，但它们不是 H7 板级配置的替代品。
 
 ### 5.2 标准机器人语义
 

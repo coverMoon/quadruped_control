@@ -1,12 +1,17 @@
 /**
  * @file mujoco_motion_tests.cpp
- * @brief MuJoCo 环境下 MotionRuntime 的无界面集成测试：自然落地、两段起立、站立和趴下。
+ * @brief 验证 MuJoCo 中自然落地、起立、RL 前进横移和趴下闭环。
  */
 
 #include "test_helpers.hpp"
 
 #include "quadruped/config/robot_config.hpp"
 #include "quadruped/motion/motion_runtime.hpp"
+
+#if defined(QUADRUPED_WITH_TORCH)
+#include "quadruped/config/rl_config_loader.hpp"
+#include "quadruped/policy/torch_policy.hpp"
+#endif
 
 #include <cmath>
 #include <cstdint>
@@ -55,6 +60,13 @@ public:
             qm::MotionUpdateInput input;
             input.now_ns = state.header.timestamp_ns;
             input.request = request;
+            if (has_base_command_)
+            {
+                base_command_.sequence += 1;
+                base_command_.timestamp_ns = state.header.timestamp_ns;
+                base_command_.expires_at_ns = state.header.timestamp_ns + 100'000'000;
+                input.base_command = &base_command_;
+            }
             last_output_ = runtime_.update(io_, input);
             if (last_output_.read_code != qc::RobotIOCode::Ok)
             {
@@ -95,6 +107,12 @@ public:
             {
                 return true;
             }
+            if (last_output_.has_result &&
+                (last_output_.result.state == qc::ModeResultState::Rejected ||
+                    last_output_.result.state == qc::ModeResultState::Failed))
+            {
+                return false;
+            }
         }
         return false;
     }
@@ -102,6 +120,16 @@ public:
     const qm::MotionUpdateOutput& last_output() const
     {
         return last_output_;
+    }
+
+    void set_base_command(const double vx, const double vy, const double wz)
+    {
+        has_base_command_ = true;
+        base_command_.source = qc::CommandSource::Test;
+        base_command_.priority = 1;
+        base_command_.vx = vx;
+        base_command_.vy = vy;
+        base_command_.wz = wz;
     }
 
 private:
@@ -115,6 +143,8 @@ private:
     const qc::ControllerConfig& config_;
     qc::Nanoseconds next_control_ns_{-1};
     qm::MotionUpdateOutput last_output_{};
+    qc::BaseCommand base_command_{};
+    bool has_base_command_{false};
 };
 
 // 读取当前状态中的全部关节位置。
@@ -203,11 +233,60 @@ void run_stand_phase(const MotionContext& ctx, const double fallen_height)
             "，落地 " + std::to_string(fallen_height) + "）");
 }
 
+#if defined(QUADRUPED_WITH_TORCH)
+// 阶段 4：真实 flat 策略接收前进命令，在 MuJoCo 中保持站立并产生机体位移。
+void run_rl_phase(const MotionContext& ctx)
+{
+    const double start_x = ctx.io.raw_data()->qpos[0];
+    ctx.sim.set_base_command(0.6, 0.0, 0.0);
+
+    qc::ModeRequest start;
+    start.request_id = 2;
+    start.type = qc::ModeRequestType::StartBehavior;
+    start.behavior_name = "rl_locomotion";
+    const bool started = ctx.sim.run_until_completed(1.0, start);
+    expect(started,
+        "RL behavior 应在首次成功推理后启动（状态：" +
+            ctx.sim.last_output().status.error_message + "，请求：" +
+            ctx.sim.last_output().result.message + "）");
+    ctx.sim.run_seconds(4.0);
+
+    const double displacement = ctx.io.raw_data()->qpos[0] - start_x;
+    const double height = ctx.io.raw_data()->qpos[2];
+    std::cout << "RL 闭环：4 秒位移=" << displacement << " m，躯干高度=" << height
+              << " m\n";
+    expect(ctx.sim.last_output().status.mode == qc::MotionMode::Running,
+        "RL 闭环期间应保持 Running");
+    expect(ctx.sim.last_output().status.behavior_name == "rl_locomotion",
+        "运行状态应报告 rl_locomotion");
+    expect(ctx.sim.last_output().status.error_message.empty(), "RL 闭环不应报告错误");
+    expect(displacement > 0.10,
+        "前进命令应产生明显前向位移（位移 " + std::to_string(displacement) + " m）");
+    expect(height > 0.25,
+        "RL 行走期间躯干不应倒地（高度 " + std::to_string(height) + " m）");
+
+    const double start_y = ctx.io.raw_data()->qpos[1];
+    ctx.sim.set_base_command(0.0, 1.0, 0.0);
+    ctx.sim.run_seconds(4.0);
+    const double lateral_displacement = ctx.io.raw_data()->qpos[1] - start_y;
+    std::cout << "RL 横移：4 秒侧向位移=" << lateral_displacement << " m\n";
+    expect(lateral_displacement > 0.05,
+        "正横移命令应产生正向侧移（位移 " +
+            std::to_string(lateral_displacement) + " m）");
+    expect(ctx.io.raw_data()->qpos[2] > 0.25, "RL 横移期间躯干不应倒地");
+}
+#endif
+
 // 阶段 4/5：趴下回到记录的落地姿态并进入 Passive。
 void run_getdown_phase(const MotionContext& ctx, const std::array<double, qc::kMaxJoints>& rest)
 {
     qc::ModeRequest getdown;
-    getdown.request_id = 2;
+    getdown.request_id =
+#if defined(QUADRUPED_WITH_TORCH)
+        3;
+#else
+        2;
+#endif
     getdown.type = qc::ModeRequestType::GetDown;
     expect(ctx.sim.run_until_completed(8.0, getdown), "趴下应在 8 秒仿真时间内完成");
     expect(ctx.sim.last_output().status.mode == qc::MotionMode::Passive,
@@ -246,6 +325,20 @@ int main()
         expect(false, "创建 MotionRuntime 失败：" + runtime.error_message);
         return 1;
     }
+#if defined(QUADRUPED_WITH_TORCH)
+    const auto rl_config = quadruped::config::load_rl_config(
+        QUADRUPED_POLICY_FLAT_CONFIG_PATH, QUADRUPED_PROJECT_SOURCE_DIR, model.model);
+    expect(rl_config.ok(), "加载 flat RL 配置失败：" + rl_config.error_message);
+    auto policy = quadruped::policy::TorchPolicy::create(rl_config.config);
+    expect(policy.ok(), "加载 flat TorchScript 失败：" + policy.error_message);
+    std::string attach_error;
+    if (!rl_config.ok() || !policy.ok() ||
+        !runtime.runtime->attach_policy(rl_config.config, *policy.policy, attach_error))
+    {
+        expect(false, "接入 flat 策略失败：" + attach_error);
+        return 1;
+    }
+#endif
     if (!created.io->reset(1).ok())
     {
         expect(false, "reset 失败");
@@ -256,6 +349,9 @@ int main()
     const MotionContext context{*created.io, sim, model.model, controller.config};
     const FallPhaseResult fall = run_fall_phase(context);
     run_stand_phase(context, fall.fallen_height);
+#if defined(QUADRUPED_WITH_TORCH)
+    run_rl_phase(context);
+#endif
     run_getdown_phase(context, fall.rest);
 
     if (failures > 0)

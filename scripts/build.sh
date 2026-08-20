@@ -11,16 +11,19 @@ project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 build_root="${project_dir}/build"
 build_profile="default"
 mujoco_cmake_option="OFF"
+torch_cmake_option="OFF"
 
 # 默认执行测试；命令行参数只覆盖本次构建行为，不修改源文件。
 run_tests=true
 clean_build=false
 enable_mujoco=false
+enable_torch=false
 
 usage() {
-    echo "Usage: ./scripts/build.sh [--mujoco] [--clean] [--no-test]"
+    echo "Usage: ./scripts/build.sh [--mujoco|--rl] [--clean] [--no-test]"
     echo
     echo "  --mujoco   Build the MuJoCo-enabled profile under build/mujoco"
+    echo "  --rl       Build MuJoCo and Torch under build/rl"
     echo "  --clean    Remove all profiles under build before configuring"
     echo "  --no-test  Build without running CTest"
     echo "  -h, --help Show this help"
@@ -35,6 +38,13 @@ while (($# > 0)); do
             enable_mujoco=true
             build_profile="mujoco"
             mujoco_cmake_option="ON"
+            ;;
+        --rl)
+            enable_mujoco=true
+            enable_torch=true
+            build_profile="rl"
+            mujoco_cmake_option="ON"
+            torch_cmake_option="ON"
             ;;
         --no-test)
             run_tests=false
@@ -66,6 +76,13 @@ then
     exit 1
 fi
 
+if [[ "${enable_torch}" == true &&
+      ! -f "${project_dir}/.deps/libtorch-2.0.1-cpu/share/cmake/Torch/TorchConfig.cmake" ]]
+then
+    echo "未找到 LibTorch 2.0.1 CPU，请先运行 ./scripts/setup_libtorch.sh。" >&2
+    exit 1
+fi
+
 # 优先使用全部在线 CPU；无法读取处理器数量时退化为单线程构建。
 jobs="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
 
@@ -74,7 +91,8 @@ cmake \
     -B "${build_dir}" \
     -DCMAKE_BUILD_TYPE=Debug \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-    -DQUADRUPED_ENABLE_MUJOCO="${mujoco_cmake_option}"
+    -DQUADRUPED_ENABLE_MUJOCO="${mujoco_cmake_option}" \
+    -DQUADRUPED_ENABLE_TORCH="${torch_cmake_option}"
 
 cmake --build "${build_dir}" --parallel "${jobs}"
 

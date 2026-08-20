@@ -9,6 +9,7 @@
 #include "quadruped/core/robot_io.hpp"
 #include "quadruped/core/robot_model.hpp"
 #include "quadruped/core/types.hpp"
+#include "quadruped/motion/rl_controller.hpp"
 
 #include <array>
 #include <cstdint>
@@ -84,6 +85,10 @@ public:
     // 不允许运行时使用部分默认值继续主动控制。
     static CreateResult create(core::RobotModel model, core::ControllerConfig config);
 
+    // 绑定一个由调用方持有的同步策略。策略对象必须比 MotionRuntime 生命周期长。
+    // 重复调用会替换当前策略并清空 RL 历史。
+    bool attach_policy(RlConfig config, Policy& policy, std::string& error_message);
+
     // 执行一个控制周期：读取最新状态、处理请求、生成并提交命令。
     // 不抛出异常；所有 RobotIO 错误都通过输出结果表达。
     MotionUpdateOutput update(core::RobotIO& io, const MotionUpdateInput& input);
@@ -133,6 +138,8 @@ private:
     core::ModeResult dispatch_enter_passive(const core::ModeRequest& request);
     core::ModeResult dispatch_getup(const core::ModeRequest& request, bool state_usable);
     core::ModeResult dispatch_stand(const core::ModeRequest& request);
+    core::ModeResult dispatch_start_behavior(
+        const core::ModeRequest& request, bool state_usable);
     core::ModeResult dispatch_getdown(const core::ModeRequest& request, bool state_usable);
     core::ModeResult dispatch_unimplemented(const core::ModeRequest& request);
 
@@ -150,6 +157,13 @@ private:
     bool run_active_mode(
         core::RobotIO& io,
         const StateRead& state,
+        MotionUpdateOutput& output);
+
+    // Running 模式按固定 decimation 执行策略，其余控制周期保持最近关节目标。
+    bool run_rl_mode(
+        core::RobotIO& io,
+        const StateRead& state,
+        const core::BaseCommand* base_command,
         MotionUpdateOutput& output);
 
     // 主动模式条件失效：活动请求转为 Failed 终态，回到 Passive 并记录错误。
@@ -183,6 +197,10 @@ private:
         const std::array<double, core::kMaxJoints>& positions;
         bool use_impedance{true};
         core::Nanoseconds now_ns{0};
+        const std::array<double, core::kMaxJoints>* velocities{nullptr};
+        const std::array<double, core::kMaxJoints>* kp{nullptr};
+        const std::array<double, core::kMaxJoints>* kd{nullptr};
+        core::CommandSource source{core::CommandSource::None};
     };
 
     // 按当前模式填充命令的关节数组并提交；use_impedance 为 false 时提交 Disabled。
@@ -190,6 +208,12 @@ private:
 
     core::RobotModel model_;
     core::ControllerConfig config_;
+
+    std::unique_ptr<RlController> rl_controller_{};
+    Policy* policy_{nullptr};
+    std::string policy_name_{};
+    std::uint32_t rl_control_cycle_{0};
+    RlController::CommandResult rl_command_{};
 
     core::MotionMode mode_{core::MotionMode::Passive};
 

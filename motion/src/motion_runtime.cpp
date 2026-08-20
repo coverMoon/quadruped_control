@@ -63,6 +63,28 @@ MotionRuntime::CreateResult MotionRuntime::create(
     return result;
 }
 
+bool MotionRuntime::attach_policy(
+    RlConfig config,
+    Policy& policy,
+    std::string& error_message)
+{
+    auto created = RlController::create(model_, config);
+    if (!created.ok())
+    {
+        error_message = created.error_message;
+        return false;
+    }
+    policy_name_ = config.name;
+    rl_controller_ = std::move(created.controller);
+    policy_ = &policy;
+    rl_control_cycle_ = 0;
+    rl_command_ = {};
+    status_.policy_name = policy_name_;
+    status_.policy_ready = true;
+    error_message.clear();
+    return true;
+}
+
 bool MotionRuntime::track_session(const core::StateFrame& state)
 {
     if (state.header.startup_id == startup_id_ && state.header.session_id == session_id_)
@@ -89,7 +111,16 @@ bool MotionRuntime::track_session(const core::StateFrame& state)
     terminal_next_ = 0;
     has_rest_pose_ = false;
     getup_second_phase_ = false;
+    rl_control_cycle_ = 0;
+    rl_command_ = {};
+    if (rl_controller_ != nullptr)
+    {
+        rl_controller_->reset();
+    }
     mode_ = core::MotionMode::Passive;
+    status_.active_source = core::CommandSource::None;
+    status_.behavior_name.clear();
+    status_.behavior_phase.clear();
     status_.error_message.clear();
     return switched;
 }
@@ -132,7 +163,7 @@ core::RobotIOCode MotionRuntime::submit_command(
         : submission.now_ns + config_.command_validity_ns;
     command.joint_count = model_.joint_count;
     command.motion_mode = mode_;
-    command.source = core::CommandSource::None;
+    command.source = submission.source;
 
     for (std::size_t i = 0; i < model_.joint_count; ++i)
     {
@@ -145,9 +176,11 @@ core::RobotIOCode MotionRuntime::submit_command(
         }
         joint.mode = core::ControlMode::JointImpedance;
         joint.target_position = submission.positions[i];
-        joint.target_velocity = 0.0;
-        joint.kp = config_.fixed_kp[i];
-        joint.kd = config_.fixed_kd[i];
+        joint.target_velocity = submission.velocities == nullptr
+            ? 0.0
+            : (*submission.velocities)[i];
+        joint.kp = submission.kp == nullptr ? config_.fixed_kp[i] : (*submission.kp)[i];
+        joint.kd = submission.kd == nullptr ? config_.fixed_kd[i] : (*submission.kd)[i];
         joint.feedforward_effort = 0.0;
     }
     return io.submit(command);
@@ -229,6 +262,88 @@ bool MotionRuntime::run_active_mode(
     return false;
 }
 
+bool MotionRuntime::run_rl_mode(
+    core::RobotIO& io,
+    const StateRead& state,
+    const core::BaseCommand* const base_command,
+    MotionUpdateOutput& output)
+{
+    const auto fail = [&](const std::string& reason) {
+        fail_active_motion(reason);
+        status_.active_source = core::CommandSource::None;
+        status_.behavior_name.clear();
+        status_.behavior_phase.clear();
+        if (state.usable)
+        {
+            output.submit_code = submit_command(io, {current_positions_, false, state.now_ns});
+            output.submitted = true;
+        }
+        return true;
+    };
+
+    if (!state.usable)
+    {
+        return fail(state.failure_reason);
+    }
+    if (std::string reason; !check_active_preconditions(reason))
+    {
+        return fail(reason);
+    }
+    if (rl_controller_ == nullptr || policy_ == nullptr)
+    {
+        return fail("RL policy is not attached");
+    }
+
+    rl_controller_->update_command(base_command, state.now_ns);
+    const bool inference_due = !rl_command_.ok || rl_control_cycle_ % kRlDecimation == 0;
+    if (inference_due)
+    {
+        const auto observation = rl_controller_->build_observation(state.frame, state.now_ns);
+        if (!observation.ok)
+        {
+            return fail("RL observation failed: " + observation.error_message);
+        }
+        rl_controller_->insert_observation(observation.observation);
+        const auto inference = policy_->forward(rl_controller_->inference_input());
+        if (!inference.ok)
+        {
+            return fail("RL inference failed: " + inference.error_message);
+        }
+        if (inference.elapsed_ns > kRlInferenceDeadlineNs)
+        {
+            return fail("RL inference exceeded deadline: " +
+                std::to_string(inference.elapsed_ns / 1'000'000) + " ms");
+        }
+        rl_command_ = rl_controller_->convert_actions(inference.actions, current_positions_);
+        if (!rl_command_.ok)
+        {
+            return fail("RL action conversion failed: " + rl_command_.error_message);
+        }
+        if (has_active_request_)
+        {
+            complete_active_request("behavior started");
+        }
+    }
+    ++rl_control_cycle_;
+
+    status_.active_source = rl_controller_->active_command_source();
+    status_.behavior_phase = "driving";
+    output.submit_code = submit_command(io,
+        {rl_command_.target_positions,
+            true,
+            state.now_ns,
+            &rl_command_.target_velocities,
+            &rl_command_.kp,
+            &rl_command_.kd,
+            status_.active_source});
+    output.submitted = true;
+    if (output.submit_code != core::RobotIOCode::Ok)
+    {
+        return fail("RL command submit failed");
+    }
+    return false;
+}
+
 MotionUpdateOutput MotionRuntime::update(core::RobotIO& io, const MotionUpdateInput& input)
 {
     MotionUpdateOutput output;
@@ -249,6 +364,10 @@ MotionUpdateOutput MotionRuntime::update(core::RobotIO& io, const MotionUpdateIn
             output.submit_code = submit_command(io, {current_positions_, false, input.now_ns});
             output.submitted = true;
         }
+    }
+    else if (mode_ == core::MotionMode::Running)
+    {
+        failed_this_cycle = run_rl_mode(io, state, input.base_command, output);
     }
     else
     {
