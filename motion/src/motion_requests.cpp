@@ -37,6 +37,7 @@ double interpolate(const double start, const double target, const double percent
 void MotionRuntime::handle_input_request(
     const MotionUpdateInput& input,
     const StateRead& state,
+    const bool base_command_usable,
     MotionUpdateOutput& output)
 {
     if (input.request == nullptr)
@@ -70,7 +71,7 @@ void MotionRuntime::handle_input_request(
     if (input.request->request_id != 0 &&
         input.request->request_id <= latest_request_id_)
     {
-        output.result = handle_request(*input.request, state.usable);
+        output.result = handle_request(*input.request, state.usable, base_command_usable);
         return;
     }
 
@@ -83,13 +84,14 @@ void MotionRuntime::handle_input_request(
     }
     else
     {
-        output.result = handle_request(*input.request, state.usable);
+        output.result = handle_request(*input.request, state.usable, base_command_usable);
     }
 }
 
 core::ModeResult MotionRuntime::handle_request(
     const core::ModeRequest& request,
-    const bool state_usable)
+    const bool state_usable,
+    const bool base_command_usable)
 {
     // 正在执行的活动请求：相同编号视为重试，返回实时结果，不重复执行。
     if (has_active_request_ && request.request_id == active_request_id_)
@@ -109,7 +111,7 @@ core::ModeResult MotionRuntime::handle_request(
     }
 
     // 编号更大的新请求：被拒绝的请求只记录自身终态，不覆盖活动请求的结果。
-    const core::ModeResult result = dispatch_request(request, state_usable);
+    const core::ModeResult result = dispatch_request(request, state_usable, base_command_usable);
     if (request.request_id > latest_request_id_)
     {
         latest_request_id_ = request.request_id;
@@ -128,7 +130,8 @@ core::ModeResult MotionRuntime::handle_request(
 
 core::ModeResult MotionRuntime::dispatch_request(
     const core::ModeRequest& request,
-    const bool state_usable)
+    const bool state_usable,
+    const bool base_command_usable)
 {
     switch (request.type)
     {
@@ -139,7 +142,7 @@ core::ModeResult MotionRuntime::dispatch_request(
     case core::ModeRequestType::Stand:
         return dispatch_stand(request);
     case core::ModeRequestType::StartBehavior:
-        return dispatch_start_behavior(request, state_usable);
+        return dispatch_start_behavior(request, state_usable, base_command_usable);
     case core::ModeRequestType::GetDown:
         return dispatch_getdown(request, state_usable);
     case core::ModeRequestType::SwitchPolicy:
@@ -252,7 +255,8 @@ core::ModeResult MotionRuntime::dispatch_getdown(
 
 core::ModeResult MotionRuntime::dispatch_start_behavior(
     const core::ModeRequest& request,
-    const bool state_usable)
+    const bool state_usable,
+    const bool base_command_usable)
 {
     if (request.behavior_name != "rl_locomotion")
     {
@@ -273,6 +277,11 @@ core::ModeResult MotionRuntime::dispatch_start_behavior(
     {
         return make_result(request.request_id, core::ModeResultState::Rejected,
             "no valid state");
+    }
+    if (!base_command_usable)
+    {
+        return make_result(request.request_id, core::ModeResultState::Rejected,
+            "rl_locomotion requires a valid BaseCommand");
     }
     if (std::string reason; !check_active_preconditions(reason))
     {

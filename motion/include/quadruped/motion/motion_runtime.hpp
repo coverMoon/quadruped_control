@@ -25,7 +25,8 @@ struct MotionUpdateInput
 {
     core::Nanoseconds now_ns{0};
 
-    // 最新有效的机体速度命令；M2 不执行 Running 功能，仅保留接口位置。
+    // 最新有效的机体速度命令；启动 rl_locomotion 时必须存在且未过期。
+    // 运行中命令失效时按零速观测。
     const core::BaseCommand* base_command{nullptr};
 
     // 本周期待处理的一次性请求；同一请求可以在后续周期重试。
@@ -128,23 +129,32 @@ private:
 
     // 处理本周期的请求：新请求分派，相同编号返回当前结果，旧编号查询终态。
     // 去重查询优先于字段校验，保证过期重试仍能取得原请求结果。
-    core::ModeResult handle_request(const core::ModeRequest& request, bool state_usable);
+    core::ModeResult handle_request(
+        const core::ModeRequest& request,
+        bool state_usable,
+        bool base_command_usable);
 
     // 处理输入请求并写入输出：非法请求直接拒绝，合法请求进入编号去重；
     // 会话切换周期不处理任何输入请求，避免旧请求被自动重启到新会话。
     void handle_input_request(
         const MotionUpdateInput& input,
         const StateRead& state,
+        bool base_command_usable,
         MotionUpdateOutput& output);
 
     // 分派一个编号严格大于最近编号的新请求；按请求类型拆到具体处理函数。
-    core::ModeResult dispatch_request(const core::ModeRequest& request, bool state_usable);
+    core::ModeResult dispatch_request(
+        const core::ModeRequest& request,
+        bool state_usable,
+        bool base_command_usable);
 
     core::ModeResult dispatch_enter_passive(const core::ModeRequest& request);
     core::ModeResult dispatch_getup(const core::ModeRequest& request, bool state_usable);
     core::ModeResult dispatch_stand(const core::ModeRequest& request);
     core::ModeResult dispatch_start_behavior(
-        const core::ModeRequest& request, bool state_usable);
+        const core::ModeRequest& request,
+        bool state_usable,
+        bool base_command_usable);
     core::ModeResult dispatch_getdown(const core::ModeRequest& request, bool state_usable);
     core::ModeResult dispatch_switch_policy(
         const core::ModeRequest& request, bool state_usable);

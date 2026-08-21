@@ -61,5 +61,6 @@ TorchScript 策略目标频率                50 Hz（20 ms）
 ## 4. 模型选择
 
 - 默认交互运行加载 `assets/policies/black/flat/Flat_Jul03_15-01-07.pt`；
-- obstacle 模型保留在资产目录并有参考输出测试，但当前没有运行时切换入口；
+- obstacle 模型保留在资产目录并有参考输出测试，可在 `rl_locomotion` Running 期间通过
+  `SwitchPolicy` 切换；姿态接近时直接 reload，否则先做固定周期位置阻抗过渡；
 - 策略文件来源记录在 `assets/policies/black/SOURCE.md`。

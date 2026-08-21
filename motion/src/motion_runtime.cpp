@@ -521,7 +521,9 @@ MotionUpdateOutput MotionRuntime::update(core::RobotIO& io, const MotionUpdateIn
 
     const StateRead state = read_state(io, input.now_ns);
     output.read_code = state.code;
-    handle_input_request(input, state, output);
+    const bool base_command_usable = input.base_command != nullptr &&
+        core::validate(*input.base_command, input.now_ns).ok();
+    handle_input_request(input, state, base_command_usable, output);
 
     // 本周期是否发生了主动动作失败；失败周期的错误说明不能被随后的成功提交冲掉。
     bool failed_this_cycle = false;

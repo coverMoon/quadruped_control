@@ -309,9 +309,14 @@ BaseCommand 表示机器人整体怎样移动，主要包含 `vx`、`vy`、`wz`�
 
 起立、趴下、运行功能、切换策略、申请控制权和故障复位属于一次性操作。每个请求要有唯一编号，并返回接受、拒绝、执行中、完成或失败。
 
-`StartBehavior` 通过名称选择具体功能，例如 `rl_locomotion`、`bridge_drive` 或
-`event_chain`。功能内部的准备、行驶、姿态过渡等步骤只是 MotionRuntime 的内部状态，
-不对外暴露为 ModeRequestType。MotionRuntime 通过自己的功能注册表查找名称，并拒绝未知功能。
+`StartBehavior` 通过名称选择具体功能。当前只冻结 `rl_locomotion`：它只能从
+`Stand` 进入 `Running`，启动请求必须同时带有未过期的有效 `BaseCommand`，输出为 RL 关节阻抗命令，内部阶段为 `starting` 和 `driving`。首次成功推理后请求变为
+`Completed`，
+随后行为持续运行；推理超时、观测/动作转换或命令提交失败时请求变为 `Failed`，清空 RL
+输出并回到 `Passive`。运行期间 `BaseCommand` 过期或暂时缺失只产生零速度观测，不能继续使用旧速度命令。`EnterPassive` 可以打断该行为，`SwitchPolicy` 允许进入策略过渡。
+
+其他行为名称仍然拒绝，待真实需求明确后再逐个定义其进入条件、输出模式、完成、超时和
+失败规则，不提前建设通用行为插件系统。
 
 `SwitchPolicy` 只负责切换 RL 功能使用的策略，不替代 `StartBehavior`。
 

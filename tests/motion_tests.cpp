@@ -418,6 +418,7 @@ void test_request_lifecycle_and_ordering()
 }
 
 // GetUp/GetDown 可以互相打断；EnterPassive 可以打断任意主动请求。
+// Passive 下的策略切换仍应拒绝。
 void test_request_interruptions_and_explicit_rejections()
 {
     auto created = motion_test::make_runtime();
@@ -562,6 +563,84 @@ void test_getdown_interrupted_by_getup()
         motion_test::update(*created.runtime, io);
     }
     expect_command_positions(io, rest, "重新起立后趴下仍应回到首次记录的落地姿态");
+}
+
+// rl_locomotion 必须在 Stand 且带有有效 BaseCommand 才能启动。
+void test_rl_behavior_requires_base_command()
+{
+    auto created = make_rl_runtime();
+    if (!created.ok())
+    {
+        return;
+    }
+    const auto model = make_rl_model();
+    const auto stand_pose = config_stand_pose();
+    FakePolicy policy;
+    std::string error;
+    created.runtime->attach_policy(make_rl_config("flat", stand_pose), policy, error);
+
+    motion_test::FakeRobotIO io;
+    io.state = motion_test::make_state(model, motion_test::make_rest_positions());
+    motion_test::drive_getup(*created.runtime, io, 1);
+    io.state = motion_test::make_state(model, stand_pose);
+
+    auto missing_command = motion_test::make_request(2, qc::ModeRequestType::StartBehavior);
+    missing_command.behavior_name = "rl_locomotion";
+    const auto rejected = motion_test::update(*created.runtime, io, &missing_command);
+    expect(rejected.result.state == qc::ModeResultState::Rejected,
+        "没有 BaseCommand 时启动 rl_locomotion 必须拒绝");
+    expect(rejected.result.message == "rl_locomotion requires a valid BaseCommand",
+        "缺少 BaseCommand 的拒绝原因必须明确");
+    expect(rejected.status.mode == qc::MotionMode::Stand,
+        "启动条件不满足时不得离开 Stand");
+
+    const auto command = make_base_command();
+    auto start = motion_test::make_request(3, qc::ModeRequestType::StartBehavior);
+    start.behavior_name = "rl_locomotion";
+    const auto accepted = update_with_command(*created.runtime, io, command, &start);
+    expect(accepted.status.mode == qc::MotionMode::Running,
+        "提供有效 BaseCommand 后应允许启动 rl_locomotion");
+    expect(policy.forward_count == 1, "rl_locomotion 启动后应在首次周期推理");
+    expect(created.runtime->query_result(start.request_id).state ==
+            qc::ModeResultState::Completed,
+        "首次推理成功后 StartBehavior 应完成");
+
+    const auto duplicate = update_with_command(*created.runtime, io, command, &start);
+    expect(duplicate.result.state == qc::ModeResultState::Completed,
+        "重复 StartBehavior 请求必须返回已保存的 Completed");
+    expect(policy.forward_count == 1, "重复请求不得重启策略或额外推理");
+
+    const auto passive = motion_test::make_request(4, qc::ModeRequestType::EnterPassive);
+    const auto stopped = update_with_command(*created.runtime, io, command, &passive);
+    expect(stopped.result.state == qc::ModeResultState::Completed &&
+            stopped.status.mode == qc::MotionMode::Passive,
+        "EnterPassive 必须结束 rl_locomotion 并进入 Passive");
+
+    motion_test::drive_getup(*created.runtime, io, 5);
+    auto restart = motion_test::make_request(6, qc::ModeRequestType::StartBehavior);
+    restart.behavior_name = "rl_locomotion";
+    update_with_command(*created.runtime, io, command, &restart);
+    io.state.header.session_id = 2;
+    const auto reset = update_with_command(*created.runtime, io, command);
+    expect(reset.status.mode == qc::MotionMode::Passive &&
+            reset.status.behavior_name.empty(),
+        "会话变化必须终止 rl_locomotion 并清空行为状态");
+
+    io.state = motion_test::make_state(model, motion_test::make_rest_positions());
+    io.state.header.session_id = 2;
+    motion_test::drive_getup(*created.runtime, io, 1);
+    io.state = motion_test::make_state(model, stand_pose);
+    io.state.header.session_id = 2;
+    policy.fail_forward = true;
+    auto failing_start = motion_test::make_request(2, qc::ModeRequestType::StartBehavior);
+    failing_start.behavior_name = "rl_locomotion";
+    const auto failed = update_with_command(
+        *created.runtime, io, command, &failing_start);
+    expect(failed.status.mode == qc::MotionMode::Passive,
+        "rl_locomotion 首次推理失败后必须进入 Passive");
+    expect(created.runtime->query_result(failing_start.request_id).state ==
+            qc::ModeResultState::Failed,
+        "rl_locomotion 首次推理失败必须返回 Failed");
 }
 
 // 已加载策略可以在 Running 中直接 reload，并保留最新 BaseCommand。
@@ -758,10 +837,11 @@ void test_policy_transition_interrupted_by_passive()
     io.state = motion_test::make_state(model, flat_pose);
     auto start = motion_test::make_request(2, qc::ModeRequestType::StartBehavior);
     start.behavior_name = "rl_locomotion";
-    motion_test::update(*created.runtime, io, &start);
+    const auto command = make_base_command();
+    update_with_command(*created.runtime, io, command, &start);
     auto switch_far = motion_test::make_request(3, qc::ModeRequestType::SwitchPolicy);
     switch_far.policy_name = "far";
-    motion_test::update(*created.runtime, io, &switch_far);
+    update_with_command(*created.runtime, io, command, &switch_far);
 
     const auto passive = motion_test::make_request(4, qc::ModeRequestType::EnterPassive);
     const auto interrupted = motion_test::update(*created.runtime, io, &passive);
@@ -786,6 +866,7 @@ int main()
     test_getdown_interrupted_by_getup();
     test_session_change_returns_to_passive();
     test_request_lifecycle_and_ordering();
+    test_rl_behavior_requires_base_command();
     test_request_interruptions_and_explicit_rejections();
     test_fault_fails_active_request();
     test_direct_policy_switches();
