@@ -123,6 +123,7 @@ private:
     StateRead read_state(core::RobotIO& io, core::Nanoseconds now_ns);
 
     // 处理本周期的请求：新请求分派，相同编号返回当前结果，旧编号查询终态。
+    // 去重查询优先于字段校验，保证过期重试仍能取得原请求结果。
     core::ModeResult handle_request(const core::ModeRequest& request, bool state_usable);
 
     // 处理输入请求并写入输出：非法请求直接拒绝，合法请求进入编号去重；
@@ -141,7 +142,8 @@ private:
     core::ModeResult dispatch_start_behavior(
         const core::ModeRequest& request, bool state_usable);
     core::ModeResult dispatch_getdown(const core::ModeRequest& request, bool state_usable);
-    core::ModeResult dispatch_unimplemented(const core::ModeRequest& request);
+    core::ModeResult dispatch_switch_policy(const core::ModeRequest& request);
+    core::ModeResult dispatch_reset_fault(const core::ModeRequest& request);
 
     // 接受 GetUp：必要时记录 rest_pose，并从当前关节位置开始第一段插值。
     core::ModeResult accept_getup(std::uint64_t request_id);

@@ -317,6 +317,16 @@ BaseCommand 表示机器人整体怎样移动，主要包含 `vx`、`vy`、`wz`�
 
 重复收到同一个请求时，不能把同一个动作再执行一次。
 
+MotionRuntime 对请求采用固定生命周期：新请求先返回 `Accepted`，进入实际控制周期后
+变为 `Running`，成功完成返回 `Completed`，未满足前置条件或请求类型当前不可用时返回
+`Rejected`，运行中发生 RobotIO、状态或推理错误时返回 `Failed`。活动请求重试返回当前
+状态，已终态请求重试返回保存的历史终态；更小的旧 `request_id` 不得覆盖更新的请求。
+
+`EnterPassive` 拥有最高打断优先级，可以中止任意主动动作并把被中止请求交付为 `Failed`。
+`GetUp` 和 `GetDown` 互相打断时，旧动作同样交付 `Failed`，新动作从最新状态重新开始。
+运行错误后 MotionRuntime 必须回到安全 `Passive`，并在 `MotionStatus.error_message` 中保留
+最近一次错误；当前模式、行为名、行为阶段、策略名和 `policy_ready` 由运行时统一更新。
+
 请求终态在产生周期即通过周期更新输出交付（输入请求经 `result` 字段，同周期被中断的
 其他请求经固定容量的 `result_events` 数组）；运行时内部只保存有限历史供重试查询，
 调用方不能依赖该历史缓存作为可靠结果通道。

@@ -53,6 +53,27 @@ void MotionRuntime::handle_input_request(
         output.result.message = "session changed; resubmit request";
         return;
     }
+
+    // 重试必须先查当前请求或终态历史，不能因为原请求已经过期而变成新的拒绝。
+    // 这样外围 Action 可以使用同一个 request_id 查询 Accepted、Running 或终态。
+    if (has_active_request_ && input.request->request_id == active_request_id_)
+    {
+        output.result = active_result_;
+        return;
+    }
+    core::ModeResult stored{};
+    if (find_terminal_result(input.request->request_id, stored))
+    {
+        output.result = stored;
+        return;
+    }
+    if (input.request->request_id != 0 &&
+        input.request->request_id <= latest_request_id_)
+    {
+        output.result = handle_request(*input.request, state.usable);
+        return;
+    }
+
     if (const auto validation = core::validate(*input.request, input.now_ns); !validation)
     {
         // 字段非法的请求不参与编号去重，直接拒绝且不影响当前运动。
@@ -89,7 +110,10 @@ core::ModeResult MotionRuntime::handle_request(
 
     // 编号更大的新请求：被拒绝的请求只记录自身终态，不覆盖活动请求的结果。
     const core::ModeResult result = dispatch_request(request, state_usable);
-    latest_request_id_ = request.request_id;
+    if (request.request_id > latest_request_id_)
+    {
+        latest_request_id_ = request.request_id;
+    }
     if (result.state != core::ModeResultState::Accepted)
     {
         store_terminal_result(result);
@@ -117,9 +141,13 @@ core::ModeResult MotionRuntime::dispatch_request(
         return dispatch_start_behavior(request, state_usable);
     case core::ModeRequestType::GetDown:
         return dispatch_getdown(request, state_usable);
-    default:
-        return dispatch_unimplemented(request);
+    case core::ModeRequestType::SwitchPolicy:
+        return dispatch_switch_policy(request);
+    case core::ModeRequestType::ResetFault:
+        return dispatch_reset_fault(request);
     }
+    return make_result(request.request_id, core::ModeResultState::Rejected,
+        "unknown request type");
 }
 
 core::ModeResult MotionRuntime::dispatch_enter_passive(const core::ModeRequest& request)
@@ -201,11 +229,6 @@ core::ModeResult MotionRuntime::dispatch_getdown(
         return make_result(request.request_id, core::ModeResultState::Rejected,
             "getdown already in progress");
     }
-    if (mode_ == core::MotionMode::GetUp)
-    {
-        return make_result(request.request_id, core::ModeResultState::Rejected,
-            "getup in progress");
-    }
     if (!has_rest_pose_)
     {
         return make_result(request.request_id, core::ModeResultState::Rejected,
@@ -266,11 +289,18 @@ core::ModeResult MotionRuntime::dispatch_start_behavior(
         "RL behavior accepted");
 }
 
-core::ModeResult MotionRuntime::dispatch_unimplemented(const core::ModeRequest& request)
+core::ModeResult MotionRuntime::dispatch_switch_policy(const core::ModeRequest& request)
 {
-    // M2 明确拒绝未实现请求，不创建占位实现。
+    // 策略目录和切换属于阶段 3；阶段 2 只固定该请求的拒绝终态语义。
     return make_result(request.request_id, core::ModeResultState::Rejected,
-        "request type is not implemented in M2");
+        "policy switching is not available in this stage");
+}
+
+core::ModeResult MotionRuntime::dispatch_reset_fault(const core::ModeRequest& request)
+{
+    // RobotIO 当前没有 reset_fault() 边界，不能在 MotionRuntime 内伪造故障复位。
+    return make_result(request.request_id, core::ModeResultState::Rejected,
+        "fault reset is not supported by RobotIO");
 }
 
 core::ModeResult MotionRuntime::accept_getup(const std::uint64_t request_id)
@@ -293,6 +323,9 @@ core::ModeResult MotionRuntime::accept_getup(const std::uint64_t request_id)
     interp_elapsed_cycles_ = 0;
     getup_second_phase_ = false;
     mode_ = core::MotionMode::GetUp;
+    status_.active_source = core::CommandSource::None;
+    status_.behavior_name.clear();
+    status_.behavior_phase = "interpolating";
     return make_result(request_id, core::ModeResultState::Accepted, "getup accepted");
 }
 
@@ -304,7 +337,7 @@ core::ModeResult MotionRuntime::accept_getdown(const std::uint64_t request_id)
     }
     status_.active_source = core::CommandSource::None;
     status_.behavior_name.clear();
-    status_.behavior_phase.clear();
+    status_.behavior_phase = "interpolating";
     interp_start_ = current_positions_;
     interp_target_ = rest_pose_;
     interp_total_cycles_ = config_.getdown_cycles;
@@ -349,6 +382,7 @@ bool MotionRuntime::advance_active_motion(
     if (mode_ == core::MotionMode::GetUp)
     {
         mode_ = core::MotionMode::Stand;
+        status_.behavior_phase.clear();
         complete_active_request("getup completed");
         positions = config_.stand_position;
         return true;
@@ -356,6 +390,9 @@ bool MotionRuntime::advance_active_motion(
 
     // GetDown 完成：回到记录的落地姿态后进入 Passive，本周期起发送 Disabled。
     mode_ = core::MotionMode::Passive;
+    status_.active_source = core::CommandSource::None;
+    status_.behavior_name.clear();
+    status_.behavior_phase.clear();
     complete_active_request("getdown completed");
     return false;
 }

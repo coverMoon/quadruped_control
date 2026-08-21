@@ -144,6 +144,9 @@ void MotionRuntime::fail_active_motion(const std::string& reason)
 {
     abort_active_request(reason);
     mode_ = core::MotionMode::Passive;
+    status_.active_source = core::CommandSource::None;
+    status_.behavior_name.clear();
+    status_.behavior_phase.clear();
     status_.error_message = reason;
 }
 
@@ -195,6 +198,7 @@ MotionRuntime::StateRead MotionRuntime::read_state(
     result.failure_reason = read_failure_message(result.code);
     if (result.code != core::RobotIOCode::Ok)
     {
+        status_.error_message = result.failure_reason;
         return result;
     }
 
@@ -292,6 +296,11 @@ bool MotionRuntime::run_rl_mode(
     if (rl_controller_ == nullptr || policy_ == nullptr)
     {
         return fail("RL policy is not attached");
+    }
+
+    if (has_active_request_ && active_result_.state == core::ModeResultState::Accepted)
+    {
+        active_result_.state = core::ModeResultState::Running;
     }
 
     rl_controller_->update_command(base_command, state.now_ns);

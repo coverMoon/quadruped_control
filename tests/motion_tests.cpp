@@ -270,6 +270,160 @@ void test_session_change_returns_to_passive()
         "新会话重新提交 GetUp 后才能恢复主动动作");
 }
 
+// 请求重试返回当前生命周期状态，乱序编号不能覆盖正在执行的新请求。
+void test_request_lifecycle_and_ordering()
+{
+    auto created = motion_test::make_runtime();
+    if (!created.ok())
+    {
+        return;
+    }
+    motion_test::FakeRobotIO io;
+    const auto model = motion_test::make_test_model();
+    io.state = motion_test::make_state(model, motion_test::make_rest_positions());
+    motion_test::update(*created.runtime, io);
+
+    auto getup = motion_test::make_request(10, qc::ModeRequestType::GetUp);
+    getup.timestamp_ns = 1;
+    qm::MotionUpdateInput first_input;
+    first_input.now_ns = 1;
+    first_input.request = &getup;
+    const auto accepted = created.runtime->update(io, first_input);
+    expect(accepted.result.state == qc::ModeResultState::Accepted,
+        "新请求首次提交应返回 Accepted");
+    expect(created.runtime->query_result(10).state == qc::ModeResultState::Running,
+        "请求开始执行后查询应返回 Running");
+
+    const std::size_t command_count = io.submitted.size();
+    qm::MotionUpdateInput retry_input;
+    retry_input.now_ns = 0;
+    retry_input.request = &getup;
+    const auto retried = created.runtime->update(io, retry_input);
+    expect(retried.result.state == qc::ModeResultState::Running,
+        "活动请求重试应返回 Running");
+    expect(io.submitted.size() == command_count + 1,
+        "活动请求重试只能继续一个控制周期，不能重新创建动作");
+
+    const auto old_request = motion_test::make_request(9, qc::ModeRequestType::GetUp);
+    const auto old_result = motion_test::update(*created.runtime, io, &old_request);
+    expect(old_result.result.state == qc::ModeResultState::Rejected,
+        "乱序旧 request_id 应被拒绝");
+    expect(created.runtime->query_result(10).state == qc::ModeResultState::Running,
+        "旧 request_id 不能覆盖活动请求");
+
+    qm::MotionUpdateOutput completed_cycle;
+    for (int i = 0; i < 3 && completed_cycle.result_event_count == 0; ++i)
+    {
+        completed_cycle = motion_test::update(*created.runtime, io);
+    }
+    expect(completed_cycle.result_event_count == 1 &&
+            completed_cycle.result_events[0].request_id == getup.request_id &&
+            completed_cycle.result_events[0].state == qc::ModeResultState::Completed,
+        "动作完成周期必须交付 Completed 终态事件");
+    expect(created.runtime->query_result(10).state == qc::ModeResultState::Completed,
+        "动作完成后查询应返回 Completed");
+    const auto completed = created.runtime->query_result(10);
+    expect(completed.request_id == 10, "终态查询必须保留原 request_id");
+    expect(completed.state == qc::ModeResultState::Completed,
+        "终态查询与动作完成状态必须一致");
+}
+
+// GetUp/GetDown 可以互相打断；EnterPassive 可以打断任意主动请求。
+void test_request_interruptions_and_explicit_rejections()
+{
+    auto created = motion_test::make_runtime();
+    if (!created.ok())
+    {
+        return;
+    }
+    motion_test::FakeRobotIO io;
+    const auto model = motion_test::make_test_model();
+    const auto rest = motion_test::make_rest_positions();
+    io.state = motion_test::make_state(model, rest);
+    motion_test::update(*created.runtime, io);
+
+    const auto getup = motion_test::make_request(1, qc::ModeRequestType::GetUp);
+    motion_test::update(*created.runtime, io, &getup);
+
+    const auto getdown = motion_test::make_request(2, qc::ModeRequestType::GetDown);
+    const auto getdown_result = motion_test::update(*created.runtime, io, &getdown);
+    expect(getdown_result.result.state == qc::ModeResultState::Accepted,
+        "GetDown 应能明确打断 GetUp");
+    expect(getdown_result.result_event_count == 1 &&
+            getdown_result.result_events[0].request_id == getup.request_id &&
+            getdown_result.result_events[0].state == qc::ModeResultState::Failed,
+        "GetDown 打断 GetUp 时旧请求必须交付 Failed");
+    expect(created.runtime->query_result(getup.request_id).state == qc::ModeResultState::Failed,
+        "被打断的 GetUp 查询必须返回 Failed");
+
+    const auto getup_again = motion_test::make_request(3, qc::ModeRequestType::GetUp);
+    const auto getup_result = motion_test::update(*created.runtime, io, &getup_again);
+    expect(getup_result.result.state == qc::ModeResultState::Accepted,
+        "GetUp 应能明确打断 GetDown");
+    expect(getup_result.result_event_count == 1 &&
+            getup_result.result_events[0].request_id == getdown.request_id &&
+            getup_result.result_events[0].state == qc::ModeResultState::Failed,
+        "GetUp 打断 GetDown 时旧请求必须交付 Failed");
+
+    const auto passive = motion_test::make_request(4, qc::ModeRequestType::EnterPassive);
+    const auto passive_result = motion_test::update(*created.runtime, io, &passive);
+    expect(passive_result.result.state == qc::ModeResultState::Completed,
+        "EnterPassive 应立即完成");
+    expect(passive_result.status.mode == qc::MotionMode::Passive,
+        "EnterPassive 后必须进入 Passive");
+    expect(passive_result.result_event_count == 1 &&
+            passive_result.result_events[0].request_id == getup_again.request_id &&
+            passive_result.result_events[0].state == qc::ModeResultState::Failed,
+        "EnterPassive 打断活动请求时必须交付 Failed");
+
+    auto switch_policy = motion_test::make_request(5, qc::ModeRequestType::SwitchPolicy);
+    switch_policy.policy_name = "obstacle";
+    const auto switch_result = motion_test::update(*created.runtime, io, &switch_policy);
+    expect(switch_result.result.state == qc::ModeResultState::Rejected,
+        "阶段 2 不应执行策略切换，但必须返回明确 Rejected");
+
+    const auto reset_fault = motion_test::make_request(6, qc::ModeRequestType::ResetFault);
+    const auto reset_result = motion_test::update(*created.runtime, io, &reset_fault);
+    expect(reset_result.result.state == qc::ModeResultState::Rejected,
+        "RobotIO 尚未提供故障复位边界时 ResetFault 必须明确拒绝");
+}
+
+// 主动动作运行时发生 RobotIO fault 必须失败、回到 Passive，并拒绝新的主动请求。
+void test_fault_fails_active_request()
+{
+    auto created = motion_test::make_runtime();
+    if (!created.ok())
+    {
+        return;
+    }
+    motion_test::FakeRobotIO io;
+    const auto model = motion_test::make_test_model();
+    io.state = motion_test::make_state(model, motion_test::make_rest_positions());
+    motion_test::update(*created.runtime, io);
+
+    const auto getup = motion_test::make_request(1, qc::ModeRequestType::GetUp);
+    motion_test::update(*created.runtime, io, &getup);
+
+    io.read_code = qc::RobotIOCode::Fault;
+    const auto failed = motion_test::update(*created.runtime, io);
+    expect(failed.status.mode == qc::MotionMode::Passive,
+        "RobotIO fault 后 MotionRuntime 必须回到 Passive");
+    expect(failed.result_event_count == 1 &&
+            failed.result_events[0].request_id == getup.request_id &&
+            failed.result_events[0].state == qc::ModeResultState::Failed,
+        "RobotIO fault 必须交付活动请求 Failed 终态");
+    expect(!failed.status.error_message.empty(), "RobotIO fault 必须写入最近错误");
+    expect(created.runtime->query_result(getup.request_id).state == qc::ModeResultState::Failed,
+        "RobotIO fault 后终态查询必须返回 Failed");
+
+    const auto new_getup = motion_test::make_request(2, qc::ModeRequestType::GetUp);
+    const auto rejected = motion_test::update(*created.runtime, io, &new_getup);
+    expect(rejected.result.state == qc::ModeResultState::Rejected,
+        "RobotIO fault 期间新的主动请求必须拒绝");
+    expect(rejected.status.mode == qc::MotionMode::Passive,
+        "RobotIO fault 期间拒绝请求不能离开 Passive");
+}
+
 // GetDown 期间重新请求 GetUp：从当时姿态重新起立，但保留首次记录的 rest_pose。
 void test_getdown_interrupted_by_getup()
 {
@@ -331,6 +485,9 @@ int main()
     test_getdown_returns_to_rest();
     test_getdown_interrupted_by_getup();
     test_session_change_returns_to_passive();
+    test_request_lifecycle_and_ordering();
+    test_request_interruptions_and_explicit_rejections();
+    test_fault_fails_active_request();
 
     if (motion_test::failures > 0)
     {
