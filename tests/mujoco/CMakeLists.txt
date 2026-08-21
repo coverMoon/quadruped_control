@@ -18,6 +18,7 @@ target_link_libraries(quadruped_mujoco_tests PRIVATE
 target_compile_features(quadruped_mujoco_tests PRIVATE cxx_std_17)
 target_compile_definitions(quadruped_mujoco_tests PRIVATE
     QUADRUPED_BLACK_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/black/mujoco/scene.xml"
+    QUADRUPED_BLACK_TERRAIN_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/black/mujoco/scene_terrain.xml"
     QUADRUPED_ROBOT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/robots/black.yaml"
     QUADRUPED_CONTROLLER_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/controllers/black.yaml"
 )

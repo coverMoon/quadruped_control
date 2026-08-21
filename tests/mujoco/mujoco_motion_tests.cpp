@@ -15,6 +15,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <string>
 
 namespace qc = quadruped::core;
@@ -103,11 +104,13 @@ public:
                 return false;
             }
             if (last_output_.has_result &&
+                last_output_.result.request_id == request.request_id &&
                 last_output_.result.state == qc::ModeResultState::Completed)
             {
                 return true;
             }
             if (last_output_.has_result &&
+                last_output_.result.request_id == request.request_id &&
                 (last_output_.result.state == qc::ModeResultState::Rejected ||
                     last_output_.result.state == qc::ModeResultState::Failed))
             {
@@ -201,6 +204,109 @@ void check_reset_pose(const MotionContext& ctx)
     }
 }
 
+// terrain 场景必须沿用 black 的关节、执行器和 IMU 映射，并可建立首个会话。
+void check_terrain_scene_mapping(const qc::RobotModel& model)
+{
+    auto created = quadruped::backends::mujoco::MujocoRobotIO::create(
+        QUADRUPED_BLACK_TERRAIN_SCENE_PATH, model, 1);
+    expect(created.ok(), "terrain 场景应加载成功并完成 black 映射");
+    if (!created.ok())
+    {
+        return;
+    }
+
+    const auto reset = created.io->reset(31);
+    expect(reset.ok(), "terrain 场景应能建立会话并生成状态");
+    if (!reset.ok())
+    {
+        return;
+    }
+
+    qc::StateFrame state;
+    expect(created.io->read_latest(state) == qc::RobotIOCode::Ok,
+        "terrain 场景 reset 后应能读取状态");
+    expect(state.joint_count == model.joint_count,
+        "terrain 场景状态关节数必须与 black RobotModel 一致");
+    expect(state.imu.valid, "terrain 场景 IMU 映射输出必须有效");
+}
+
+// reset 必须建立新会话、清除旧命令，并拒绝使用相同会话号重新 reset。
+void check_reset_session_semantics(
+    quadruped::backends::mujoco::MujocoRobotIO& io,
+    const qc::RobotModel& model)
+{
+    const auto first_reset = io.reset(11);
+    expect(first_reset.ok(), "会话 11 的 reset 应成功");
+    if (!first_reset.ok())
+    {
+        return;
+    }
+
+    qc::CommandFrame old_command =
+        quadruped::backends::mujoco::test::make_command(1, qc::ControlMode::Disabled);
+    old_command.header.startup_id = 1;
+    old_command.header.session_id = 11;
+    old_command.joint_count = model.joint_count;
+    expect(io.submit(old_command) == qc::RobotIOCode::Ok,
+        "旧会话中的合法命令应被接受");
+    expect(io.status().latest_command_sequence == 1,
+        "接受旧会话命令后应记录其序号");
+
+    const auto same_session_reset = io.reset(11);
+    expect(same_session_reset.code == qc::RobotIOCode::Rejected,
+        "相同 session_id 的 reset 必须被拒绝");
+
+    const auto second_reset = io.reset(12);
+    expect(second_reset.ok(), "新会话 12 的 reset 应成功");
+    if (!second_reset.ok())
+    {
+        return;
+    }
+
+    qc::StateFrame state;
+    expect(io.read_latest(state) == qc::RobotIOCode::Ok,
+        "新会话 reset 后必须立即发布状态");
+    expect(state.header.session_id == 12 && state.header.sequence == 1,
+        "新会话的首个状态帧必须使用 session 12 和序号 1");
+    expect(io.status().latest_command_sequence == 0,
+        "新会话 reset 后必须清除旧命令序号");
+    expect(io.submit(old_command) == qc::RobotIOCode::Rejected,
+        "旧会话命令不得跨 session 提交");
+    expect(io.step() == qc::RobotIOCode::Ok,
+        "新会话无有效命令时仍应能安全步进");
+    expect(io.read_latest(state) == qc::RobotIOCode::Ok,
+        "安全步进后应发布新状态");
+    expect(state.effective_command_sequence == 0,
+        "reset 后旧命令不得在新会话中生效");
+}
+
+// MuJoCo 发生内部时间故障后必须锁存 Fault，且不再接受正常命令。
+void check_fault_latches_command_rejection(
+    quadruped::backends::mujoco::MujocoRobotIO& io,
+    const qc::RobotModel& model)
+{
+    const auto reset = io.reset(21);
+    expect(reset.ok(), "故障用例的 reset 应成功");
+    if (!reset.ok())
+    {
+        return;
+    }
+
+    io.raw_data()->time = std::numeric_limits<double>::quiet_NaN();
+    expect(io.step() == qc::RobotIOCode::Fault,
+        "非有限仿真时间必须使 MuJoCo 后端进入 Fault");
+    expect(io.status().state == qc::RobotIOState::Fault,
+        "后端故障后状态必须锁存为 Fault");
+
+    qc::CommandFrame normal_command =
+        quadruped::backends::mujoco::test::make_command(1, qc::ControlMode::Disabled);
+    normal_command.header.startup_id = 1;
+    normal_command.header.session_id = 21;
+    normal_command.joint_count = model.joint_count;
+    expect(io.submit(normal_command) == qc::RobotIOCode::Fault,
+        "Fault 后不得继续接受正常命令");
+}
+
 // 阶段 1 的落地结果：记录的落地姿态和落地时的躯干高度。
 struct FallPhaseResult
 {
@@ -287,6 +393,28 @@ void run_rl_phase(const MotionContext& ctx)
         "正横移命令应产生正向侧移（位移 " +
             std::to_string(lateral_displacement) + " m）");
     expect(ctx.io.raw_data()->qpos[2] > 0.25, "RL 横移期间躯干不应倒地");
+
+    qc::ModeRequest passive;
+    passive.request_id = 3;
+    passive.type = qc::ModeRequestType::EnterPassive;
+    expect(ctx.sim.run_until_completed(1.0, passive),
+        "Running 应能通过 EnterPassive 回到 Passive");
+    expect(ctx.sim.last_output().status.mode == qc::MotionMode::Passive,
+        "EnterPassive 完成后应处于 Passive");
+    expect(!ctx.sim.last_output().submitted ||
+            ctx.sim.last_output().submit_code == qc::RobotIOCode::Ok,
+        "Running → Passive 的安全命令提交不应失败");
+
+    qc::ModeRequest getup_again;
+    getup_again.request_id = 4;
+    getup_again.type = qc::ModeRequestType::GetUp;
+    expect(ctx.sim.run_until_completed(5.0, getup_again),
+        "Running → Passive 后应能重新起立");
+    expect(ctx.sim.last_output().status.mode == qc::MotionMode::Stand,
+        std::string("重新起立完成后应回到 Stand（当前 ") +
+            qm::motion_mode_name(ctx.sim.last_output().status.mode) +
+            "，错误：" + ctx.sim.last_output().status.error_message +
+            "，结果：" + ctx.sim.last_output().result.message + "）");
 }
 #endif
 
@@ -296,7 +424,7 @@ void run_getdown_phase(const MotionContext& ctx, const std::array<double, qc::kM
     qc::ModeRequest getdown;
     getdown.request_id =
 #if defined(QUADRUPED_WITH_TORCH)
-        3;
+        5;
 #else
         2;
 #endif
@@ -324,6 +452,26 @@ int main()
     {
         return 1;
     }
+
+    check_terrain_scene_mapping(model.model);
+
+    auto reset_semantics = quadruped::backends::mujoco::MujocoRobotIO::create(
+        QUADRUPED_BLACK_SCENE_PATH, model.model, 1);
+    if (!reset_semantics.ok())
+    {
+        expect(false, "创建 reset 语义 MuJoCo 后端失败：" + reset_semantics.error_message);
+        return 1;
+    }
+    check_reset_session_semantics(*reset_semantics.io, model.model);
+
+    auto fault_semantics = quadruped::backends::mujoco::MujocoRobotIO::create(
+        QUADRUPED_BLACK_SCENE_PATH, model.model, 1);
+    if (!fault_semantics.ok())
+    {
+        expect(false, "创建 fault 语义 MuJoCo 后端失败：" + fault_semantics.error_message);
+        return 1;
+    }
+    check_fault_latches_command_rejection(*fault_semantics.io, model.model);
 
     auto created = quadruped::backends::mujoco::MujocoRobotIO::create(
         QUADRUPED_BLACK_SCENE_PATH, model.model, 1);

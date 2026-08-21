@@ -227,6 +227,49 @@ void test_getdown_returns_to_rest()
         "趴下完成后重试应报告 Completed");
 }
 
+// 会话变化必须中止旧请求、清空动作状态，并让新会话从 Passive 重新开始。
+void test_session_change_returns_to_passive()
+{
+    auto created = motion_test::make_runtime();
+    if (!created.ok())
+    {
+        return;
+    }
+    motion_test::FakeRobotIO io;
+    const auto model = motion_test::make_test_model();
+    io.state = motion_test::make_state(model, motion_test::make_rest_positions());
+
+    const auto getup = motion_test::make_request(1, qc::ModeRequestType::GetUp);
+    const auto accepted = motion_test::update(*created.runtime, io, &getup);
+    expect(accepted.result.state == qc::ModeResultState::Accepted,
+        "旧会话的 GetUp 应先被接受");
+    expect(accepted.status.mode == qc::MotionMode::GetUp,
+        "旧会话应进入 GetUp");
+
+    io.state.header.session_id = 2;
+    io.state.header.sequence = 1;
+    const auto switched = motion_test::update(*created.runtime, io);
+    expect(switched.status.mode == qc::MotionMode::Passive,
+        "会话变化后必须回到 Passive");
+    expect(!io.submitted.empty() &&
+            io.submitted.back().header.session_id == 2 &&
+            io.submitted.back().header.sequence == 1,
+        "新会话的首条命令必须使用新会话号和序号 1");
+    expect(io.submitted.back().joints[0].mode == qc::ControlMode::Disabled,
+        "会话变化周期必须提交 Disabled 命令");
+    expect(switched.result_event_count == 1,
+        "会话变化应交付旧活动请求的终态");
+    expect(switched.result_events[0].request_id == getup.request_id &&
+            switched.result_events[0].state == qc::ModeResultState::Failed,
+        "旧会话的 GetUp 必须以 Failed 结束");
+
+    const auto restarted = motion_test::update(*created.runtime, io, &getup);
+    expect(restarted.result.state == qc::ModeResultState::Accepted,
+        "新会话可重新使用请求编号，旧请求不能继续执行");
+    expect(restarted.status.mode == qc::MotionMode::GetUp,
+        "新会话重新提交 GetUp 后才能恢复主动动作");
+}
+
 // GetDown 期间重新请求 GetUp：从当时姿态重新起立，但保留首次记录的 rest_pose。
 void test_getdown_interrupted_by_getup()
 {
@@ -287,6 +330,7 @@ int main()
     test_stand_and_getdown_rejections();
     test_getdown_returns_to_rest();
     test_getdown_interrupted_by_getup();
+    test_session_change_returns_to_passive();
 
     if (motion_test::failures > 0)
     {
