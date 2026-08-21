@@ -3,9 +3,26 @@
 ## Scope
 
 This repository implements the quadruped and wheel-legged robot control system.
-M0 is the dependency-free C++ core. M1 adds MuJoCo only to its own backend;
-ROS 2, Torch, hardware SDKs, and application assembly belong to their own later
-modules.
+It currently contains the dependency-free C++ core, motion runtime, MuJoCo backend,
+Torch policy adapter, configuration loaders, and runnable simulation applications.
+
+## Delivery priorities
+
+- Prefer a working end-to-end control path over speculative completeness.
+- Treat `rl_sar` as the behavior reference for policy observations, history, action
+  conversion, and inference cadence. Treat `real_robot/mujoco` as the reference for
+  MuJoCo scenes and interaction. Reuse verified behavior and only adapt language,
+  dependency, and `RobotIO` boundaries.
+- Keep the smallest implementation that satisfies the current request. Do not add a
+  framework, abstraction layer, extension point, or configuration field for an
+  unrequested future use case.
+- Prefer modifying an existing source, test, or document. Add a file only when it has
+  an independent responsibility; do not split code merely to satisfy a line-count goal.
+- Keep one implementation for black and blackW differences, one primary test entry per
+  module, and one current document per topic. Do not create milestone documents or test
+  files for every small behavior.
+- User requirements and the actual repository take precedence over stale plans or
+  collaboration documents.
 
 ## Dependency boundaries
 
@@ -88,12 +105,9 @@ modules.
 - Write code comments in concise Chinese with normal Chinese punctuation.
 - Comments should explain intent, constraints, units, ownership, or why a choice
   exists. Do not merely translate the next line of code into prose.
-- When a domain-specific variable, field, constant, or state first appears, explain
-  its meaning and role. Also document its unit, valid range, zero/sentinel meaning,
-  coordinate frame, or lifetime when any of those are not obvious.
-- Add short comments before non-obvious groups of local variables so a new reader
-  can understand what is being prepared and why. Do not comment self-explanatory
-  loop indices, temporary values, or standard-library operations one by one.
+- Document non-obvious units, ranges, coordinate frames, sentinel values, ownership,
+  or lifetimes where they affect correct use. Do not add comments to restate clear code.
+- Add a short comment only before a genuinely non-obvious group of local variables.
 - Public data structures should document every field whose meaning cannot be fully
   inferred from its name. Clearly distinguish similar fields such as online/valid,
   generated/applied sequence, and startup/session identifiers.
@@ -112,10 +126,15 @@ modules.
 
 ## Build and test
 
-- Run `./scripts/build.sh` after source or build-system changes.
-- Run `./scripts/build.sh --mujoco` for MuJoCo backend changes.
-- Use `./scripts/build.sh --clean` when verifying changes to CMake configuration.
-- Add or update tests for validation rules and public-interface behavior.
+- Run the smallest affected build profile before handing off: `./scripts/build.sh` for
+  shared core changes, `./scripts/build.sh --mujoco` for MuJoCo changes, and the RL
+  profile when Torch behavior changes. Do not run every profile by default.
+- Use `--clean` only when dependency discovery, profile options, generated configuration,
+  or a suspected stale cache is part of the change.
+- Prefer extending an existing integration test. Add focused tests for core state-machine
+  behavior, numerical conversion, known bugs, and realistic safety failures that are not
+  already covered. Simple field mapping, configuration wiring, and thin adapters do not
+  require separate tests.
 - Tests in M0 must not require network access or a third-party test framework.
 - Do not commit `build/`, generated binaries, or `compile_commands.json`.
 

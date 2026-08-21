@@ -1,6 +1,6 @@
 /**
  * @file mujoco_robot_io.cpp
- * @brief 实现 MujocoRobotIO：加载模型、reset 到 keyframe 并生成 StateFrame。
+ * @brief 实现 MujocoRobotIO：加载模型、reset 到 XML 零位并生成 StateFrame。
  */
 
 #include "quadruped/backends/mujoco/mujoco_robot_io.hpp"
@@ -72,18 +72,9 @@ MujocoRobotIO::ResetResult MujocoRobotIO::reset(const std::uint64_t session_id)
     const mjModel* model = model_.raw_model();
     mjData* data = model_.raw_data();
 
-    // 按名称查找 default_pose keyframe，不假设它在 keyframe 数组中是第 0 个。
-    const int key_id = mj_name2id(model, mjOBJ_KEY, "default_pose");
-    if (key_id < 0)
-    {
-        status_.state = core::RobotIOState::Fault;
-        result.code = core::RobotIOCode::Fault;
-        result.error_message = "keyframe \"default_pose\" does not exist in the MuJoCo model";
-        return result;
-    }
-
-    // 用 keyframe 恢复初始位置、速度、执行器状态和仿真时间，再刷新派生状态与传感器。
-    mj_resetDataKeyframe(model, data, key_id);
+    // 恢复 MJCF 本身的 qpos0：自由基座使用 body pos/quat，所有转动关节为 0 rad。
+    // XML keyframe 可以保存 RL 站姿等额外姿态，但不得偷换 reset 的模型零位语义。
+    mj_resetData(model, data);
     mj_forward(model, data);
 
     // 新会话必须清除上一会话的命令，防止旧命令跨会话执行。

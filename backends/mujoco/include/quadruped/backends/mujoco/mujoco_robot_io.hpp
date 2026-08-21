@@ -58,7 +58,8 @@ public:
         const core::RobotModel& robot_model,
         std::uint64_t startup_id);
 
-    // 重置到 XML 中名为 default_pose 的 keyframe，并生成新会话的第一份 StateFrame。
+    // 重置到 MJCF 模型零位（自由基座默认位姿、全部关节 0 rad），
+    // 并生成新会话的第一份 StateFrame；XML keyframe 不参与 reset。
     // session_id 必须非零；已建立会话后重复使用同一 session_id 会被拒绝。
     ResetResult reset(std::uint64_t session_id);
 

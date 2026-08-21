@@ -109,7 +109,7 @@ int run_physics_loop(
 
     qsim::TerminalStatusPrinter status_printer(terminal.interactive());
     window.load(io.raw_model(), io.raw_data(), scene_path);
-    window.sync();
+    static_cast<void>(window.sync());
 
     auto next_tick = clock::now();
     auto next_visual_sync = next_tick;
@@ -166,6 +166,7 @@ int run_physics_loop(
             }
             status_printer.reset();
             printed_update_sequence = 0;
+            window.focus_on_robot(io.raw_model(), io.raw_data());
         }
         controller.apply_input(input);
 
@@ -178,7 +179,20 @@ int run_physics_loop(
         const auto now = clock::now();
         if (now >= next_visual_sync)
         {
-            window.sync();
+            const bool gui_reset_requested = window.sync();
+            if (gui_reset_requested)
+            {
+                if (const std::string error = controller.reset_new_session(); !error.empty())
+                {
+                    std::cerr << "界面 reset 后重建会话失败: " << error << '\n';
+                    window.request_exit();
+                    return 1;
+                }
+                status_printer.reset();
+                printed_update_sequence = 0;
+                window.focus_on_robot(io.raw_model(), io.raw_data());
+                next_tick = now;
+            }
             next_visual_sync = now + visual_sync_duration;
         }
         if (!controller.paused() &&

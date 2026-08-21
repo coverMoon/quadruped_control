@@ -190,6 +190,17 @@ struct MotionContext
     const qc::ControllerConfig& config;
 };
 
+// Reset 必须表示 MJCF 零位，不能被 RL 站姿 keyframe 或控制器配置覆盖。
+void check_reset_pose(const MotionContext& ctx)
+{
+    const auto positions = current_positions(ctx.io);
+    for (std::size_t i = 0; i < ctx.model.joint_count; ++i)
+    {
+        expect_close(positions[i], 0.0, 1.0e-12,
+            "Reset 后关节应回到 MJCF 零位（关节 " + std::to_string(i) + "）");
+    }
+}
+
 // 阶段 1 的落地结果：记录的落地姿态和落地时的躯干高度。
 struct FallPhaseResult
 {
@@ -200,7 +211,9 @@ struct FallPhaseResult
 // 阶段 1：Passive 下自然落地，返回记录的落地姿态。
 FallPhaseResult run_fall_phase(const MotionContext& ctx)
 {
-    ctx.sim.run_seconds(1.0);
+    // XML 零位的四条腿接近伸直，被动落地比 RL 屈腿姿态慢；
+    // 这里给足自然失稳和接触稳定时间，不把旧 keyframe 的塌落速度写成接口要求。
+    ctx.sim.run_seconds(3.0);
     FallPhaseResult result;
     result.fallen_height = ctx.io.raw_data()->qpos[2];
     expect(result.fallen_height < 0.25,
@@ -347,6 +360,7 @@ int main()
 
     SimHarness sim(*created.io, *runtime.runtime, controller.config);
     const MotionContext context{*created.io, sim, model.model, controller.config};
+    check_reset_pose(context);
     const FallPhaseResult fall = run_fall_phase(context);
     run_stand_phase(context, fall.fallen_height);
 #if defined(QUADRUPED_WITH_TORCH)
