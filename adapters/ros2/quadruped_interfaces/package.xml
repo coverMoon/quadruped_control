@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!-- quadruped_control 的 ROS 2 顶层接口包。 -->
+<package format="3">
+  <name>quadruped_interfaces</name>
+  <version>0.1.0</version>
+  <description>四足机器人控制系统的 ROS 2 消息、动作和服务接口。</description>
+  <maintainer email="maintainer@example.com">quadruped_control maintainers</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
+
+  <depend>action_msgs</depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+
+  <member_of_group>rosidl_interface_packages</member_of_group>
+</package>

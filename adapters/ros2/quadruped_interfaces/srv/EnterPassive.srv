@@ -1,0 +1,8 @@
+# 请求立即进入 Passive；request_id 用于关联统一 ModeResult。
+uint64 request_id
+---
+# result 是 EnterPassive 请求自身的结果。
+quadruped_interfaces/ModeResult result
+# 若主动请求被打断，保留其终态交付；否则 has_interrupted_request 为 false。
+bool has_interrupted_request
+quadruped_interfaces/ModeResult interrupted_result

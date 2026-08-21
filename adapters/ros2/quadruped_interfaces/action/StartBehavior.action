@@ -1,0 +1,9 @@
+# 请求启动指定行为，例如 rl_locomotion。
+uint64 request_id
+string behavior_name
+---
+# 结果必须与输入 request_id 关联，并遵循 ModeResult 状态语义。
+quadruped_interfaces/ModeResult result
+---
+# feedback 是该请求当前的 Accepted、Running 或终态快照。
+quadruped_interfaces/ModeResult status

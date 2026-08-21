@@ -1,0 +1,5 @@
+# 请求复位执行侧允许软件复位的故障；当前后端不支持时返回 Rejected。
+uint64 request_id
+---
+# 结果遵循统一 ModeResult 状态语义。
+quadruped_interfaces/ModeResult result

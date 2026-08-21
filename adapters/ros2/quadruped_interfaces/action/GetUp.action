@@ -1,0 +1,8 @@
+# 请求从当前姿态进入站立流程。
+uint64 request_id
+---
+# 结果必须与输入 request_id 关联，并遵循 ModeResult 状态语义。
+quadruped_interfaces/ModeResult result
+---
+# feedback 是该请求当前的 Accepted、Running 或终态快照。
+quadruped_interfaces/ModeResult status

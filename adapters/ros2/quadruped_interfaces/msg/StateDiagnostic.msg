@@ -1,0 +1,27 @@
+# StateFrame 的低频诊断子集，不用于高频控制闭环。
+uint8 SAFETY_UNKNOWN=0
+uint8 SAFETY_DAMPING=1
+uint8 SAFETY_CONTROL_ENABLED=2
+uint8 SAFETY_FAULT=3
+uint8 SAFETY_EMERGENCY_STOP=4
+
+uint32 schema_version
+uint64 startup_id
+uint64 session_id
+uint64 sequence
+int64 timestamp_ns
+uint32 joint_count
+uint8 safety_state
+uint64 last_accepted_command_sequence
+uint64 effective_command_sequence
+bool imu_valid
+float64 imu_orientation_w
+float64 imu_orientation_x
+float64 imu_orientation_y
+float64 imu_orientation_z
+float64 imu_angular_velocity_x
+float64 imu_angular_velocity_y
+float64 imu_angular_velocity_z
+float64 imu_linear_acceleration_x
+float64 imu_linear_acceleration_y
+float64 imu_linear_acceleration_z
