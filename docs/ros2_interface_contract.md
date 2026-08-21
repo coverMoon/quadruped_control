@@ -1,12 +1,12 @@
 # ROS 2 顶层接口契约
 
-本文件冻结阶段 5 的 ROS 2 消息、动作、服务、命名和请求语义。当前阶段只提供
-`adapters/ros2/quadruped_interfaces/` 接口包，不实现 ROS 2 gateway、MotionRuntime
-调度、RobotIO 接线或控制进程。
+本文件冻结阶段 5 的 ROS 2 消息、动作、服务、命名和请求语义。阶段 6 已由
+`adapters/ros2/quadruped_gateway/` 实现顶层 gateway，并通过本机 IPC 连接独立的 motiond
+和 mujoco_backendd；接口字段和请求语义仍以本文件为准。
 
 ## 1. 包和主题命名
 
-接口包名称为 `quadruped_interfaces`。推荐由后续 `ros2_gateway` 使用以下名称：
+接口包名称为 `quadruped_interfaces`。阶段 6 的 `ros2_gateway` 使用以下名称：
 
 | 类型 | 名称 | ROS 类型 | 语义 |
 | --- | --- | --- | --- |
@@ -49,7 +49,9 @@ adapter 必须：
 - 将 `source` 固定为 `core::CommandSource::Navigation`；
 - 为每个来源维护严格递增且非零的 `sequence`；
 - 使用本机 monotonic clock 生成 `timestamp_ns`；
-- 依据启动时加载的 `ControllerConfig::command_validity_ns` 生成 `expires_at_ns`；
+- gateway 使用独立的 `cmd_vel_timeout_ns` ROS 参数生成 `expires_at_ns`，默认
+  200,000,000 ns（200 ms）；
+- 该超时只约束 `BaseCommand`，不得复用 10 ms 级的 `CommandFrame` 有效期；
 - 不把 ROS wall time 或 `builtin_interfaces/msg/Time` 直接写入 core 时间戳；
 - 只保留同一来源的最新命令，旧消息允许丢弃；
 - 只通过后续 motion 层提交 `BaseCommand`，ROS callback 不直接调用
@@ -186,16 +188,18 @@ MotionRuntime 的既有去重语义通过 ROS 统一保留：
 | `/motion/result` | reliable、depth 16、volatile | 终态事件可靠发布，订阅端仍以 request_id 去重 |
 
 QoS 是顶层 adapter 的约定，不改变 core 的固定容量数据结构。ROS callback 只负责解析、
-校验、写入最新值通道或可靠请求通道；后续阶段由独立 motion 控制线程在自己的周期读取
-这些输入，再创建 `BaseCommand` / `ModeRequest` 并调用 `MotionRuntime::update()`。
-ROS 接口不能绕过 `RobotIO` 提交 `CommandFrame`，也不能把 ROS 消息类型放入 core。
+校验、写入最新值通道或固定容量请求通道；独立 motiond 在自己的周期读取这些输入，再创建
+`BaseCommand` / `ModeRequest` 并调用 `MotionRuntime::update()`。ROS 接口不能绕过
+`RobotIO` 提交 `CommandFrame`，也不能把 ROS 消息类型放入 core。
 
-## 5. 本阶段边界
+## 5. 当前实现边界
 
-本阶段只冻结接口和语义，明确不包含：
+阶段 6 已实现 ROS 2 node、executor、IPC、session 和三进程故障退路，仍明确不包含：
 
-- ROS 2 node、gateway、launch 或 executor；
-- ROS callback 到 MotionRuntime 的实际接线；
+- MuJoCo GUI 和 ROS 2 launch；
 - ROS 到 RobotIO 的直接提交；
-- 三进程 IPC、session 建立和进程故障恢复；
-- blackW、策略文件或新的通用行为框架。
+- blackW、真实硬件或跨机器协议；
+- 新的通用行为框架。
+
+三进程运行、构建和故障规则见
+[`ros2_three_process_runtime.md`](ros2_three_process_runtime.md)。

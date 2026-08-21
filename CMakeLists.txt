@@ -19,6 +19,7 @@ if(QUADRUPED_ENABLE_MUJOCO)
 endif()
 
 add_subdirectory(core)
+add_subdirectory(adapters/ipc)
 add_subdirectory(motion)
 add_subdirectory(config_loader)
 

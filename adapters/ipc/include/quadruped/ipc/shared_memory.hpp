@@ -1,0 +1,129 @@
+/**
+ * @file shared_memory.hpp
+ * @brief 声明共享内存生命周期、最新值槽和单生产者队列操作。
+ */
+
+#pragma once
+
+#include "quadruped/ipc/wire_protocol.hpp"
+
+#include <cstdint>
+#include <memory>
+#include <string>
+
+namespace quadruped::ipc
+{
+
+class SharedMemory
+{
+public:
+    struct OpenResult
+    {
+        std::unique_ptr<SharedMemory> memory{};
+        std::string error_message{};
+
+        [[nodiscard]] bool ok() const noexcept
+        {
+            return memory != nullptr;
+        }
+    };
+
+    static OpenResult create_owner(const std::string& name, const WireIdentity& identity);
+    static OpenResult open_existing(const std::string& name);
+
+    SharedMemory(const SharedMemory&) = delete;
+    SharedMemory& operator=(const SharedMemory&) = delete;
+    ~SharedMemory();
+
+    SharedLayout& layout() noexcept
+    {
+        return *layout_;
+    }
+
+    const SharedLayout& layout() const noexcept
+    {
+        return *layout_;
+    }
+
+private:
+    SharedMemory(std::string name, int fd, SharedLayout* layout, bool owner)
+        : name_(std::move(name)), fd_(fd), layout_(layout), owner_(owner)
+    {
+    }
+
+    std::string name_{};
+    int fd_{-1};
+    SharedLayout* layout_{nullptr};
+    bool owner_{false};
+};
+
+[[nodiscard]] std::int64_t monotonic_now_ns() noexcept;
+
+template<typename T>
+void publish_latest(LatestSlot<T>& slot, const T& value) noexcept
+{
+    while (slot.lock.exchange(1, std::memory_order_acquire) != 0)
+    {
+    }
+    slot.value = value;
+    slot.version.fetch_add(1, std::memory_order_release);
+    slot.lock.store(0, std::memory_order_release);
+}
+
+template<typename T>
+bool read_latest(const LatestSlot<T>& slot, T& value, std::uint64_t* version = nullptr) noexcept
+{
+    for (int attempt = 0; attempt < 4; ++attempt)
+    {
+        if (slot.lock.exchange(1, std::memory_order_acquire) != 0)
+        {
+            continue;
+        }
+        const std::uint64_t current = slot.version.load(std::memory_order_acquire);
+        if (current != 0)
+        {
+            value = slot.value;
+        }
+        slot.lock.store(0, std::memory_order_release);
+        if (current == 0)
+        {
+            return false;
+        }
+        if (version != nullptr)
+        {
+            *version = current;
+        }
+        return true;
+    }
+    return false;
+}
+
+template<typename T, std::size_t Capacity>
+bool queue_push(SpscQueue<T, Capacity>& queue, const T& value) noexcept
+{
+    const std::uint64_t write = queue.write_index.load(std::memory_order_relaxed);
+    const std::uint64_t read = queue.read_index.load(std::memory_order_acquire);
+    if (write - read >= Capacity)
+    {
+        return false;
+    }
+    queue.entries[write % Capacity] = value;
+    queue.write_index.store(write + 1, std::memory_order_release);
+    return true;
+}
+
+template<typename T, std::size_t Capacity>
+bool queue_pop(SpscQueue<T, Capacity>& queue, T& value) noexcept
+{
+    const std::uint64_t read = queue.read_index.load(std::memory_order_relaxed);
+    const std::uint64_t write = queue.write_index.load(std::memory_order_acquire);
+    if (read == write)
+    {
+        return false;
+    }
+    value = queue.entries[read % Capacity];
+    queue.read_index.store(read + 1, std::memory_order_release);
+    return true;
+}
+
+}  // 命名空间 quadruped::ipc

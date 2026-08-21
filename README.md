@@ -4,7 +4,7 @@
 
 ## 当前实现
 
-仓库目前包含一个独立的 C++17 核心库，以及可选的 MuJoCo 仿真后端：
+仓库目前包含独立的 C++17 控制核心，以及可选的 MuJoCo、Torch 和 ROS 2 运行链路：
 
 - 固定最大 16 关节的公共数据结构；
 - `StateFrame`、`CommandFrame`、`BaseCommand` 和模式请求；
@@ -20,7 +20,12 @@
 - `motion/` 中固定 black 数据布局的 `RlController`，直接实现与 `rl_sar` 一致的
   45 维观测、6 帧历史和动作换算；
 - `policy/torch/` 中的轻量 `TorchPolicy`，只负责单个 TorchScript 模型的加载和 forward；
+- flat/obstacle 策略运行时切换及请求终态管理；
+- `adapters/ipc/` 中的固定容量本机共享内存协议和远程 `RobotIO`；
+- `apps/runtime_daemons/` 中相互独立的 `motiond` 和 `mujoco_backendd`；
+- `adapters/ros2/quadruped_gateway/` 中的 ROS 2 topic、action 和 service 网关；
 - `tests/mujoco/` 中覆盖 RobotIO、MotionRuntime 和 MuJoCo 的无界面闭环测试；
+- 三进程 ROS 2 headless 端到端和进程故障退路测试；
 - `apps/mujoco_headless/` 中的最小无界面运行入口；
 - `apps/mujoco_sim/` 中嵌入 MuJoCo 官方 Simulate 完整界面的交互仿真程序，支持起立、
   RL 行走、趴下、被动、重置和暂停。
@@ -33,15 +38,22 @@ YAML 配置加载只存在于启动期模块 `config_loader/`。MuJoCo C++ API �
 
 ## 当前阶段
 
-M1 的 MuJoCo 开环仿真和 M2 的基础运动闭环已经完成。M2 已通过代码复审和用户界面验收
-（起立和趴下效果已由用户确认）：启动期 YAML 配置加载统一了 black 的 `RobotModel` 和
-`ControllerConfig`，`MotionRuntime` 不依赖 ROS 2、Torch 和 MuJoCo，带 GLFW 界面的
-  MuJoCo 交互程序已完成 `Passive → GetUp → Stand → GetDown → Passive` 闭环。
+阶段 1 至阶段 6 已完成。black 已具备基础运动、真实 TorchScript RL、flat/obstacle
+运行时切换、冻结的 ROS 2 接口契约，以及以下三进程无界面仿真链路：
 
-公共数据结构、`RobotModel`、`RobotIO`、基础校验、`MujocoRobotIO` 和基础运动闭环已经
-完成。M3 的 black 固定 RL 数据路径和真实 TorchScript 推理已经接入 `MotionRuntime` 与
-MuJoCo：从 Stand 启动 `rl_locomotion` 后，每 4 个控制周期执行一次策略并提交关节阻抗命令；
-推理、观测或动作失败时回到 Passive。ROS 2 适配器尚未实现。
+```text
+ros2_gateway
+    ↓ BaseCommand / ModeRequest
+motiond
+    ↓ RobotIO StateFrame / CommandFrame
+mujoco_backendd
+```
+
+进程之间使用固定容量本机共享内存，包含 schema、startup、session、序列、heartbeat 和
+过期语义。ROS 2 网关已接入 `/cmd_vel`、运动 action/service 和状态话题；headless 验收覆盖
+正常动作、策略切换、reset，以及 gateway、motiond、backend 分别退出时的安全退路。
+
+当前阶段仍不包含 ROS 2 launch、三进程 MuJoCo GUI、blackW、真实硬件或跨机器协议。
 
 M1 固定使用 MuJoCo 3.9.0。依赖安装在仓库本地的 `.deps/` 目录，不依赖
 Python 或 Conda 环境。
@@ -84,6 +96,20 @@ Python 或 Conda 环境。
 ./scripts/setup_mujoco.sh
 ```
 
+构建 ROS 2 Humble 接口和 gateway：
+
+```bash
+./scripts/build_ros2.sh
+```
+
+该脚本在 `/tmp/quadruped_control_ros2_ws_stage6/` 下创建独立 colcon 工作区，不在仓库内
+生成 ROS 2 build、install 或 log。完成主工程 `--rl` 构建和 ROS 2 构建后，可运行阶段 6
+无界面端到端测试：
+
+```bash
+./scripts/test_ros2_headless.sh
+```
+
 系统依赖（Ubuntu/Debian 包名）：
 
 - 默认构建需要 yaml-cpp 开发包：`sudo apt install libyaml-cpp-dev`；
@@ -109,9 +135,12 @@ Python 或 Conda 环境。
 仿真可使用 `./scripts/run_mujoco_sim.sh --basic`。
 速度键只在 `rl_locomotion` 的 Running 模式生效；离开该模式会自动清零速度目标。
 
-当前实现状态、参考工程差距和 RL 时序分别见
-[`docs/current_status.md`](docs/current_status.md) 与
-[`docs/rl_mujoco_runtime.md`](docs/rl_mujoco_runtime.md)。
+当前实现状态、RL 时序、ROS 2 接口和三进程运行架构分别见：
+
+- [`docs/current_status.md`](docs/current_status.md)；
+- [`docs/rl_mujoco_runtime.md`](docs/rl_mujoco_runtime.md)；
+- [`docs/ros2_interface_contract.md`](docs/ros2_interface_contract.md)；
+- [`docs/ros2_three_process_runtime.md`](docs/ros2_three_process_runtime.md)。
 
 上述脚本均可从任意当前目录启动。
 
@@ -129,7 +158,11 @@ ctest --test-dir build/default --output-on-failure
 quadruped_control/
 ├── apps/
 │   ├── mujoco_headless/              最小无界面 MuJoCo 仿真入口
-│   └── mujoco_sim/                   带 GLFW 界面的交互式 MuJoCo 仿真
+│   ├── mujoco_sim/                   带 GLFW 界面的交互式 MuJoCo 仿真
+│   └── runtime_daemons/              独立 motiond 和 MuJoCo backend 进程
+├── adapters/
+│   ├── ipc/                          固定容量本机共享内存和 RemoteRobotIO
+│   └── ros2/                         ROS 2 接口包与顶层 gateway
 ├── assets/
 │   └── robots/black/mujoco/          固定版本的仿真模型和网格
 ├── backends/
@@ -176,20 +209,13 @@ compile_commands.json                  指向编译数据库的符号链接
 - `tests/` 按被测模块组织测试。M0 测试不依赖网络和第三方测试框架。
 - 构建结果、日志、临时文件和编辑器生成文件不能放入源码目录，也不能提交到 Git。
 
-后续接入 ROS 2 时使用下面的位置：
-
-```text
-adapters/ros2/                          ROS 2 消息转换和外围接口
-```
-
-这些模块可以依赖 `core`，但 `core` 不能反向依赖它们。没有开始实现的模块暂时不创建空目录。
+`adapters/ipc/` 和 `adapters/ros2/` 可以依赖 `core`，但 `core` 不能反向依赖它们。
 
 ## 机器人匹配与标定边界
 
-当前单进程应用只加载一份 `RobotModel`，并把它同时交给 MotionRuntime 和后端；MuJoCo
-后端在启动时按有序关节名称检查模型、执行器和传感器。未来控制器与后端独立运行时，
-应在建立控制会话前核对数据格式、机器人名称和有序关节名称，匹配成功后再使用启动编号
-和会话编号识别重启与旧帧。机器人身份和标定编号不进入高频状态帧或命令帧。
+单进程应用加载一份 `RobotModel` 并同时交给 MotionRuntime 和后端。三进程运行时则在
+共享内存建立控制会话前核对 wire schema、机器人名称和有序关节名称，再使用 startup 和
+session 编号拒绝重启前的旧帧。机器人身份和标定编号不进入高频状态帧或命令帧。
 
 电机零点、方向、减速比和传感器标定归最终执行侧管理。MotionRuntime 只使用统一关节
 顺序下的归一化 SI 数据，不加载也不选择具体实机的标定记录。

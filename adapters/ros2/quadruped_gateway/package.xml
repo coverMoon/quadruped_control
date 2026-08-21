@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!-- quadruped_control 的 ROS 2 共享内存网关包。 -->
+<package format="3">
+  <name>quadruped_gateway</name>
+  <version>0.1.0</version>
+  <description>三进程仿真链路的 ROS 2 顶层网关和本地控制工具。</description>
+  <maintainer email="maintainer@example.com">quadruped_control maintainers</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_action</depend>
+  <depend>geometry_msgs</depend>
+  <depend>quadruped_interfaces</depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

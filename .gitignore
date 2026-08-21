@@ -1,4 +1,5 @@
 /build/
+/log/
 /cmake-build-*/
 /compile_commands.json
 /.deps/

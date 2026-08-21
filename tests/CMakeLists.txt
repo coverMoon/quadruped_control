@@ -26,6 +26,12 @@ target_compile_definitions(quadruped_config_tests PRIVATE
 quadruped_add_test(quadruped_motion_tests motion_tests.cpp)
 target_link_libraries(quadruped_motion_tests PRIVATE quadruped::motion)
 
+quadruped_add_test(quadruped_ipc_tests ipc_tests.cpp)
+target_link_libraries(quadruped_ipc_tests PRIVATE quadruped::config quadruped::ipc)
+target_compile_definitions(quadruped_ipc_tests PRIVATE
+    QUADRUPED_ROBOT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/robots/black.yaml"
+)
+
 quadruped_add_test(quadruped_rl_tests rl_tests.cpp)
 target_link_libraries(quadruped_rl_tests PRIVATE quadruped::config quadruped::motion)
 target_compile_definitions(quadruped_rl_tests PRIVATE
