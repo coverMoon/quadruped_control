@@ -10,6 +10,95 @@ namespace
 
 using motion_test::expect;
 using motion_test::expect_close;
+
+class FakePolicy final : public qm::Policy
+{
+public:
+    qm::RlInferenceOutput forward(const qm::RlInferenceInput& input) override
+    {
+        ++forward_count;
+        last_input = input;
+        qm::RlInferenceOutput output;
+        if (fail_forward)
+        {
+            output.error_message = "injected policy load failure";
+            return output;
+        }
+        output.ok = true;
+        output.actions.fill(action);
+        return output;
+    }
+
+    int forward_count{0};
+    bool fail_forward{false};
+    float action{0.0F};
+    qm::RlInferenceInput last_input{};
+};
+
+qc::RobotModel make_rl_model()
+{
+    auto model = motion_test::make_test_model();
+    model.name = "black";
+    return model;
+}
+
+qm::RlConfig make_rl_config(
+    const std::string& name,
+    const std::array<double, qc::kMaxJoints>& default_positions)
+{
+    qm::RlConfig config;
+    config.name = name;
+    config.robot_name = "black";
+    config.model_path = "/tmp/" + name + ".pt";
+    config.command_scale = {1.0, 1.0, 1.0};
+    config.command_limits = {2.0, 2.0, 2.0};
+    config.angular_velocity_scale = 1.0;
+    config.joint_position_scale = 1.0;
+    config.joint_velocity_scale = 1.0;
+    config.observation_clip = 100.0;
+    config.action_scale = 0.25;
+    config.action_clip = 100.0;
+    config.max_position_jump = 1.0;
+    for (std::size_t i = 0; i < qm::kRlJointCount; ++i)
+    {
+        config.default_joint_positions[i] = default_positions[i];
+        config.kp[i] = 40.0;
+        config.kd[i] = 1.2;
+    }
+    return config;
+}
+
+qm::MotionRuntime::CreateResult make_rl_runtime()
+{
+    auto created = qm::MotionRuntime::create(make_rl_model(), motion_test::make_test_config());
+    expect(created.ok(), "black RL 测试运行时应创建成功：" + created.error_message);
+    return created;
+}
+
+qc::BaseCommand make_base_command()
+{
+    qc::BaseCommand command;
+    command.sequence = 1;
+    command.expires_at_ns = 100'000'000;
+    command.source = qc::CommandSource::Test;
+    command.priority = 1;
+    command.vx = 0.6;
+    return command;
+}
+
+qm::MotionUpdateOutput update_with_command(
+    qm::MotionRuntime& runtime,
+    motion_test::FakeRobotIO& io,
+    const qc::BaseCommand& command,
+    const qc::ModeRequest* request = nullptr)
+{
+    qm::MotionUpdateInput input;
+    input.now_ns = 0;
+    input.base_command = &command;
+    input.request = request;
+    return runtime.update(io, input);
+}
+
 // 校验最近一条命令的所有关节目标位置等于给定数组。
 void expect_command_positions(
     const motion_test::FakeRobotIO& io,
@@ -475,6 +564,217 @@ void test_getdown_interrupted_by_getup()
     expect_command_positions(io, rest, "重新起立后趴下仍应回到首次记录的落地姿态");
 }
 
+// 已加载策略可以在 Running 中直接 reload，并保留最新 BaseCommand。
+void test_direct_policy_switches()
+{
+    auto created = make_rl_runtime();
+    if (!created.ok())
+    {
+        return;
+    }
+
+    const auto model = make_rl_model();
+    const auto flat_pose = config_stand_pose();
+    auto obstacle_pose = flat_pose;
+    for (std::size_t i = 0; i < qm::kRlJointCount; ++i)
+    {
+        obstacle_pose[i] += (i % 2 == 0) ? 0.05 : -0.05;
+    }
+    FakePolicy flat_policy;
+    FakePolicy obstacle_policy;
+    FakePolicy unloaded_policy;
+    std::string error;
+    expect(created.runtime->attach_policy(
+        make_rl_config("flat", flat_pose), flat_policy, error),
+        "flat 策略应接入：" + error);
+    expect(created.runtime->register_policy(
+        make_rl_config("obstacle", obstacle_pose), obstacle_policy, error),
+        "obstacle 策略应注册：" + error);
+    auto unloaded_config = make_rl_config("unloaded", obstacle_pose);
+    unloaded_config.model_path.clear();
+    expect(!created.runtime->register_policy(unloaded_config, unloaded_policy, error),
+        "未通过加载配置校验的策略不得进入策略目录");
+
+    motion_test::FakeRobotIO io;
+    io.state = motion_test::make_state(model, motion_test::make_rest_positions());
+    motion_test::drive_getup(*created.runtime, io, 1);
+    io.state = motion_test::make_state(model, flat_pose);
+
+    const auto command = make_base_command();
+    auto start = motion_test::make_request(2, qc::ModeRequestType::StartBehavior);
+    start.behavior_name = "rl_locomotion";
+    update_with_command(*created.runtime, io, command, &start);
+    expect(flat_policy.forward_count == 1, "启动 RL 时 flat 应完成首次推理");
+
+    auto obstacle = motion_test::make_request(3, qc::ModeRequestType::SwitchPolicy);
+    obstacle.policy_name = "obstacle";
+    const auto switched = update_with_command(*created.runtime, io, command, &obstacle);
+    expect(switched.result.state == qc::ModeResultState::Accepted,
+        "flat → obstacle 直接 reload 应接受");
+    expect(switched.status.policy_name == "obstacle", "直接 reload 后应报告 obstacle");
+    expect(obstacle_policy.forward_count == 1, "obstacle 应在直接 reload 周期首次推理");
+    expect(flat_policy.forward_count == 1, "直接 reload 周期不得继续调用旧 flat 策略");
+    expect(switched.status.active_source == qc::CommandSource::Test,
+        "直接 reload 后同周期 BaseCommand 仍应有效");
+    expect_close({obstacle_policy.last_input.observation[0], 0.6, 1.0e-6,
+        "切换后新策略应收到最新 vx 命令"});
+    for (std::size_t i = qm::kRlObservationDim; i < qm::kRlInputDim; ++i)
+    {
+        expect_close({obstacle_policy.last_input.observation[i], 0.0, 1.0e-9,
+            "切换后旧 RL 历史必须清零"});
+    }
+    expect(created.runtime->query_result(obstacle.request_id).state ==
+            qc::ModeResultState::Completed,
+        "直接 reload 应在新策略首次推理后完成请求");
+
+    io.state = motion_test::make_state(model, obstacle_pose);
+    auto flat = motion_test::make_request(4, qc::ModeRequestType::SwitchPolicy);
+    flat.policy_name = "flat";
+    update_with_command(*created.runtime, io, command, &flat);
+    expect(flat_policy.forward_count == 2, "obstacle → flat 应直接 reload 并重新推理");
+    expect(obstacle_policy.forward_count == 1, "切回 flat 时不得再次调用 obstacle");
+
+    auto unknown = motion_test::make_request(5, qc::ModeRequestType::SwitchPolicy);
+    unknown.policy_name = "missing";
+    const auto rejected = update_with_command(*created.runtime, io, command, &unknown);
+    expect(rejected.result.state == qc::ModeResultState::Rejected,
+        "未知或未加载策略必须拒绝");
+    expect(rejected.status.mode == qc::MotionMode::Running,
+        "拒绝未知策略后应保持当前 RL 行为");
+
+    auto unloaded = motion_test::make_request(6, qc::ModeRequestType::SwitchPolicy);
+    unloaded.policy_name = "unloaded";
+    const auto unloaded_result =
+        update_with_command(*created.runtime, io, command, &unloaded);
+    expect(unloaded_result.result.state == qc::ModeResultState::Rejected,
+        "未成功加载和注册的策略必须拒绝切换");
+}
+
+// 姿态不匹配时先执行固定周期阻抗过渡，过渡完成后才允许目标策略推理。
+void test_policy_transition_and_failure()
+{
+    auto created = make_rl_runtime();
+    if (!created.ok())
+    {
+        return;
+    }
+
+    const auto model = make_rl_model();
+    const auto flat_pose = config_stand_pose();
+    auto far_pose = flat_pose;
+    for (std::size_t i = 0; i < qm::kRlJointCount; ++i)
+    {
+        far_pose[i] += (i % 2 == 0) ? 0.5 : -0.5;
+    }
+    FakePolicy flat_policy;
+    FakePolicy far_policy;
+    FakePolicy failing_policy;
+    failing_policy.fail_forward = true;
+    std::string error;
+    expect(created.runtime->attach_policy(
+        make_rl_config("flat", flat_pose), flat_policy, error),
+        "flat 策略应接入：" + error);
+    expect(created.runtime->register_policy(
+        make_rl_config("far", far_pose), far_policy, error),
+        "far 策略应注册：" + error);
+    expect(created.runtime->register_policy(
+        make_rl_config("failing", far_pose), failing_policy, error),
+        "失败注入策略应注册：" + error);
+
+    motion_test::FakeRobotIO io;
+    io.state = motion_test::make_state(model, motion_test::make_rest_positions());
+    motion_test::drive_getup(*created.runtime, io, 1);
+    io.state = motion_test::make_state(model, flat_pose);
+    const auto command = make_base_command();
+    auto start = motion_test::make_request(2, qc::ModeRequestType::StartBehavior);
+    start.behavior_name = "rl_locomotion";
+    update_with_command(*created.runtime, io, command, &start);
+
+    auto switch_far = motion_test::make_request(3, qc::ModeRequestType::SwitchPolicy);
+    switch_far.policy_name = "far";
+    const auto accepted = update_with_command(*created.runtime, io, command, &switch_far);
+    expect(accepted.result.state == qc::ModeResultState::Accepted,
+        "姿态不匹配的策略切换应接受并进入 transition");
+    expect(accepted.status.behavior_phase == "policy_transition",
+        "姿态不匹配时应报告 policy_transition");
+    expect(io.submitted.back().joints[0].mode == qc::ControlMode::JointImpedance,
+        "策略过渡必须输出位置阻抗命令");
+    expect(flat_policy.forward_count == 1 && far_policy.forward_count == 0,
+        "策略过渡首周期不得执行旧策略或目标策略推理");
+
+    for (int cycle = 1; cycle < 20; ++cycle)
+    {
+        update_with_command(*created.runtime, io, command);
+    }
+    expect(created.runtime->query_result(switch_far.request_id).state ==
+            qc::ModeResultState::Completed,
+        "固定周期过渡完成后切换请求应 Completed");
+    expect(far_policy.forward_count == 0,
+        "完成过渡的命令周期仍不应执行目标策略推理");
+    expect(io.submitted.back().joints[0].target_position == far_pose[0],
+        "过渡最后一周期应到达目标策略默认姿态");
+
+    io.state = motion_test::make_state(model, far_pose);
+    const auto resumed = update_with_command(*created.runtime, io, command);
+    expect(far_policy.forward_count == 1, "过渡完成后下一周期应恢复目标策略推理");
+    expect(resumed.status.policy_name == "far", "过渡完成后当前策略应更新为 far");
+    expect(resumed.status.active_source == qc::CommandSource::Test,
+        "过渡期间持续接收的 BaseCommand 应在恢复 RL 后生效");
+
+    auto switch_failing = motion_test::make_request(4, qc::ModeRequestType::SwitchPolicy);
+    switch_failing.policy_name = "failing";
+    const auto failed = update_with_command(*created.runtime, io, command, &switch_failing);
+    expect(failed.status.mode == qc::MotionMode::Passive,
+        "目标策略首次推理失败后必须进入 Passive");
+    expect(created.runtime->query_result(switch_failing.request_id).state ==
+            qc::ModeResultState::Failed,
+        "目标策略加载后的首次推理失败必须返回 Failed");
+    expect(!failed.status.error_message.empty(), "策略切换失败必须保留错误说明");
+    expect(io.submitted.back().joints[0].mode == qc::ControlMode::Disabled,
+        "策略切换失败后必须清空旧 RL 命令并提交 Disabled");
+}
+
+// EnterPassive 在策略过渡期间拥有最高打断优先级。
+void test_policy_transition_interrupted_by_passive()
+{
+    auto created = make_rl_runtime();
+    if (!created.ok())
+    {
+        return;
+    }
+    const auto model = make_rl_model();
+    const auto flat_pose = config_stand_pose();
+    auto far_pose = flat_pose;
+    far_pose[0] += 0.5;
+    FakePolicy flat_policy;
+    FakePolicy far_policy;
+    std::string error;
+    created.runtime->attach_policy(make_rl_config("flat", flat_pose), flat_policy, error);
+    created.runtime->register_policy(make_rl_config("far", far_pose), far_policy, error);
+
+    motion_test::FakeRobotIO io;
+    io.state = motion_test::make_state(model, motion_test::make_rest_positions());
+    motion_test::drive_getup(*created.runtime, io, 1);
+    io.state = motion_test::make_state(model, flat_pose);
+    auto start = motion_test::make_request(2, qc::ModeRequestType::StartBehavior);
+    start.behavior_name = "rl_locomotion";
+    motion_test::update(*created.runtime, io, &start);
+    auto switch_far = motion_test::make_request(3, qc::ModeRequestType::SwitchPolicy);
+    switch_far.policy_name = "far";
+    motion_test::update(*created.runtime, io, &switch_far);
+
+    const auto passive = motion_test::make_request(4, qc::ModeRequestType::EnterPassive);
+    const auto interrupted = motion_test::update(*created.runtime, io, &passive);
+    expect(interrupted.result.state == qc::ModeResultState::Completed,
+        "策略过渡期间 EnterPassive 应立即完成");
+    expect(interrupted.status.mode == qc::MotionMode::Passive,
+        "EnterPassive 应立即结束策略过渡并进入 Passive");
+    expect(created.runtime->query_result(switch_far.request_id).state ==
+            qc::ModeResultState::Failed,
+        "被 EnterPassive 打断的策略切换应返回 Failed");
+    expect(far_policy.forward_count == 0, "被打断后目标策略不得推理");
+}
+
 }  // namespace
 
 int main()
@@ -488,6 +788,9 @@ int main()
     test_request_lifecycle_and_ordering();
     test_request_interruptions_and_explicit_rejections();
     test_fault_fails_active_request();
+    test_direct_policy_switches();
+    test_policy_transition_and_failure();
+    test_policy_transition_interrupted_by_passive();
 
     if (motion_test::failures > 0)
     {

@@ -13,6 +13,8 @@ struct SimInput
 {
     bool getup{false};          // 0：请求起立
     bool start_rl{false};       // 1：从 Stand 启动 RL 行走
+    bool switch_flat{false};    // 2：Running 中切换到 flat
+    bool switch_obstacle{false};  // 3：Running 中切换到 obstacle
     bool getdown{false};        // 9：请求趴下
     bool enter_passive{false};  // P：请求进入被动
     bool reset{false};          // R：reset 并建立新会话

@@ -40,7 +40,8 @@ constexpr const char* kDefaultRobotConfigPath = QUADRUPED_DEFAULT_ROBOT_CONFIG_P
 constexpr const char* kDefaultControllerConfigPath = QUADRUPED_DEFAULT_CONTROLLER_CONFIG_PATH;
 constexpr const char* kDefaultSimulationConfigPath = QUADRUPED_DEFAULT_SIMULATION_CONFIG_PATH;
 #if defined(QUADRUPED_WITH_TORCH)
-constexpr const char* kDefaultPolicyConfigPath = QUADRUPED_DEFAULT_POLICY_CONFIG_PATH;
+constexpr const char* kFlatPolicyConfigPath = QUADRUPED_FLAT_POLICY_CONFIG_PATH;
+constexpr const char* kObstaclePolicyConfigPath = QUADRUPED_OBSTACLE_POLICY_CONFIG_PATH;
 #endif
 
 // 程序启动标识固定为非零值；会话号由 SimController 从 1 开始递增。
@@ -247,26 +248,36 @@ int run(const Options& options)
         return 1;
     }
 #if defined(QUADRUPED_WITH_TORCH)
-    const auto rl_config = quadruped::config::load_rl_config(
-        kDefaultPolicyConfigPath, QUADRUPED_PROJECT_SOURCE_DIR, model.model);
-    if (!rl_config.ok())
+    const auto flat_config = quadruped::config::load_rl_config(
+        kFlatPolicyConfigPath, QUADRUPED_PROJECT_SOURCE_DIR, model.model);
+    const auto obstacle_config = quadruped::config::load_rl_config(
+        kObstaclePolicyConfigPath, QUADRUPED_PROJECT_SOURCE_DIR, model.model);
+    if (!flat_config.ok() || !obstacle_config.ok())
     {
-        std::cerr << "加载 RL 配置失败: " << rl_config.error_message << '\n';
+        std::cerr << "加载 RL 配置失败: "
+                  << (flat_config.ok() ? obstacle_config.error_message : flat_config.error_message)
+                  << '\n';
         return 1;
     }
-    auto policy = quadruped::policy::TorchPolicy::create(rl_config.config);
-    if (!policy.ok())
+    auto flat_policy = quadruped::policy::TorchPolicy::create(flat_config.config);
+    auto obstacle_policy = quadruped::policy::TorchPolicy::create(obstacle_config.config);
+    if (!flat_policy.ok() || !obstacle_policy.ok())
     {
-        std::cerr << "加载 RL 策略失败: " << policy.error_message << '\n';
+        std::cerr << "加载 RL 策略失败: "
+                  << (flat_policy.ok() ? obstacle_policy.error_message : flat_policy.error_message)
+                  << '\n';
         return 1;
     }
     std::string attach_error;
-    if (!runtime.runtime->attach_policy(rl_config.config, *policy.policy, attach_error))
+    if (!runtime.runtime->attach_policy(
+            flat_config.config, *flat_policy.policy, attach_error) ||
+        !runtime.runtime->register_policy(
+            obstacle_config.config, *obstacle_policy.policy, attach_error))
     {
         std::cerr << "接入 RL 策略失败: " << attach_error << '\n';
         return 1;
     }
-    command_limits = rl_config.config.command_limits;
+    command_limits = flat_config.config.command_limits;
     policy_ready = true;
 #endif
     qsim::TerminalInput terminal(command_limits);

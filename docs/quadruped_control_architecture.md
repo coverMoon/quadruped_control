@@ -315,6 +315,21 @@ BaseCommand 表示机器人整体怎样移动，主要包含 `vx`、`vy`、`wz`�
 
 `SwitchPolicy` 只负责切换 RL 功能使用的策略，不替代 `StartBehavior`。
 
+当前实现使用固定容量策略目录。应用在启动期完成 YAML 配置读取、Torch 模型加载和预热，
+随后通过 `attach_policy()` 选择初始策略，并用 `register_policy()` 注册其他已加载策略；
+MotionRuntime 不在控制周期中访问模型文件或动态加载插件。策略对象由应用持有，
+MotionRuntime 只保存其同步推理接口和对应的 `RlController`。
+
+`SwitchPolicy` 仅在 `rl_locomotion` 处于 `Running` 时接受。目标名称不存在或尚未注册时
+返回 `Rejected`。若当前关节姿态接近目标策略默认姿态，运行时立即切换到目标策略，
+清空目标策略的观测历史、旧动作和推理节拍，并以目标策略完成下一次推理；若姿态差异较大，
+先在固定控制周期内输出位置阻抗命令，平滑过渡到目标默认姿态。过渡期间旧策略和目标策略
+都不执行推理，最新 `BaseCommand` 仍可输入，但只在切换完成、RL 恢复后参与观测。
+
+策略切换的首次目标推理、过渡命令提交或状态校验失败时，请求返回 `Failed`，旧 RL 命令被
+清空并进入 `Passive`。`EnterPassive` 可以在过渡期间立即打断切换，被打断的切换请求同样
+取得明确的 `Failed` 终态。
+
 重复收到同一个请求时，不能把同一个动作再执行一次。
 
 MotionRuntime 对请求采用固定生命周期：新请求先返回 `Accepted`，进入实际控制周期后

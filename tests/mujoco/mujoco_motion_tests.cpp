@@ -384,6 +384,28 @@ void run_rl_phase(const MotionContext& ctx)
     expect(height > 0.25,
         "RL 行走期间躯干不应倒地（高度 " + std::to_string(height) + " m）");
 
+    qc::ModeRequest obstacle;
+    obstacle.request_id = 3;
+    obstacle.type = qc::ModeRequestType::SwitchPolicy;
+    obstacle.policy_name = "obstacle";
+    expect(ctx.sim.run_until_completed(1.0, obstacle),
+        "Running 中应能从 flat 切换到 obstacle");
+    expect(ctx.sim.last_output().status.policy_name == "obstacle",
+        "切换完成后应报告 obstacle 策略");
+    ctx.sim.run_seconds(1.0);
+    expect(ctx.sim.last_output().status.mode == qc::MotionMode::Running,
+        "obstacle 策略运行后应保持 Running");
+    expect(ctx.io.raw_data()->qpos[2] > 0.25, "obstacle 策略运行期间躯干不应倒地");
+
+    qc::ModeRequest flat;
+    flat.request_id = 4;
+    flat.type = qc::ModeRequestType::SwitchPolicy;
+    flat.policy_name = "flat";
+    expect(ctx.sim.run_until_completed(1.0, flat),
+        "Running 中应能从 obstacle 切换回 flat");
+    expect(ctx.sim.last_output().status.policy_name == "flat",
+        "切换完成后应重新报告 flat 策略");
+
     const double start_y = ctx.io.raw_data()->qpos[1];
     ctx.sim.set_base_command(0.0, 1.0, 0.0);
     ctx.sim.run_seconds(4.0);
@@ -395,7 +417,7 @@ void run_rl_phase(const MotionContext& ctx)
     expect(ctx.io.raw_data()->qpos[2] > 0.25, "RL 横移期间躯干不应倒地");
 
     qc::ModeRequest passive;
-    passive.request_id = 3;
+    passive.request_id = 5;
     passive.type = qc::ModeRequestType::EnterPassive;
     expect(ctx.sim.run_until_completed(1.0, passive),
         "Running 应能通过 EnterPassive 回到 Passive");
@@ -406,7 +428,7 @@ void run_rl_phase(const MotionContext& ctx)
         "Running → Passive 的安全命令提交不应失败");
 
     qc::ModeRequest getup_again;
-    getup_again.request_id = 4;
+    getup_again.request_id = 6;
     getup_again.type = qc::ModeRequestType::GetUp;
     expect(ctx.sim.run_until_completed(5.0, getup_again),
         "Running → Passive 后应能重新起立");
@@ -424,7 +446,7 @@ void run_getdown_phase(const MotionContext& ctx, const std::array<double, qc::kM
     qc::ModeRequest getdown;
     getdown.request_id =
 #if defined(QUADRUPED_WITH_TORCH)
-        5;
+        7;
 #else
         2;
 #endif
@@ -487,16 +509,27 @@ int main()
         return 1;
     }
 #if defined(QUADRUPED_WITH_TORCH)
-    const auto rl_config = quadruped::config::load_rl_config(
+    const auto flat_config = quadruped::config::load_rl_config(
         QUADRUPED_POLICY_FLAT_CONFIG_PATH, QUADRUPED_PROJECT_SOURCE_DIR, model.model);
-    expect(rl_config.ok(), "加载 flat RL 配置失败：" + rl_config.error_message);
-    auto policy = quadruped::policy::TorchPolicy::create(rl_config.config);
-    expect(policy.ok(), "加载 flat TorchScript 失败：" + policy.error_message);
+    const auto obstacle_config = quadruped::config::load_rl_config(
+        QUADRUPED_POLICY_OBSTACLE_CONFIG_PATH, QUADRUPED_PROJECT_SOURCE_DIR, model.model);
+    expect(flat_config.ok(), "加载 flat RL 配置失败：" + flat_config.error_message);
+    expect(obstacle_config.ok(),
+        "加载 obstacle RL 配置失败：" + obstacle_config.error_message);
+    auto flat_policy = quadruped::policy::TorchPolicy::create(flat_config.config);
+    auto obstacle_policy = quadruped::policy::TorchPolicy::create(obstacle_config.config);
+    expect(flat_policy.ok(), "加载 flat TorchScript 失败：" + flat_policy.error_message);
+    expect(obstacle_policy.ok(),
+        "加载 obstacle TorchScript 失败：" + obstacle_policy.error_message);
     std::string attach_error;
-    if (!rl_config.ok() || !policy.ok() ||
-        !runtime.runtime->attach_policy(rl_config.config, *policy.policy, attach_error))
+    if (!flat_config.ok() || !obstacle_config.ok() || !flat_policy.ok() ||
+        !obstacle_policy.ok() ||
+        !runtime.runtime->attach_policy(
+            flat_config.config, *flat_policy.policy, attach_error) ||
+        !runtime.runtime->register_policy(
+            obstacle_config.config, *obstacle_policy.policy, attach_error))
     {
-        expect(false, "接入 flat 策略失败：" + attach_error);
+        expect(false, "接入 flat/obstacle 策略失败：" + attach_error);
         return 1;
     }
 #endif

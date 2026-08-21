@@ -7,6 +7,7 @@
 
 #include "quadruped/core/validation.hpp"
 
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <utility>
@@ -68,20 +69,108 @@ bool MotionRuntime::attach_policy(
     Policy& policy,
     std::string& error_message)
 {
+    const std::string policy_name = config.name;
+    if (!register_policy(std::move(config), policy, error_message))
+    {
+        return false;
+    }
+    current_policy_index_ = find_policy(policy_name);
+    if (current_policy_index_ == kInvalidPolicyIndex)
+    {
+        error_message = "registered policy cannot be selected";
+        return false;
+    }
+    activate_policy(current_policy_index_);
+    return true;
+}
+
+bool MotionRuntime::register_policy(
+    RlConfig config,
+    Policy& policy,
+    std::string& error_message)
+{
+    if (config.name.empty())
+    {
+        error_message = "policy name is empty";
+        return false;
+    }
+    if (find_policy(config.name) != kInvalidPolicyIndex)
+    {
+        error_message = "policy is already registered: " + config.name;
+        return false;
+    }
+
+    std::size_t free_index = kInvalidPolicyIndex;
+    for (std::size_t i = 0; i < policies_.size(); ++i)
+    {
+        if (!policies_[i].registered)
+        {
+            free_index = i;
+            break;
+        }
+    }
+    if (free_index == kInvalidPolicyIndex)
+    {
+        error_message = "policy registry is full";
+        return false;
+    }
+
     auto created = RlController::create(model_, config);
     if (!created.ok())
     {
         error_message = created.error_message;
         return false;
     }
-    policy_name_ = config.name;
-    rl_controller_ = std::move(created.controller);
-    policy_ = &policy;
+
+    auto& entry = policies_[free_index];
+    entry.config = std::move(config);
+    entry.policy = &policy;
+    entry.controller = std::move(created.controller);
+    entry.registered = true;
+    error_message.clear();
+    return true;
+}
+
+void MotionRuntime::activate_policy(const std::size_t policy_index)
+{
+    auto& entry = policies_[policy_index];
+    current_policy_index_ = policy_index;
+    pending_policy_index_ = kInvalidPolicyIndex;
+    policy_transition_active_ = false;
+    rl_controller_ = entry.controller.get();
+    policy_ = entry.policy;
+    policy_name_ = entry.config.name;
     rl_control_cycle_ = 0;
     rl_command_ = {};
+    rl_controller_->reset();
     status_.policy_name = policy_name_;
     status_.policy_ready = true;
-    error_message.clear();
+}
+
+std::size_t MotionRuntime::find_policy(const std::string& name) const
+{
+    for (std::size_t i = 0; i < policies_.size(); ++i)
+    {
+        if (policies_[i].registered && policies_[i].config.name == name)
+        {
+            return i;
+        }
+    }
+    return kInvalidPolicyIndex;
+}
+
+bool MotionRuntime::pose_close_to_policy(
+    const RlConfig& config,
+    const std::array<double, core::kMaxJoints>& positions) const
+{
+    for (std::size_t i = 0; i < kRlJointCount; ++i)
+    {
+        if (std::abs(positions[i] - config.default_joint_positions[i]) >
+            kPolicyPoseTolerance)
+        {
+            return false;
+        }
+    }
     return true;
 }
 
@@ -105,6 +194,7 @@ bool MotionRuntime::track_session(const core::StateFrame& state)
     command_sequence_ = 0;
     latest_request_id_ = 0;
     active_request_id_ = 0;
+    active_request_type_ = core::ModeRequestType::EnterPassive;
     active_result_ = {};
     has_active_request_ = false;
     terminal_count_ = 0;
@@ -113,6 +203,8 @@ bool MotionRuntime::track_session(const core::StateFrame& state)
     getup_second_phase_ = false;
     rl_control_cycle_ = 0;
     rl_command_ = {};
+    pending_policy_index_ = kInvalidPolicyIndex;
+    policy_transition_active_ = false;
     if (rl_controller_ != nullptr)
     {
         rl_controller_->reset();
@@ -143,6 +235,14 @@ bool MotionRuntime::check_active_preconditions(std::string& reason) const
 void MotionRuntime::fail_active_motion(const std::string& reason)
 {
     abort_active_request(reason);
+    pending_policy_index_ = kInvalidPolicyIndex;
+    policy_transition_active_ = false;
+    rl_control_cycle_ = 0;
+    rl_command_ = {};
+    if (rl_controller_ != nullptr)
+    {
+        rl_controller_->reset();
+    }
     mode_ = core::MotionMode::Passive;
     status_.active_source = core::CommandSource::None;
     status_.behavior_name.clear();
@@ -293,6 +393,10 @@ bool MotionRuntime::run_rl_mode(
     {
         return fail(reason);
     }
+    if (policy_transition_active_)
+    {
+        return run_policy_transition(io, state, output);
+    }
     if (rl_controller_ == nullptr || policy_ == nullptr)
     {
         return fail("RL policy is not attached");
@@ -330,7 +434,10 @@ bool MotionRuntime::run_rl_mode(
         }
         if (has_active_request_)
         {
-            complete_active_request("behavior started");
+            const char* message = active_request_type_ == core::ModeRequestType::SwitchPolicy
+                ? "policy switched"
+                : "behavior started";
+            complete_active_request(message);
         }
     }
     ++rl_control_cycle_;
@@ -349,6 +456,58 @@ bool MotionRuntime::run_rl_mode(
     if (output.submit_code != core::RobotIOCode::Ok)
     {
         return fail("RL command submit failed");
+    }
+    return false;
+}
+
+bool MotionRuntime::run_policy_transition(
+    core::RobotIO& io,
+    const StateRead& state,
+    MotionUpdateOutput& output)
+{
+    if (pending_policy_index_ == kInvalidPolicyIndex ||
+        !policies_[pending_policy_index_].registered)
+    {
+        fail_active_motion("policy transition target is unavailable");
+        output.submit_code = submit_command(io, {current_positions_, false, state.now_ns});
+        output.submitted = true;
+        return true;
+    }
+
+    if (has_active_request_ && active_result_.state == core::ModeResultState::Accepted)
+    {
+        active_result_.state = core::ModeResultState::Running;
+    }
+
+    std::array<double, core::kMaxJoints> positions = interp_target_;
+    if (interp_elapsed_cycles_ < interp_total_cycles_)
+    {
+        ++interp_elapsed_cycles_;
+        const double percent = static_cast<double>(interp_elapsed_cycles_) /
+            static_cast<double>(interp_total_cycles_);
+        for (std::size_t i = 0; i < model_.joint_count; ++i)
+        {
+            positions[i] = (1.0 - percent) * interp_start_[i] +
+                percent * interp_target_[i];
+        }
+    }
+
+    status_.active_source = core::CommandSource::None;
+    status_.behavior_phase = "policy_transition";
+    output.submit_code = submit_command(io, {positions, true, state.now_ns});
+    output.submitted = true;
+    if (output.submit_code != core::RobotIOCode::Ok)
+    {
+        fail_active_motion("policy transition command submit failed");
+        return true;
+    }
+
+    if (interp_elapsed_cycles_ >= interp_total_cycles_)
+    {
+        const std::size_t target_index = pending_policy_index_;
+        activate_policy(target_index);
+        status_.behavior_phase = "starting";
+        complete_active_request("policy switched");
     }
     return false;
 }

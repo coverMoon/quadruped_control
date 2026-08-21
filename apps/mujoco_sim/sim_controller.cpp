@@ -68,6 +68,10 @@ void SimController::apply_input(const SimInput& input)
     {
         type = qc::ModeRequestType::StartBehavior;
     }
+    else if (input.switch_flat || input.switch_obstacle)
+    {
+        type = qc::ModeRequestType::SwitchPolicy;
+    }
     else if (input.getdown)
     {
         type = qc::ModeRequestType::GetDown;
@@ -88,6 +92,10 @@ void SimController::apply_input(const SimInput& input)
     if (type == qc::ModeRequestType::StartBehavior)
     {
         pending_request_.behavior_name = "rl_locomotion";
+    }
+    else if (type == qc::ModeRequestType::SwitchPolicy)
+    {
+        pending_request_.policy_name = input.switch_flat ? "flat" : "obstacle";
     }
     has_pending_request_ = true;
 }

@@ -35,5 +35,6 @@ if(QUADRUPED_ENABLE_TORCH)
         QUADRUPED_WITH_TORCH=1
         QUADRUPED_PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
         QUADRUPED_POLICY_FLAT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/black/flat.yaml"
+        QUADRUPED_POLICY_OBSTACLE_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/black/obstacle.yaml"
     )
 endif()

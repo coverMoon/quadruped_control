@@ -85,8 +85,12 @@ public:
     // 不允许运行时使用部分默认值继续主动控制。
     static CreateResult create(core::RobotModel model, core::ControllerConfig config);
 
-    // 绑定一个由调用方持有的同步策略。策略对象必须比 MotionRuntime 生命周期长。
-    // 重复调用会替换当前策略并清空 RL 历史。
+    // 注册一个由调用方持有的同步策略。策略对象必须比 MotionRuntime 生命周期长。
+    // 注册不会改变当前策略；策略名称在同一运行时内必须唯一。
+    bool register_policy(RlConfig config, Policy& policy, std::string& error_message);
+
+    // 绑定一个由调用方持有的同步策略并立即选为当前策略。
+    // 该接口保留给单策略调用方，重复名称会被拒绝；运行中切换使用 SwitchPolicy。
     bool attach_policy(RlConfig config, Policy& policy, std::string& error_message);
 
     // 执行一个控制周期：读取最新状态、处理请求、生成并提交命令。
@@ -142,7 +146,8 @@ private:
     core::ModeResult dispatch_start_behavior(
         const core::ModeRequest& request, bool state_usable);
     core::ModeResult dispatch_getdown(const core::ModeRequest& request, bool state_usable);
-    core::ModeResult dispatch_switch_policy(const core::ModeRequest& request);
+    core::ModeResult dispatch_switch_policy(
+        const core::ModeRequest& request, bool state_usable);
     core::ModeResult dispatch_reset_fault(const core::ModeRequest& request);
 
     // 接受 GetUp：必要时记录 rest_pose，并从当前关节位置开始第一段插值。
@@ -167,6 +172,20 @@ private:
         const StateRead& state,
         const core::BaseCommand* base_command,
         MotionUpdateOutput& output);
+
+    // 策略切换期间只输出固定位置阻抗，不调用旧策略推理。
+    bool run_policy_transition(
+        core::RobotIO& io,
+        const StateRead& state,
+        MotionUpdateOutput& output);
+
+    // 将已注册策略设为当前策略，并清空其观测历史和动作目标。
+    void activate_policy(std::size_t policy_index);
+
+    [[nodiscard]] std::size_t find_policy(const std::string& name) const;
+
+    [[nodiscard]] bool pose_close_to_policy(
+        const RlConfig& config, const std::array<double, core::kMaxJoints>& positions) const;
 
     // 主动模式条件失效：活动请求转为 Failed 终态，回到 Passive 并记录错误。
     void fail_active_motion(const std::string& reason);
@@ -211,7 +230,24 @@ private:
     core::RobotModel model_;
     core::ControllerConfig config_;
 
-    std::unique_ptr<RlController> rl_controller_{};
+    struct RegisteredPolicy
+    {
+        bool registered{false};
+        RlConfig config{};
+        Policy* policy{nullptr};
+        std::unique_ptr<RlController> controller{};
+    };
+
+    static constexpr std::size_t kMaxPolicies = 4;
+    static constexpr std::size_t kInvalidPolicyIndex = kMaxPolicies;
+    static constexpr std::uint32_t kPolicyTransitionCycles = 20;
+    static constexpr double kPolicyPoseTolerance = 0.15;
+
+    std::array<RegisteredPolicy, kMaxPolicies> policies_{};
+    std::size_t current_policy_index_{kInvalidPolicyIndex};
+    std::size_t pending_policy_index_{kInvalidPolicyIndex};
+    bool policy_transition_active_{false};
+    RlController* rl_controller_{nullptr};
     Policy* policy_{nullptr};
     std::string policy_name_{};
     std::uint32_t rl_control_cycle_{0};
@@ -232,6 +268,7 @@ private:
     // 当前主动动作对应的请求及其实时结果；同一时刻至多一个主动动作。
     // 新请求（包括被拒绝的）只记录自身结果，不覆盖活动请求。
     std::uint64_t active_request_id_{0};
+    core::ModeRequestType active_request_type_{core::ModeRequestType::EnterPassive};
     core::ModeResult active_result_{};
     bool has_active_request_{false};
 

@@ -120,6 +120,7 @@ core::ModeResult MotionRuntime::handle_request(
         return result;
     }
     active_request_id_ = request.request_id;
+    active_request_type_ = request.type;
     active_result_ = result;
     has_active_request_ = true;
     return result;
@@ -142,7 +143,7 @@ core::ModeResult MotionRuntime::dispatch_request(
     case core::ModeRequestType::GetDown:
         return dispatch_getdown(request, state_usable);
     case core::ModeRequestType::SwitchPolicy:
-        return dispatch_switch_policy(request);
+        return dispatch_switch_policy(request, state_usable);
     case core::ModeRequestType::ResetFault:
         return dispatch_reset_fault(request);
     }
@@ -163,6 +164,8 @@ core::ModeResult MotionRuntime::dispatch_enter_passive(const core::ModeRequest& 
     status_.behavior_phase.clear();
     rl_control_cycle_ = 0;
     rl_command_ = {};
+    pending_policy_index_ = kInvalidPolicyIndex;
+    policy_transition_active_ = false;
     if (rl_controller_ != nullptr)
     {
         rl_controller_->reset();
@@ -289,11 +292,74 @@ core::ModeResult MotionRuntime::dispatch_start_behavior(
         "RL behavior accepted");
 }
 
-core::ModeResult MotionRuntime::dispatch_switch_policy(const core::ModeRequest& request)
+core::ModeResult MotionRuntime::dispatch_switch_policy(
+    const core::ModeRequest& request,
+    const bool state_usable)
 {
-    // 策略目录和切换属于阶段 3；阶段 2 只固定该请求的拒绝终态语义。
-    return make_result(request.request_id, core::ModeResultState::Rejected,
-        "policy switching is not available in this stage");
+    if (mode_ != core::MotionMode::Running ||
+        status_.behavior_name != "rl_locomotion")
+    {
+        return make_result(request.request_id, core::ModeResultState::Rejected,
+            "policy switching requires running rl_locomotion");
+    }
+    if (!state_usable)
+    {
+        return make_result(request.request_id, core::ModeResultState::Rejected,
+            "no valid state");
+    }
+    if (std::string reason; !check_active_preconditions(reason))
+    {
+        return make_result(request.request_id, core::ModeResultState::Rejected,
+            reason.c_str());
+    }
+
+    const std::size_t target_index = find_policy(request.policy_name);
+    if (target_index == kInvalidPolicyIndex)
+    {
+        return make_result(request.request_id, core::ModeResultState::Rejected,
+            "policy is not registered");
+    }
+
+    auto& target = policies_[target_index];
+    if (target.policy == nullptr || target.controller == nullptr)
+    {
+        return make_result(request.request_id, core::ModeResultState::Rejected,
+            "policy is not loaded");
+    }
+    if (has_active_request_)
+    {
+        abort_active_request("interrupted by policy switch");
+    }
+
+    rl_control_cycle_ = 0;
+    rl_command_ = {};
+    if (rl_controller_ != nullptr)
+    {
+        rl_controller_->reset();
+    }
+    status_.active_source = core::CommandSource::None;
+
+    if (pose_close_to_policy(target.config, current_positions_))
+    {
+        activate_policy(target_index);
+        status_.behavior_phase = "starting";
+        return make_result(request.request_id, core::ModeResultState::Accepted,
+            "policy reload accepted");
+    }
+
+    pending_policy_index_ = target_index;
+    policy_transition_active_ = true;
+    interp_start_ = current_positions_;
+    interp_target_ = current_positions_;
+    for (std::size_t i = 0; i < kRlJointCount; ++i)
+    {
+        interp_target_[i] = target.config.default_joint_positions[i];
+    }
+    interp_total_cycles_ = kPolicyTransitionCycles;
+    interp_elapsed_cycles_ = 0;
+    status_.behavior_phase = "policy_transition";
+    return make_result(request.request_id, core::ModeResultState::Accepted,
+        "policy transition accepted");
 }
 
 core::ModeResult MotionRuntime::dispatch_reset_fault(const core::ModeRequest& request)

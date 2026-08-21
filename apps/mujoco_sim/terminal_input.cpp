@@ -89,6 +89,12 @@ void TerminalInput::handle_character(
     case '1':
         input.start_rl = true;
         break;
+    case '2':
+        input.switch_flat = true;
+        break;
+    case '3':
+        input.switch_obstacle = true;
+        break;
     case '9':
         input.getdown = true;
         break;
