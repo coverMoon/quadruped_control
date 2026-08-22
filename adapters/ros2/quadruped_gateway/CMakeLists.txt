@@ -8,10 +8,19 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(quadruped_interfaces REQUIRED)
 
 file(REAL_PATH "${CMAKE_CURRENT_SOURCE_DIR}" QUADRUPED_GATEWAY_SOURCE_DIR)
 set(QUADRUPED_SOURCE_ROOT "${QUADRUPED_GATEWAY_SOURCE_DIR}/../../..")
+set(QUADRUPED_PROJECT_ROOT "${QUADRUPED_SOURCE_ROOT}")
+set(QUADRUPED_BACKEND_EXECUTABLE "${QUADRUPED_SOURCE_ROOT}/.build/rl/apps/runtime_daemons/quadruped_mujoco_backendd")
+set(QUADRUPED_MOTION_EXECUTABLE "${QUADRUPED_SOURCE_ROOT}/.build/rl/apps/runtime_daemons/quadruped_motiond")
+configure_file(
+    launch/black_simulation.launch.py.in
+    "${CMAKE_CURRENT_BINARY_DIR}/launch/black_simulation.launch.py"
+    @ONLY
+)
 
 add_library(quadruped_gateway_ipc
     "${QUADRUPED_SOURCE_ROOT}/adapters/ipc/src/conversions.cpp"
@@ -33,6 +42,7 @@ ament_target_dependencies(ros2_gateway
     rclcpp
     rclcpp_action
     geometry_msgs
+    sensor_msgs
     quadruped_interfaces
 )
 
@@ -43,6 +53,15 @@ target_link_libraries(quadruped_ipc_control PRIVATE quadruped_gateway_ipc)
 
 install(TARGETS ros2_gateway quadruped_ipc_control
     DESTINATION lib/${PROJECT_NAME}
+)
+install(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/launch/"
+    DESTINATION share/${PROJECT_NAME}/launch
+)
+install(PROGRAMS scripts/controller_input.py
+    DESTINATION lib/${PROJECT_NAME}
+)
+install(FILES "${QUADRUPED_SOURCE_ROOT}/configs/input/gamepads.yaml"
+    DESTINATION share/${PROJECT_NAME}/config
 )
 
 ament_package()

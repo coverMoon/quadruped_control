@@ -1,106 +1,120 @@
 #!/usr/bin/env bash
 # 文件：build.sh
-# 作用：按默认或 MuJoCo 配置执行本地 Debug 编译和自动测试。
+# 作用：提供 core、backend、motion、command 和默认全量构建的唯一公共入口。
 
 set -euo pipefail
 
-# 无论从哪个工作目录调用脚本，都以脚本上一级目录作为工程根目录。
 project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-
-# 所有构建配置放在 build/ 的子目录中，避免在仓库根目录生成缓存。
-build_root="${project_dir}/build"
-build_profile="default"
-mujoco_cmake_option="OFF"
-torch_cmake_option="OFF"
-
-# 默认执行测试；命令行参数只覆盖本次构建行为，不修改源文件。
+build_root="${project_dir}/.build"
+target="all"
+backend="mujoco"
 run_tests=true
 clean_build=false
-enable_mujoco=false
-enable_torch=false
+legacy_profile=""
 
 usage() {
-    echo "Usage: ./scripts/build.sh [--mujoco|--rl] [--clean] [--no-test]"
-    echo
-    echo "  --mujoco   Build the MuJoCo-enabled profile under build/mujoco"
-    echo "  --rl       Build MuJoCo and Torch under build/rl"
-    echo "  --clean    Remove all profiles under build before configuring"
-    echo "  --no-test  Build without running CTest"
-    echo "  -h, --help Show this help"
+    cat <<USAGE
+用法: $0 [--target all|core|backend|motion|command] [选项]
+
+选项:
+  --target NAME       构建目标，默认 all
+  --backend NAME      backend 类型，目前仅支持 mujoco
+  --mujoco            兼容入口，等价 --target backend --backend mujoco
+  --rl                兼容入口，构建 backend 和 motion 的 RL profile
+  --clean             清理所选 CMake profile；command 清理 ROS 2 临时工作区
+  --no-test           构建后不运行 CTest
+USAGE
 }
 
 while (($# > 0)); do
     case "$1" in
-        --clean)
-            clean_build=true
+        --target)
+            [[ $# -ge 2 ]] || { echo "--target 缺少参数" >&2; exit 2; }
+            target="$2"; shift 2
+            ;;
+        --backend)
+            [[ $# -ge 2 ]] || { echo "--backend 缺少参数" >&2; exit 2; }
+            backend="$2"; shift 2
             ;;
         --mujoco)
-            enable_mujoco=true
-            build_profile="mujoco"
-            mujoco_cmake_option="ON"
+            target="backend"; backend="mujoco"; legacy_profile="mujoco"; shift
             ;;
         --rl)
-            enable_mujoco=true
-            enable_torch=true
-            build_profile="rl"
-            mujoco_cmake_option="ON"
-            torch_cmake_option="ON"
+            target="motion"; legacy_profile="rl"; shift
+            ;;
+        --clean)
+            clean_build=true; shift
             ;;
         --no-test)
-            run_tests=false
+            run_tests=false; shift
             ;;
         -h|--help)
-            usage
-            exit 0
+            usage; exit 0
             ;;
         *)
-            echo "Unknown option: $1" >&2
-            usage >&2
-            exit 2
+            echo "未知选项: $1" >&2; usage >&2; exit 2
             ;;
     esac
-    shift
 done
 
-# 参数解析完成后再确定构建目录，确保每种配置使用独立的 CMake 缓存。
-build_dir="${build_root}/${build_profile}"
-
-if [[ "${clean_build}" == true ]]; then
-    cmake -E remove_directory "${build_root}"
+case "${target}" in all|core|backend|motion|command) ;; *) echo "未知 target: ${target}" >&2; exit 2 ;; esac
+if [[ "${backend}" != "mujoco" ]]; then
+    echo "未知 backend: ${backend}（当前仅支持 mujoco）" >&2
+    exit 2
 fi
-
-if [[ "${enable_mujoco}" == true &&
-      ! -f "${project_dir}/.deps/mujoco-3.9.0/lib/libmujoco.so" ]]
-then
-    echo "未找到 MuJoCo 3.9.0，请先运行 ./scripts/setup_mujoco.sh。" >&2
-    exit 1
-fi
-
-if [[ "${enable_torch}" == true &&
-      ! -f "${project_dir}/.deps/libtorch-2.0.1-cpu/share/cmake/Torch/TorchConfig.cmake" ]]
-then
-    echo "未找到 LibTorch 2.0.1 CPU，请先运行 ./scripts/setup_libtorch.sh。" >&2
-    exit 1
-fi
-
-# 优先使用全部在线 CPU；无法读取处理器数量时退化为单线程构建。
 jobs="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
 
-cmake \
-    -S "${project_dir}" \
-    -B "${build_dir}" \
-    -DCMAKE_BUILD_TYPE=Debug \
-    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-    -DQUADRUPED_ENABLE_MUJOCO="${mujoco_cmake_option}" \
-    -DQUADRUPED_ENABLE_TORCH="${torch_cmake_option}"
+build_cmake_profile() {
+    local profile="$1"
+    local mujoco="$2"
+    local torch="$3"
+    local build_dir="${build_root}/${profile}"
+    if [[ "${clean_build}" == true ]]; then cmake -E remove_directory "${build_dir}"; fi
+    if [[ "${mujoco}" == ON && ! -f "${project_dir}/.deps/mujoco-3.9.0/lib/libmujoco.so" ]]; then
+        echo "未找到 MuJoCo 3.9.0，请先运行 ./scripts/setup/mujoco.sh。" >&2; exit 1
+    fi
+    if [[ "${torch}" == ON && ! -f "${project_dir}/.deps/libtorch-2.0.1-cpu/share/cmake/Torch/TorchConfig.cmake" ]]; then
+        echo "未找到 LibTorch 2.0.1 CPU，请先运行 ./scripts/setup/libtorch.sh。" >&2; exit 1
+    fi
+    cmake -S "${project_dir}" -B "${build_dir}" \
+        -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+        -DQUADRUPED_ENABLE_MUJOCO="${mujoco}" -DQUADRUPED_ENABLE_TORCH="${torch}"
+    cmake --build "${build_dir}" --parallel "${jobs}"
+    if [[ "${run_tests}" == true ]]; then
+        ctest --test-dir "${build_dir}" --output-on-failure
+    fi
+}
 
-cmake --build "${build_dir}" --parallel "${jobs}"
+build_command() {
+    local ros_setup="${ROS_SETUP:-/opt/ros/humble/setup.bash}"
+    local workspace_root="${QUADRUPED_ROS2_WORKSPACE_ROOT:-/tmp/quadruped_control_ros2_ws_stage8}"
+    if [[ ! -f "${ros_setup}" ]]; then
+        echo "未找到 ROS 2 环境脚本: ${ros_setup}" >&2; exit 1
+    fi
+    if [[ "${clean_build}" == true ]]; then cmake -E remove_directory "${workspace_root}"; fi
+    QUADRUPED_ROS2_WORKSPACE_ROOT="${workspace_root}" \
+        "${project_dir}/scripts/build/ros2.sh"
+}
 
-# 根目录符号链接方便编辑器读取编译数据库，实际文件仍由 CMake 在 build/ 中生成。
-cmake -E create_symlink \
-    "${build_dir}/compile_commands.json" \
-    "${project_dir}/compile_commands.json"
+case "${target}" in
+    core)
+        build_cmake_profile default OFF OFF
+        ;;
+    backend)
+        build_cmake_profile mujoco ON OFF
+        ;;
+    motion)
+        build_cmake_profile rl ON ON
+        ;;
+    command)
+        build_command
+        ;;
+    all)
+        build_cmake_profile rl ON ON
+        build_command
+        ;;
+esac
 
-if [[ "${run_tests}" == true ]]; then
-    ctest --test-dir "${build_dir}" --output-on-failure
+if [[ "${legacy_profile}" == "rl" ]]; then
+    echo "提示: --rl 兼容入口仅构建 CMake RL profile；ROS 2 command 请使用 --target command。"
 fi

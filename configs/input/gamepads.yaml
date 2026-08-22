@@ -1,0 +1,100 @@
+# 文件：gamepads.yaml
+# 作用：定义物理手柄到固定长度规范化 Joy 数组的映射，不包含机器人动作语义。
+
+output:
+  axis_count: 8
+  button_count: 12
+  default_deadband: 0.08
+
+profiles:
+  xbox:
+    match: ["xbox", "xinput", "f710", "gamepad"]
+    axes:
+      lx: {index: 0, scale: -1.0}
+      ly: {index: 1, scale: -1.0}
+      lt: {index: 2, scale: 1.0, trigger: true}
+      rx: {index: 3, scale: -1.0}
+      ry: {index: 4, scale: -1.0}
+      rt: {index: 5, scale: 1.0, trigger: true}
+    dpad: {source: hat, index: 0, x_axis: 6, y_axis: 7}
+    buttons:
+      a: 0
+      b: 1
+      x: 2
+      y: 3
+      lb: 4
+      rb: 5
+      back: 6
+      start: 7
+      guide: 8
+      left_stick: 9
+      right_stick: 10
+
+  gaishi_xiaoji:
+    match: ["盖世小鸡", "gamesir"]
+    axes:
+      lx: {index: 0, scale: 1.0}
+      ly: {index: 1, scale: 1.0}
+      lt: {index: 5, scale: 1.0, trigger: true}
+      rx: {index: 2, scale: 1.0}
+      ry: {index: 3, scale: 1.0}
+      rt: {index: 4, scale: 1.0, trigger: true}
+    dpad: {source: hat, index: 0, x_axis: 6, y_axis: 7}
+    buttons:
+      a: 0
+      b: 1
+      x: 2
+      y: 4
+      lb: 6
+      rb: 5
+      back: 10
+      start: 11
+      guide: 8
+      left_stick: 9
+      right_stick: 14
+
+  beitong_btp_kp20d:
+    match: ["beitong", "btp-kp20d", "北通"]
+    axes:
+      lx: {index: 0, scale: -1.0}
+      ly: {index: 1, scale: -1.0}
+      lt: {index: 5, scale: 1.0, trigger: true}
+      rx: {index: 2, scale: -1.0}
+      ry: {index: 3, scale: -1.0}
+      rt: {index: 4, scale: 1.0, trigger: true}
+    dpad: {source: hat, index: 0, x_axis: 6, y_axis: 7}
+    buttons:
+      a: 0
+      b: 1
+      x: 2
+      y: 4
+      lb: 6
+      rb: 5
+      back: 10
+      start: 11
+      guide: 8
+      left_stick: 9
+      right_stick: 14
+
+  shamohu:
+    match: ["沙漠狐", "shamohu", "desert fox"]
+    axes:
+      lx: {index: 0, scale: 1.0}
+      ly: {index: 1, scale: 1.0}
+      lt: {index: 5, scale: 1.0, trigger: true}
+      rx: {index: 6, scale: 1.0}
+      ry: {index: 7, scale: 1.0}
+      rt: {index: 4, scale: 1.0, trigger: true}
+    dpad: {source: hat, index: 0, x_axis: 6, y_axis: 7}
+    buttons:
+      a: 0
+      b: 1
+      x: 2
+      y: 4
+      lb: 6
+      rb: 5
+      back: 10
+      start: 11
+      guide: 8
+      left_stick: 9
+      right_stick: 14

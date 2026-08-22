@@ -110,7 +110,7 @@ int run_physics_loop(
 
     qsim::TerminalStatusPrinter status_printer(terminal.interactive());
     window.load(io.raw_model(), io.raw_data(), scene_path);
-    static_cast<void>(window.sync());
+    static_cast<void>(window.sync(io.raw_model(), io.raw_data()));
 
     auto next_tick = clock::now();
     auto next_visual_sync = next_tick;
@@ -180,7 +180,7 @@ int run_physics_loop(
         const auto now = clock::now();
         if (now >= next_visual_sync)
         {
-            const bool gui_reset_requested = window.sync();
+            const bool gui_reset_requested = window.sync(io.raw_model(), io.raw_data());
             if (gui_reset_requested)
             {
                 if (const std::string error = controller.reset_new_session(); !error.empty())

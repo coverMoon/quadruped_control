@@ -7,6 +7,10 @@ if(QUADRUPED_ENABLE_MUJOCO)
         quadruped::config
         quadruped::ipc
         quadruped::mujoco
+        quadruped_mujoco_gui
+    )
+    target_include_directories(quadruped_mujoco_backendd PRIVATE
+        "${PROJECT_SOURCE_DIR}/apps/mujoco_sim"
     )
     target_compile_features(quadruped_mujoco_backendd PRIVATE cxx_std_17)
     target_compile_definitions(quadruped_mujoco_backendd PRIVATE

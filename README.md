@@ -38,7 +38,7 @@ YAML 配置加载只存在于启动期模块 `config_loader/`。MuJoCo C++ API �
 
 ## 当前阶段
 
-阶段 1 至阶段 6 已完成。black 已具备基础运动、真实 TorchScript RL、flat/obstacle
+阶段 1 至阶段 8 已完成。black 已具备基础运动、真实 TorchScript RL、flat/obstacle
 运行时切换、冻结的 ROS 2 接口契约，以及以下三进程无界面仿真链路：
 
 ```text
@@ -53,86 +53,76 @@ mujoco_backendd
 过期语义。ROS 2 网关已接入 `/cmd_vel`、运动 action/service 和状态话题；headless 验收覆盖
 正常动作、策略切换、reset，以及 gateway、motiond、backend 分别退出时的安全退路。
 
-当前阶段仍不包含 ROS 2 launch、三进程 MuJoCo GUI、blackW、真实硬件或跨机器协议。
+阶段 7 已增加三进程 MuJoCo backend 的 headless/GUI 模式、ROS 2 launch、统一启动参数和进程退出监督。
+GUI 使用后端状态的独立显示副本，不直接修改 authoritative mjData；GUI reset 转换为 backend session reset。
+当前仍不包含 blackW、真实硬件或跨机器协议。
 
 M1 固定使用 MuJoCo 3.9.0。依赖安装在仓库本地的 `.deps/` 目录，不依赖
 Python 或 Conda 环境。
 
-编译时运行：
+编译和测试统一通过 `scripts/build.sh` 选择目标，构建产物位于隐藏的 `.build/` 目录：
 
 ```bash
-./scripts/build.sh
+./scripts/build.sh                         # 默认全量：RL CMake + ROS 2 colcon
+./scripts/build.sh --target core           # core/default profile
+./scripts/build.sh --target backend --backend mujoco
+./scripts/build.sh --target motion          # RL profile（MuJoCo + LibTorch）
+./scripts/build.sh --target command         # 独立 ROS 2 colcon 工作区
+./scripts/test/ctest.sh                     # 默认执行 RL profile CTest
+./scripts/test/ctest.sh default
+./scripts/test/ctest.sh mujoco
+./scripts/test/ros2_headless.sh             # 三进程 ROS 2 无界面 E2E
 ```
 
-脚本默认执行 Debug 构建和全部测试。需要删除旧构建结果后重新编译时运行：
+`--mujoco`、`--rl`、`--clean` 和 `--no-test` 保留为兼容参数。ROS 2 工作区默认位于
+`/tmp/quadruped_control_ros2_ws_stage8/`，仓库内不生成 colcon build、install 或 log。
+
+阶段 8 的人工三终端主路径不使用 ROS 2 launch：
 
 ```bash
-./scripts/build.sh --clean
+# 终端 1：MuJoCo backend，默认 black/plain/gui
+./scripts/run/backend.sh black plain
+# 终端 2：MotionRuntime，默认 black/flat
+./scripts/run/motion.sh black flat
+# 终端 3：ROS 2 command；TTY 默认启用键盘，自动监督手柄适配器
+./scripts/run/command.sh black
 ```
 
-只编译、不运行测试：
+backend 支持 `--mode gui|headless`、`--shm`、`--scene`、`--robot-config`、
+`--real-time-factor`、`--visual-sync-hz` 和 `--vsync`；当前后端仅为 `mujoco`，scene
+仅接受 `plain|terrain` 或显式 MJCF 路径。motion 支持 `flat|obstacle`、`--shm`、机器人、
+控制器和两份策略配置覆盖，其他参数透传给 `quadruped_motiond`。command 支持
+`--keyboard on|off|auto`、`--controller auto|off|external|explicit`、`--controller-profile`、
+`--controller-config`、`--joy-topic` 和超时覆盖；`controller_input` 只发布固定 8 轴、12 按钮
+的规范化 `/joy`，不进入 core 或 motion。
 
-```bash
-./scripts/build.sh --no-test
-```
-
-构建需要 MuJoCo 的 M1 模块：
-
-```bash
-./scripts/build.sh --mujoco
-```
-
-构建 MuJoCo 和 LibTorch 策略模块：
-
-```bash
-./scripts/build.sh --rl
-```
-
-该参数会启用 MuJoCo 3.9.0 依赖，构建 `quadruped_mujoco` 后端、全部 MuJoCo 测试、
-  `apps/mujoco_headless/` 无界面程序和 `apps/mujoco_sim/` 官方完整界面程序。
-首次使用 MuJoCo 模块前运行：
-
-```bash
-./scripts/setup_mujoco.sh
-```
-
-构建 ROS 2 Humble 接口和 gateway：
-
-```bash
-./scripts/build_ros2.sh
-```
-
-该脚本在 `/tmp/quadruped_control_ros2_ws_stage6/` 下创建独立 colcon 工作区，不在仓库内
-生成 ROS 2 build、install 或 log。完成主工程 `--rl` 构建和 ROS 2 构建后，可运行阶段 6
-无界面端到端测试：
-
-```bash
-./scripts/test_ros2_headless.sh
-```
+脚本按职责分为构建、依赖准备、正式运行、测试和调试入口。人工调试使用三个终端，
+ROS 2 launch 只服务自动化场景；GUI 窗口和真实手柄设备需要在具备对应桌面/SDL 环境的机器上
+手工验证。
 
 系统依赖（Ubuntu/Debian 包名）：
 
 - 默认构建需要 yaml-cpp 开发包：`sudo apt install libyaml-cpp-dev`；
 - `--mujoco` 构建的带界面程序还需要 GLFW 3.3、OpenGL 和 libpng：
   `sudo apt install libglfw3-dev libgl1-mesa-dev libpng-dev`；
-- MuJoCo 3.9.0 本身由 `setup_mujoco.sh` 安装到仓库本地 `.deps/`，不依赖 Python 或 Conda。
+- MuJoCo 3.9.0 本身由 `scripts/setup/mujoco.sh` 安装到仓库本地 `.deps/`，不依赖 Python 或 Conda。
 
 运行无界面仿真：
 
 ```bash
-./scripts/run_mujoco_headless.sh --duration 2.0
+./scripts/run/backend.sh black plain --mode headless
 ```
 
 运行带 GLFW 界面的 RL 交互仿真：
 
 ```bash
-./scripts/run_mujoco_sim.sh
+./scripts/debug/mujoco_sim.sh
 ```
 
 机器人按键在启动程序的终端中输入，MuJoCo 窗口只保留官方快捷键。按 `0` 起立，完成后按
 `1` 启动 RL；`W/S`、`A/D`、`Q/E` 每次把对应速度调整 `0.1`，`Space` 将三轴速度归零。
-`9` 趴下，`P` 进入被动，`R` 重置，`K` 暂停，`X` 退出。只运行不加载 LibTorch 的基础
-仿真可使用 `./scripts/run_mujoco_sim.sh --basic`。
+`9` 趴下，`P` 进入被动，`R` 重置，`K` 暂停，`X` 退出。不加载 LibTorch 的基础仿真
+可使用 `./scripts/debug/mujoco_sim.sh --basic`。
 速度键只在 `rl_locomotion` 的 Running 模式生效；离开该模式会自动清零速度目标。
 
 当前实现状态、RL 时序、ROS 2 接口和三进程运行架构分别见：
@@ -147,49 +137,55 @@ Python 或 Conda 环境。
 也可以手动执行：
 
 ```bash
-cmake -S . -B build/default -DCMAKE_BUILD_TYPE=Debug
-cmake --build build/default
-ctest --test-dir build/default --output-on-failure
+cmake -S . -B .build/default -DCMAKE_BUILD_TYPE=Debug
+cmake --build .build/default
+ctest --test-dir .build/default --output-on-failure
 ```
 
 ## 仓库目录
 
+日常开发和仿真运行优先关注以下核心目录：
+
 ```text
 quadruped_control/
-├── apps/
-│   ├── mujoco_headless/              最小无界面 MuJoCo 仿真入口
-│   ├── mujoco_sim/                   带 GLFW 界面的交互式 MuJoCo 仿真
-│   └── runtime_daemons/              独立 motiond 和 MuJoCo backend 进程
-├── adapters/
-│   ├── ipc/                          固定容量本机共享内存和 RemoteRobotIO
-│   └── ros2/                         ROS 2 接口包与顶层 gateway
-├── assets/
-│   └── robots/black/mujoco/          固定版本的仿真模型和网格
-├── backends/
-│   └── mujoco/                       MuJoCo 模型加载与 RobotIO 实现
-├── cmake/                            CMake 依赖查找模块
-├── config_loader/                    启动期 YAML 配置加载代码
-├── configs/
-│   ├── controllers/                  控制器参数配置
-│   ├── policies/                     精简 RL 策略参数
-│   └── robots/                       机器人结构配置
-├── core/
-│   ├── include/quadruped/core/       核心库公共头文件
-│   └── src/                          核心库实现
-├── docs/
-│   └── diagrams/                     架构图源文件和图片
-├── motion/                           MotionRuntime、RlController 与基础运动状态机
-├── policy/torch/                     单个 TorchScript 策略的推理适配器
-├── scripts/                          编译、运行和开发辅助脚本
-└── tests/                            自动测试
+├── core/                    无外部框架依赖的公共核心
+├── configs/                 机器人、控制器、策略、输入和场景配置
+├── motion/                  MotionRuntime、RlController 与运动状态机
+├── backends/                MuJoCo 等仿真和执行后端
+├── assets/                  MuJoCo 模型、网格和 TorchScript 资源
+├── apps/                   可执行程序和运行 daemon
+└── scripts/                构建、依赖准备、运行、测试和调试入口
+```
+
+其余顶层目录是保持独立依赖边界的支撑模块：
+
+```text
+├── adapters/               IPC、ROS 2 和外部接口适配
+├── config_loader/          启动期 YAML 配置加载代码
+├── policy/                 LibTorch/TorchScript 策略适配器
+├── tests/                  单元、集成和仿真测试源码
+├── docs/                   设计、接口和运行文档
+└── cmake/                  CMake 依赖查找模块
+```
+
+`scripts/` 内部按用途分组：
+
+```text
+scripts/
+├── build.sh                CMake 和 ROS 2 的公共构建入口
+├── build/ros2.sh           独立 ROS 2 colcon 构建实现
+├── setup/                  固定版本第三方依赖准备
+├── run/                    三进程正式人工运行入口
+├── test/                   CTest 和 ROS 2 无界面测试入口
+└── debug/                  单进程或本地交互调试入口
 ```
 
 运行构建后还会生成：
 
 ```text
-build/default/                         默认配置的缓存、目标文件和测试程序
-build/mujoco/                          MuJoCo 配置的缓存、目标文件和测试程序
-compile_commands.json                  指向编译数据库的符号链接
+.build/default/                       默认配置的缓存、目标文件和测试程序
+.build/mujoco/                        MuJoCo 配置的缓存、目标文件和测试程序
+.build/rl/                            MuJoCo + LibTorch 配置的缓存、目标文件和测试程序
 .deps/                                 脚本安装的固定版本第三方依赖
 ```
 

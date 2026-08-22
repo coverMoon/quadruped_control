@@ -1,0 +1,124 @@
+# 文件：black_simulation.launch.py
+# 作用：按参数启动 black 的 MuJoCo 后端、MotionRuntime 和 ROS 2 网关。
+
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction, RegisterEventHandler, Shutdown, TimerAction
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+from launch.event_handlers import OnProcessExit
+
+
+PROJECT_ROOT = "@QUADRUPED_PROJECT_ROOT@"
+DEFAULT_BACKEND = "@QUADRUPED_BACKEND_EXECUTABLE@"
+DEFAULT_MOTION = "@QUADRUPED_MOTION_EXECUTABLE@"
+
+
+def launch_setup(context, *args, **kwargs):
+    robot = LaunchConfiguration("robot").perform(context)
+    terrain = LaunchConfiguration("terrain").perform(context)
+    policy = LaunchConfiguration("policy").perform(context)
+    mode = LaunchConfiguration("mode").perform(context)
+    scene = LaunchConfiguration("scene").perform(context)
+    if not scene:
+        scene = f"{PROJECT_ROOT}/assets/robots/{robot}/mujoco/"
+        scene += "scene_terrain.xml" if terrain == "terrain" else "scene.xml"
+
+    backend = ExecuteProcess(
+        cmd=[
+            LaunchConfiguration("backend_executable"),
+            "--shm", LaunchConfiguration("shared_memory_name"),
+            "--scene", scene,
+            "--robot-config", LaunchConfiguration("robot_config"),
+            "--mode", mode,
+            "--real-time-factor", LaunchConfiguration("real_time_factor"),
+            "--visual-sync-hz", LaunchConfiguration("visual_sync_hz"),
+            "--vsync", LaunchConfiguration("vsync"),
+        ],
+        output="screen",
+        name="mujoco_backendd",
+    )
+    motion = ExecuteProcess(
+        cmd=[
+            LaunchConfiguration("motion_executable"),
+            "--shm", LaunchConfiguration("shared_memory_name"),
+            "--robot-config", LaunchConfiguration("robot_config"),
+            "--controller-config", LaunchConfiguration("controller_config"),
+            "--flat-policy-config", LaunchConfiguration("flat_policy_config"),
+            "--obstacle-policy-config", LaunchConfiguration("obstacle_policy_config"),
+            "--initial-policy", policy,
+        ],
+        output="screen",
+        name="motiond",
+    )
+    gateway = Node(
+        package="quadruped_gateway",
+        executable="ros2_gateway",
+        name="ros2_gateway",
+        output="screen",
+        parameters=[{
+            "shared_memory_name": LaunchConfiguration("shared_memory_name"),
+            "cmd_vel_timeout_ns": LaunchConfiguration("cmd_vel_timeout_ns"),
+        }],
+    )
+
+    shutdown_on_exit = [
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=backend,
+                on_exit=[Shutdown(reason="MuJoCo 后端退出")],
+            )
+        ),
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=motion,
+                on_exit=[Shutdown(reason="motiond 退出")],
+            )
+        ),
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=gateway,
+                on_exit=[Shutdown(reason="ROS 2 网关退出")],
+            )
+        ),
+    ]
+    return [
+        backend,
+        TimerAction(period=0.2, actions=[motion]),
+        TimerAction(period=0.4, actions=[gateway]),
+        *shutdown_on_exit,
+    ]
+
+
+def generate_launch_description():
+    arguments = [
+        DeclareLaunchArgument("robot", default_value="black"),
+        DeclareLaunchArgument("terrain", default_value="plain", choices=["plain", "terrain"]),
+        DeclareLaunchArgument("policy", default_value="flat", choices=["flat", "obstacle"]),
+        DeclareLaunchArgument("mode", default_value="headless", choices=["headless", "gui"]),
+        DeclareLaunchArgument("real_time_factor", default_value="1.0"),
+        DeclareLaunchArgument("visual_sync_hz", default_value="60.0"),
+        DeclareLaunchArgument("vsync", default_value="true"),
+        DeclareLaunchArgument("shared_memory_name", default_value="/quadruped_control_black"),
+        DeclareLaunchArgument("cmd_vel_timeout_ns", default_value="200000000"),
+        DeclareLaunchArgument("project_root", default_value=PROJECT_ROOT),
+        DeclareLaunchArgument("backend_executable", default_value=DEFAULT_BACKEND),
+        DeclareLaunchArgument("motion_executable", default_value=DEFAULT_MOTION),
+        DeclareLaunchArgument(
+            "robot_config",
+            default_value=f"{PROJECT_ROOT}/configs/robots/black.yaml",
+        ),
+        DeclareLaunchArgument(
+            "controller_config",
+            default_value=f"{PROJECT_ROOT}/configs/controllers/black.yaml",
+        ),
+        DeclareLaunchArgument(
+            "flat_policy_config",
+            default_value=f"{PROJECT_ROOT}/configs/policies/black/flat.yaml",
+        ),
+        DeclareLaunchArgument(
+            "obstacle_policy_config",
+            default_value=f"{PROJECT_ROOT}/configs/policies/black/obstacle.yaml",
+        ),
+        DeclareLaunchArgument("scene", default_value=""),
+    ]
+    return LaunchDescription(arguments + [OpaqueFunction(function=launch_setup)])

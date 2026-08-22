@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <cmath>
 #include <exception>
+#include <mutex>
+#include <stdexcept>
 #include <string>
 #include <utility>
 
@@ -31,10 +33,24 @@ public:
         simulate->vsync = vsync ? 1 : 0;
     }
 
+    ~Impl()
+    {
+        if (display_data != nullptr)
+        {
+            mj_deleteData(display_data);
+        }
+        if (display_model != nullptr)
+        {
+            mj_deleteModel(display_model);
+        }
+    }
+
     mjvCamera camera{};
     mjvOption option{};
     mjvPerturb perturb{};
     std::unique_ptr<mujoco::Simulate> simulate{};
+    mjModel* display_model{nullptr};
+    mjData* display_data{nullptr};
 };
 
 SimWindow::SimWindow(std::unique_ptr<Impl> impl) : impl_(std::move(impl)) {}
@@ -59,20 +75,59 @@ void SimWindow::load(
     mjData* const data,
     const std::string& displayed_filename)
 {
-    // 后端持有的模型实际可写；只有官方调参面板需要通过其 C API 修改模型选项。
-    impl_->simulate->Load(const_cast<mjModel*>(model), data, displayed_filename.c_str());
-    focus_on_robot(model, data);
+    if (model == nullptr || data == nullptr)
+    {
+        return;
+    }
+    if (impl_->display_data != nullptr)
+    {
+        mj_deleteData(impl_->display_data);
+        impl_->display_data = nullptr;
+    }
+    if (impl_->display_model != nullptr)
+    {
+        mj_deleteModel(impl_->display_model);
+        impl_->display_model = nullptr;
+    }
+    impl_->display_model = mj_copyModel(nullptr, model);
+    if (impl_->display_model == nullptr)
+    {
+        throw std::runtime_error("复制 MuJoCo 显示模型失败");
+    }
+    impl_->display_data = mj_makeData(impl_->display_model);
+    if (impl_->display_data == nullptr)
+    {
+        mj_deleteModel(impl_->display_model);
+        impl_->display_model = nullptr;
+        throw std::runtime_error("创建 MuJoCo 显示数据失败");
+    }
+    mj_copyData(impl_->display_data, impl_->display_model, data);
+    impl_->simulate->Load(
+        impl_->display_model, impl_->display_data, displayed_filename.c_str());
+    focus_on_robot(impl_->display_model, impl_->display_data);
 }
 
-bool SimWindow::sync()
+bool SimWindow::sync(const mjModel* const model, const mjData* const data)
 {
+    if (model == nullptr || data == nullptr || impl_->display_model == nullptr ||
+        impl_->display_data == nullptr)
+    {
+        return false;
+    }
     // pending_ 由渲染线程写入；持有官方互斥锁后取走 Reset，
     // 防止 Simulate::Sync() 绕过上层会话状态单独执行 mj_resetData()。
     mujoco::MutexLock lock(impl_->simulate->mtx);
     const bool reset_requested = impl_->simulate->pending_.reset;
     impl_->simulate->pending_.reset = false;
-    impl_->simulate->Sync();
+    mj_copyData(impl_->display_data, impl_->display_model, data);
+    impl_->simulate->Sync(true);
     return reset_requested;
+}
+
+bool SimWindow::paused() const
+{
+    mujoco::MutexLock lock(impl_->simulate->mtx);
+    return impl_->simulate->run == 0;
 }
 
 void SimWindow::focus_on_robot(const mjModel* const model, const mjData* const data)

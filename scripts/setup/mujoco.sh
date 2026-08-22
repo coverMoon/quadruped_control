@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# 文件：setup_mujoco.sh
+# 文件：mujoco.sh
 # 作用：下载、校验并解压工程固定使用的 MuJoCo 发行包。
 
 set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly REPOSITORY_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+readonly REPOSITORY_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 readonly MUJOCO_VERSION="3.9.0"
 readonly MUJOCO_ARCHIVE="mujoco-${MUJOCO_VERSION}-linux-x86_64.tar.gz"
 # 下载包来自外部网络，固定校验值用于拒绝损坏或被替换的依赖二进制。

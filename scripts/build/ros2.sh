@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# 文件：build_ros2.sh
-# 作用：在仓库外的独立临时工作区构建并验证阶段 6 ROS 2 接口和网关包。
+# 文件：ros2.sh
+# 作用：在仓库外的独立临时工作区构建 ROS 2 接口和网关包。
 
 set -euo pipefail
 
-project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 ros_setup="${ROS_SETUP:-/opt/ros/humble/setup.bash}"
-workspace_root="${QUADRUPED_ROS2_WORKSPACE_ROOT:-/tmp/quadruped_control_ros2_ws_stage6}"
+workspace_root="${QUADRUPED_ROS2_WORKSPACE_ROOT:-/tmp/quadruped_control_ros2_ws_stage8}"
 run_id="run-$(date +%Y%m%d-%H%M%S)-$$"
 run_dir="${workspace_root}/${run_id}"
 
@@ -51,6 +51,12 @@ source "${run_dir}/install/setup.bash"
 set -u
 ros2 pkg prefix quadruped_interfaces >/dev/null
 ros2 pkg prefix quadruped_gateway >/dev/null
+launch_file="${run_dir}/install/quadruped_gateway/share/quadruped_gateway/launch/black_simulation.launch.py"
+if [[ ! -f "${launch_file}" ]]
+then
+    echo "缺少 ROS 2 仿真 launch 文件: ${launch_file}" >&2
+    exit 1
+fi
 ros2 interface show quadruped_interfaces/action/GetUp >/dev/null
 /usr/bin/python3 - <<'PY'
 import rclpy

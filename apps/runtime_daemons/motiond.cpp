@@ -41,6 +41,11 @@ std::atomic<bool> stop_requested{false};
 struct Options
 {
     std::string shared_memory_name{kDefaultSharedMemoryName};
+    std::string robot_config_path{kDefaultRobotConfigPath};
+    std::string controller_config_path{kDefaultControllerConfigPath};
+    std::string flat_policy_config_path{kFlatPolicyConfigPath};
+    std::string obstacle_policy_config_path{kObstaclePolicyConfigPath};
+    std::string initial_policy{"flat"};
 };
 
 struct Policies
@@ -61,16 +66,48 @@ bool parse_args(int argc, char** argv, Options& options)
         const std::string arg = argv[i];
         if (arg == "-h" || arg == "--help")
         {
-            std::cout << "用法: " << argv[0] << " [--shm <名称>]\n";
+            std::cout << "用法: " << argv[0]
+                      << " [--shm <名称>] [--robot-config <路径>]"
+                      << " [--controller-config <路径>] [--flat-policy-config <路径>]"
+                      << " [--obstacle-policy-config <路径>]"
+                      << " [--initial-policy flat|obstacle]\n";
             std::exit(0);
         }
-        if (arg != "--shm" || i + 1 >= argc)
+        if (i + 1 >= argc)
         {
             return false;
         }
-        options.shared_memory_name = argv[++i];
+        const std::string value = argv[++i];
+        if (arg == "--shm")
+        {
+            options.shared_memory_name = value;
+        }
+        else if (arg == "--robot-config")
+        {
+            options.robot_config_path = value;
+        }
+        else if (arg == "--controller-config")
+        {
+            options.controller_config_path = value;
+        }
+        else if (arg == "--flat-policy-config")
+        {
+            options.flat_policy_config_path = value;
+        }
+        else if (arg == "--obstacle-policy-config")
+        {
+            options.obstacle_policy_config_path = value;
+        }
+        else if (arg == "--initial-policy")
+        {
+            options.initial_policy = value;
+        }
+        else
+        {
+            return false;
+        }
     }
-    return true;
+    return options.initial_policy == "flat" || options.initial_policy == "obstacle";
 }
 
 qi::SharedMemory::OpenResult wait_for_shared_memory(const std::string& name)
@@ -90,15 +127,16 @@ qi::SharedMemory::OpenResult wait_for_shared_memory(const std::string& name)
 }
 
 bool load_policies(
+    const Options& options,
     const qc::RobotModel& model,
     qm::MotionRuntime& runtime,
     Policies& policies,
     std::string& error_message)
 {
     const auto flat_config = quadruped::config::load_rl_config(
-        kFlatPolicyConfigPath, QUADRUPED_PROJECT_SOURCE_DIR, model);
+        options.flat_policy_config_path, QUADRUPED_PROJECT_SOURCE_DIR, model);
     const auto obstacle_config = quadruped::config::load_rl_config(
-        kObstaclePolicyConfigPath, QUADRUPED_PROJECT_SOURCE_DIR, model);
+        options.obstacle_policy_config_path, QUADRUPED_PROJECT_SOURCE_DIR, model);
     if (!flat_config.ok() || !obstacle_config.ok())
     {
         error_message = flat_config.ok() ? obstacle_config.error_message : flat_config.error_message;
@@ -113,10 +151,21 @@ bool load_policies(
         return false;
     }
 
-    if (!runtime.attach_policy(flat_config.config, *flat.policy, error_message) ||
-        !runtime.register_policy(obstacle_config.config, *obstacle.policy, error_message))
+    if (options.initial_policy == "obstacle")
     {
-        return false;
+        if (!runtime.attach_policy(obstacle_config.config, *obstacle.policy, error_message) ||
+            !runtime.register_policy(flat_config.config, *flat.policy, error_message))
+        {
+            return false;
+        }
+    }
+    else
+    {
+        if (!runtime.attach_policy(flat_config.config, *flat.policy, error_message) ||
+            !runtime.register_policy(obstacle_config.config, *obstacle.policy, error_message))
+        {
+            return false;
+        }
     }
     policies.flat = std::move(flat.policy);
     policies.obstacle = std::move(obstacle.policy);
@@ -155,14 +204,14 @@ void publish_rejected_wire_request(
 
 int run(const Options& options)
 {
-    const auto model = quadruped::config::load_robot_model(kDefaultRobotConfigPath);
+    const auto model = quadruped::config::load_robot_model(options.robot_config_path);
     if (!model.ok())
     {
         std::cerr << "加载机器人配置失败: " << model.error_message << '\n';
         return 1;
     }
     const auto controller =
-        quadruped::config::load_controller_config(kDefaultControllerConfigPath, model.model);
+        quadruped::config::load_controller_config(options.controller_config_path, model.model);
     if (!controller.ok())
     {
         std::cerr << "加载控制器配置失败: " << controller.error_message << '\n';
@@ -190,7 +239,7 @@ int run(const Options& options)
     }
     Policies policies;
     std::string policy_error;
-    if (!load_policies(model.model, *runtime.runtime, policies, policy_error))
+    if (!load_policies(options, model.model, *runtime.runtime, policies, policy_error))
     {
         std::cerr << "加载策略失败: " << policy_error << '\n';
         return 1;

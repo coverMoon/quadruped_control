@@ -3,10 +3,10 @@
 ## 1. 构建和启动
 
 ```bash
-./scripts/setup_mujoco.sh
-./scripts/setup_libtorch.sh
+./scripts/setup/mujoco.sh
+./scripts/setup/libtorch.sh
 ./scripts/build.sh --rl
-./scripts/run_mujoco_sim.sh
+./scripts/debug/mujoco_sim.sh
 ```
 
 界面使用 MuJoCo 3.9.0 官方 Simulate UI，具备 File、Option、Simulation、Physics、

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# 文件：setup_libtorch.sh
+# 文件：libtorch.sh
 # 作用：下载并安装固定版本的 LibTorch CPU C++11 ABI 依赖。
 
 set -euo pipefail
 
-project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 deps_dir="${project_dir}/.deps"
 install_dir="${deps_dir}/libtorch-2.0.1-cpu"
 archive_name="libtorch-cxx11-abi-shared-with-deps-2.0.1+cpu.zip"

@@ -36,12 +36,15 @@ public:
     static CreateResult create(bool vsync);
 
     // load() 由物理线程调用，并等待主线程完成 OpenGL 资源装载。
-    // 装载后自由相机会对准 trunk，不使用包含大地形的 model.stat 作为取景范围。
+    // 界面使用模型和数据的只读显示副本，不取得物理后端对象的所有权。
     void load(const mjModel* model, mjData* data, const std::string& displayed_filename);
 
     // 同步官方界面输入；返回 true 表示用户点击了官方 Reset。
-    // 该 Reset 会被拦截，由上层统一恢复 MJCF 零位并重建运动会话。
-    [[nodiscard]] bool sync();
+    // 物理数据先复制到显示副本，界面 Reset 只返回请求，不直接修改物理后端。
+    [[nodiscard]] bool sync(const mjModel* model, const mjData* data);
+
+    // 返回官方界面的暂停状态；界面只提供暂停请求，物理步进由上层决定。
+    [[nodiscard]] bool paused() const;
 
     // 把自由相机重新对准机器人躯干；只在加载和 reset 时调用，不持续跟随。
     void focus_on_robot(const mjModel* model, const mjData* data);

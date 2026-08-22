@@ -2,7 +2,7 @@
 
 ## 1. 范围
 
-阶段 6 将 black 的控制闭环拆为三个独立进程：
+阶段 7 将 black 的控制闭环拆为三个独立进程，并支持 backend headless/GUI 两种运行模式：
 
 ```text
 ROS 2 topic/action/service
@@ -20,8 +20,9 @@ ROS 2 topic/action/service
       MuJoCo headless
 ```
 
-本阶段只实现 Linux 本机、无 GUI 的 black 仿真链路。MuJoCo GUI、ROS 2 launch、blackW、
-真实硬件和跨机器协议不在本阶段范围内。
+本阶段实现 Linux 本机 black 的 headless/GUI 仿真链路和 ROS 2 launch。blackW、真实硬件
+和跨机器协议不在本阶段范围内。GUI 通过独立显示 model/data 副本读取后端状态，不直接修改
+backend authoritative mjData；GUI reset 由 backend 转换为新的 session。
 
 ## 2. 进程职责
 
@@ -119,44 +120,38 @@ ros2 run quadruped_gateway quadruped_ipc_control \
 | session 改变 | 旧命令、旧 BaseCommand、旧请求和旧结果全部拒绝 |
 | wire/enum/数值非法 | 转换或 core 校验失败，不使用该帧 |
 
-## 7. 构建和测试
+## 7. 构建、测试和模块化运行入口
 
-主工程三进程产物需要 MuJoCo 和 LibTorch：
-
-```bash
-./scripts/build.sh --rl
-```
-
-ROS 2 Humble 包在仓库外的独立临时 colcon 工作区构建：
+主工程统一使用 `scripts/build.sh`，构建目录为 `.build/default`、`.build/mujoco` 和
+`.build/rl`：
 
 ```bash
-./scripts/build_ros2.sh
+./scripts/build.sh
+./scripts/build.sh --target backend --backend mujoco
+./scripts/build.sh --target motion
+./scripts/build.sh --target command
+./scripts/test/ctest.sh
+./scripts/test/ros2_headless.sh
 ```
 
-脚本默认把每次构建放到：
+`core` 使用 default profile，`backend` 使用 MuJoCo profile，`motion` 使用 MuJoCo + LibTorch
+RL profile，`command` 使用仓库外 `/tmp/quadruped_control_ros2_ws_stage8/` 下的独立 colcon
+工作区。旧的 `--mujoco`、`--rl` 参数仍兼容。
 
-```text
-/tmp/quadruped_control_ros2_ws_stage6/run-*/
-```
-
-并将 `latest` 符号链接指向最近一次成功构建，不在仓库内生成 colcon build、install 或 log。
-
-完整无界面验收：
+人工运行按职责拆成三个独立终端，后端创建共享内存和 session：
 
 ```bash
-./scripts/test_ros2_headless.sh
+./scripts/run/backend.sh black plain
+./scripts/run/motion.sh black flat
+./scripts/run/command.sh black
 ```
 
-测试覆盖：
+backend 不依赖 ROS 2，支持 `plain|terrain`、`gui|headless`、共享内存、MJCF、robot config
+和实时倍率覆盖；motion 不读取终端、不启动 ROS 2 或 GUI，只负责 MotionRuntime 和 flat/
+obstacle 策略；command 负责 `/cmd_vel`、action/service、键盘和规范化 `/joy`。command 在
+TTY 中默认打开键盘，非 TTY 自动关闭；`--controller auto|off|external|explicit` 分别表示
+自动启动配置化 `controller_input`、不启动、使用外部 `/joy`、显式 profile 输入。
 
-1. 启动三个进程并建立 session；
-2. GetUp → Stand；
-3. `/cmd_vel` → StartBehavior(`rl_locomotion`)；
-4. obstacle/flat 双向策略切换；
-5. EnterPassive、GetDown 和再次起立/趴下；
-6. backend reset 后 session 增加；
-7. gateway 停止后速度命令超时；
-8. motiond 停止后旧 CommandFrame 失效；
-9. backend 停止后活动 action 返回 Failed。
-
-重复、乱序、schema 错误和跨 session 数据的底层拒绝由 `quadruped_ipc_tests` 覆盖。
+`configs/input/gamepads.yaml` 只保存物理手柄到固定 8 轴/12 按钮 `Joy` 数组的映射，不保存
+动作或 MotionMode 语义。正式入口统一位于 `scripts/run/`、`scripts/test/` 和 `scripts/debug/`；
+`black_simulation.launch.py` 继续用于 CI/自动化，不作为人工三进程主入口。

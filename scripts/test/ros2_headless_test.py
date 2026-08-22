@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # 文件：ros2_headless_test.py
-# 作用：启动并验证阶段 6 三进程 ROS 2 无界面仿真链路及进程故障退路。
+# 作用：启动并验证阶段 8 三进程 ROS 2 无界面仿真链路及进程故障退路。
 
 import argparse
 import os
@@ -56,7 +56,11 @@ class RuntimeGroup:
         return self._start(
             "backend",
             [
-                self.args.backend,
+                self.args.backend_script,
+                "black",
+                "plain",
+                "--mode",
+                "headless",
                 "--shm",
                 self.shared_memory_name,
                 "--real-time-factor",
@@ -67,17 +71,21 @@ class RuntimeGroup:
     def start_motion(self):
         return self._start(
             "motion",
-            [self.args.motion, "--shm", self.shared_memory_name],
+            [self.args.motion_script, "black", "flat", "--shm", self.shared_memory_name],
         )
 
     def start_gateway(self):
         return self._start(
             "gateway",
             [
-                self.args.gateway,
-                "--ros-args",
-                "-p",
-                f"shared_memory_name:={self.shared_memory_name}",
+                self.args.command_script,
+                "black",
+                "--shm",
+                self.shared_memory_name,
+                "--keyboard",
+                "off",
+                "--controller",
+                "off",
             ],
         )
 
@@ -309,8 +317,8 @@ def start_group(group):
 
 
 def functional_and_gateway_timeout(args):
-    group = RuntimeGroup(args, "quadruped_stage6_functional")
-    node = TestNode("quadruped_stage6_functional_test")
+    group = RuntimeGroup(args, "quadruped_stage7_functional")
+    node = TestNode("quadruped_stage7_functional_test")
     try:
         start_group(group)
         node.wait_ready(group)
@@ -411,8 +419,8 @@ def functional_and_gateway_timeout(args):
 
 
 def motion_failure(args):
-    group = RuntimeGroup(args, "quadruped_stage6_motion_failure")
-    node = TestNode("quadruped_stage6_motion_failure_test")
+    group = RuntimeGroup(args, "quadruped_stage7_motion_failure")
+    node = TestNode("quadruped_stage7_motion_failure_test")
     try:
         start_group(group)
         node.wait_ready(group)
@@ -437,8 +445,8 @@ def motion_failure(args):
 
 
 def backend_failure(args):
-    group = RuntimeGroup(args, "quadruped_stage6_backend_failure")
-    node = TestNode("quadruped_stage6_backend_failure_test")
+    group = RuntimeGroup(args, "quadruped_stage7_backend_failure")
+    node = TestNode("quadruped_stage7_backend_failure_test")
     try:
         start_group(group)
         node.wait_ready(group)
@@ -466,9 +474,9 @@ def backend_failure(args):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--backend", required=True)
-    parser.add_argument("--motion", required=True)
-    parser.add_argument("--gateway", required=True)
+    parser.add_argument("--backend-script", required=True)
+    parser.add_argument("--motion-script", required=True)
+    parser.add_argument("--command-script", required=True)
     parser.add_argument("--ipc-control", required=True)
     parser.add_argument("--real-time-factor", type=float, default=1.0)
     return parser.parse_args()
@@ -483,7 +491,7 @@ def main():
         backend_failure(args)
     finally:
         rclpy.shutdown()
-    print("阶段 6 ROS 2 headless 端到端测试全部通过")
+    print("阶段 8 ROS 2 headless 端到端测试全部通过")
 
 
 if __name__ == "__main__":

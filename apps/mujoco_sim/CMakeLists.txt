@@ -32,10 +32,14 @@ target_link_libraries(quadruped_mujoco_simulate
 
 target_compile_features(quadruped_mujoco_simulate PUBLIC cxx_std_17)
 
+add_library(quadruped_mujoco_gui STATIC sim_window.cpp)
+target_include_directories(quadruped_mujoco_gui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(quadruped_mujoco_gui PUBLIC quadruped_mujoco_simulate)
+target_compile_features(quadruped_mujoco_gui PUBLIC cxx_std_17)
+
 add_executable(quadruped_mujoco_sim
     main.cpp
     sim_controller.cpp
-    sim_window.cpp
     terminal_input.cpp
 )
 
@@ -44,7 +48,7 @@ target_link_libraries(quadruped_mujoco_sim
         quadruped::config
         quadruped::motion
         quadruped::mujoco
-        quadruped_mujoco_simulate
+        quadruped_mujoco_gui
 )
 
 target_compile_features(quadruped_mujoco_sim PRIVATE cxx_std_17)
@@ -69,6 +73,7 @@ if(QUADRUPED_ENABLE_TORCH)
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(quadruped_mujoco_gui PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
     target_compile_options(quadruped_mujoco_sim PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 elseif(MSVC)
     target_compile_options(quadruped_mujoco_sim PRIVATE /W4)

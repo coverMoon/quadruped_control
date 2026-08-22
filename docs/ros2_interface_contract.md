@@ -194,9 +194,9 @@ QoS 是顶层 adapter 的约定，不改变 core 的固定容量数据结构。R
 
 ## 5. 当前实现边界
 
-阶段 6 已实现 ROS 2 node、executor、IPC、session 和三进程故障退路，仍明确不包含：
+阶段 7 已实现 ROS 2 node、executor、IPC、session、三进程故障退路和统一 launch，仍明确不包含：
 
-- MuJoCo GUI 和 ROS 2 launch；
+- GUI 长时间压力测试和多显示环境适配；
 - ROS 到 RobotIO 的直接提交；
 - blackW、真实硬件或跨机器协议；
 - 新的通用行为框架。
