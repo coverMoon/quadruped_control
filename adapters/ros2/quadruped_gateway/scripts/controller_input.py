@@ -40,6 +40,14 @@ def load_config(path):
     return axis_count, button_count, deadband, profiles
 
 
+def button_indices(mapping):
+    values = mapping if isinstance(mapping, list) else [mapping]
+    indices = [int(value) for value in values]
+    if not indices or any(index < 0 for index in indices):
+        raise ValueError("按钮物理索引必须为非空非负列表")
+    return indices
+
+
 def validate_profile(name, profile, axis_count, button_count, default_deadband):
     if not isinstance(profile, dict):
         raise ValueError(f"profile {name} 必须是映射")
@@ -71,10 +79,10 @@ def validate_profile(name, profile, axis_count, button_count, default_deadband):
     for button_name in BUTTON_NAMES:
         if button_name not in buttons:
             raise ValueError(f"profile {name} 缺少按钮 {button_name}")
-        index = int(buttons[button_name])
-        if index < 0 or index in used_buttons:
+        indices = button_indices(buttons[button_name])
+        if len(set(indices)) != len(indices) or any(index in used_buttons for index in indices):
             raise ValueError(f"profile {name} 的按钮索引重复或非法")
-        used_buttons.add(index)
+        used_buttons.update(indices)
     dpad = profile.get("dpad")
     if not isinstance(dpad, dict):
         raise ValueError(f"profile {name} 的 dpad 必须是映射")
@@ -108,10 +116,16 @@ class ControllerInput(Node):
         if self.explicit_profile:
             return self.explicit_profile, self.profiles[self.explicit_profile]
         lowered = device_name.casefold()
+        best_name = ""
+        best_profile = None
+        best_match_length = -1
         for name, profile in self.profiles.items():
-            if any(fragment.casefold() in lowered for fragment in profile.get("match", [])):
-                return name, profile
-        return "", None
+            for fragment in profile.get("match", []):
+                if fragment.casefold() in lowered and len(fragment) > best_match_length:
+                    best_name = name
+                    best_profile = profile
+                    best_match_length = len(fragment)
+        return best_name, best_profile
 
     def connect(self):
         if pygame.joystick.get_count() == 0:
@@ -193,11 +207,12 @@ class ControllerInput(Node):
                 message.axes[int(dpad["y_axis"])] = float(hat_y)
             message.buttons = [0] * self.button_count
             for output_index, name in enumerate(BUTTON_NAMES):
-                physical_index = int(self.profile["buttons"][name])
-                if physical_index < self.joystick.get_numbuttons():
-                    message.buttons[output_index] = int(
-                        self.joystick.get_button(physical_index)
-                    )
+                physical_indices = button_indices(self.profile["buttons"][name])
+                message.buttons[output_index] = int(any(
+                    index < self.joystick.get_numbuttons() and
+                    self.joystick.get_button(index)
+                    for index in physical_indices
+                ))
             self.publisher.publish(message)
         except pygame.error as error:
             self.get_logger().warning(f"手柄读取失败: {error}")

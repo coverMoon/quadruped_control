@@ -68,7 +68,7 @@ void SimController::apply_input(const SimInput& input)
     {
         type = qc::ModeRequestType::StartBehavior;
     }
-    else if (input.switch_flat || input.switch_obstacle)
+    else if (input.switch_policy)
     {
         type = qc::ModeRequestType::SwitchPolicy;
     }
@@ -95,7 +95,7 @@ void SimController::apply_input(const SimInput& input)
     }
     else if (type == qc::ModeRequestType::SwitchPolicy)
     {
-        pending_request_.policy_name = input.switch_flat ? "flat" : "obstacle";
+        pending_request_.policy_name = "toggle";
     }
     has_pending_request_ = true;
 }

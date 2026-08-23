@@ -669,6 +669,8 @@ void test_direct_policy_switches()
     expect(created.runtime->register_policy(
         make_rl_config("obstacle", obstacle_pose), obstacle_policy, error),
         "obstacle 策略应注册：" + error);
+    expect(created.runtime->set_policy_cycle({"flat", "obstacle"}, 2, error),
+        "策略循环应按配置顺序设置：" + error);
     auto unloaded_config = make_rl_config("unloaded", obstacle_pose);
     unloaded_config.model_path.clear();
     expect(!created.runtime->register_policy(unloaded_config, unloaded_policy, error),
@@ -713,7 +715,15 @@ void test_direct_policy_switches()
     expect(flat_policy.forward_count == 2, "obstacle → flat 应直接 reload 并重新推理");
     expect(obstacle_policy.forward_count == 1, "切回 flat 时不得再次调用 obstacle");
 
-    auto unknown = motion_test::make_request(5, qc::ModeRequestType::SwitchPolicy);
+    auto toggle = motion_test::make_request(5, qc::ModeRequestType::SwitchPolicy);
+    toggle.policy_name = "toggle";
+    const auto toggled = update_with_command(*created.runtime, io, command, &toggle);
+    expect(toggled.result.state == qc::ModeResultState::Accepted,
+        "toggle 应按策略循环切换到 obstacle");
+    expect(toggled.status.policy_name == "obstacle",
+        "flat 状态的 toggle 目标应为循环下一项 obstacle");
+
+    auto unknown = motion_test::make_request(6, qc::ModeRequestType::SwitchPolicy);
     unknown.policy_name = "missing";
     const auto rejected = update_with_command(*created.runtime, io, command, &unknown);
     expect(rejected.result.state == qc::ModeResultState::Rejected,
@@ -721,7 +731,7 @@ void test_direct_policy_switches()
     expect(rejected.status.mode == qc::MotionMode::Running,
         "拒绝未知策略后应保持当前 RL 行为");
 
-    auto unloaded = motion_test::make_request(6, qc::ModeRequestType::SwitchPolicy);
+    auto unloaded = motion_test::make_request(7, qc::ModeRequestType::SwitchPolicy);
     unloaded.policy_name = "unloaded";
     const auto unloaded_result =
         update_with_command(*created.runtime, io, command, &unloaded);

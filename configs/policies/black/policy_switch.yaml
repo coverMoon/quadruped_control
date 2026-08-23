@@ -1,0 +1,8 @@
+# 文件：policy_switch.yaml
+# 作用：定义 black 机器人运行时策略的循环切换顺序与姿态过渡周期。
+
+black:
+  posture_transition_cycles: 150
+  policy_config_cycle:
+    - flat
+    - obstacle

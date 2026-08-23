@@ -37,16 +37,17 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         name="mujoco_backendd",
     )
+    motion_command = [
+        LaunchConfiguration("motion_executable"),
+        "--shm", LaunchConfiguration("shared_memory_name"),
+        "--robot-config", LaunchConfiguration("robot_config"),
+        "--controller-config", LaunchConfiguration("controller_config"),
+        "--policy-switch-config", LaunchConfiguration("policy_switch_config"),
+    ]
+    if policy:
+        motion_command.extend(["--initial-policy", policy])
     motion = ExecuteProcess(
-        cmd=[
-            LaunchConfiguration("motion_executable"),
-            "--shm", LaunchConfiguration("shared_memory_name"),
-            "--robot-config", LaunchConfiguration("robot_config"),
-            "--controller-config", LaunchConfiguration("controller_config"),
-            "--flat-policy-config", LaunchConfiguration("flat_policy_config"),
-            "--obstacle-policy-config", LaunchConfiguration("obstacle_policy_config"),
-            "--initial-policy", policy,
-        ],
+        cmd=motion_command,
         output="screen",
         name="motiond",
     )
@@ -93,7 +94,7 @@ def generate_launch_description():
     arguments = [
         DeclareLaunchArgument("robot", default_value="black"),
         DeclareLaunchArgument("terrain", default_value="plain", choices=["plain", "terrain"]),
-        DeclareLaunchArgument("policy", default_value="flat", choices=["flat", "obstacle"]),
+        DeclareLaunchArgument("policy", default_value=""),
         DeclareLaunchArgument("mode", default_value="headless", choices=["headless", "gui"]),
         DeclareLaunchArgument("real_time_factor", default_value="1.0"),
         DeclareLaunchArgument("visual_sync_hz", default_value="60.0"),
@@ -112,12 +113,8 @@ def generate_launch_description():
             default_value=f"{PROJECT_ROOT}/configs/controllers/black.yaml",
         ),
         DeclareLaunchArgument(
-            "flat_policy_config",
-            default_value=f"{PROJECT_ROOT}/configs/policies/black/flat.yaml",
-        ),
-        DeclareLaunchArgument(
-            "obstacle_policy_config",
-            default_value=f"{PROJECT_ROOT}/configs/policies/black/obstacle.yaml",
+            "policy_switch_config",
+            default_value=f"{PROJECT_ROOT}/configs/policies/black/policy_switch.yaml",
         ),
         DeclareLaunchArgument("scene", default_value=""),
     ]

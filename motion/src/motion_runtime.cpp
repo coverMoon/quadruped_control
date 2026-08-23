@@ -84,6 +84,71 @@ bool MotionRuntime::attach_policy(
     return true;
 }
 
+bool MotionRuntime::set_policy_cycle(
+    const std::vector<std::string>& policy_names,
+    const std::uint32_t posture_transition_cycles,
+    std::string& error_message)
+{
+    if (policy_names.empty())
+    {
+        error_message = "policy cycle must not be empty";
+        return false;
+    }
+    if (policy_names.size() > kMaxPolicies)
+    {
+        error_message = "policy cycle exceeds runtime capacity";
+        return false;
+    }
+    if (posture_transition_cycles == 0)
+    {
+        error_message = "policy transition cycles must be positive";
+        return false;
+    }
+
+    std::array<std::string, kMaxPolicies> cycle{};
+    for (std::size_t i = 0; i < policy_names.size(); ++i)
+    {
+        if (policy_names[i].empty() || find_policy(policy_names[i]) == kInvalidPolicyIndex)
+        {
+            error_message = "policy cycle contains an unregistered policy: " + policy_names[i];
+            return false;
+        }
+        for (std::size_t previous = 0; previous < i; ++previous)
+        {
+            if (cycle[previous] == policy_names[i])
+            {
+                error_message = "policy cycle contains a duplicate policy: " + policy_names[i];
+                return false;
+            }
+        }
+        cycle[i] = policy_names[i];
+    }
+
+    policy_cycle_ = std::move(cycle);
+    policy_cycle_size_ = policy_names.size();
+    policy_transition_cycles_ = posture_transition_cycles;
+    error_message.clear();
+    return true;
+}
+
+std::string MotionRuntime::next_policy_name() const
+{
+    if (policy_cycle_size_ == 0)
+    {
+        return {};
+    }
+    std::size_t next_index = 0;
+    for (std::size_t i = 0; i < policy_cycle_size_; ++i)
+    {
+        if (policy_cycle_[i] == policy_name_)
+        {
+            next_index = (i + 1) % policy_cycle_size_;
+            break;
+        }
+    }
+    return policy_cycle_[next_index];
+}
+
 bool MotionRuntime::register_policy(
     RlConfig config,
     Policy& policy,

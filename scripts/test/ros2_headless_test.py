@@ -80,12 +80,9 @@ class RuntimeGroup:
             [
                 self.args.command_script,
                 "black",
+                "keyboard",
                 "--shm",
                 self.shared_memory_name,
-                "--keyboard",
-                "off",
-                "--controller",
-                "off",
             ],
         )
 

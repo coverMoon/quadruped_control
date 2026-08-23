@@ -150,6 +150,7 @@ struct WireRobotIOStatus
 enum class WireControlType : std::uint8_t
 {
     Reset = 0,
+    PauseToggle = 1,
 };
 
 struct WireControlRequest

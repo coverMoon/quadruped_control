@@ -46,6 +46,9 @@ public:
     // 返回官方界面的暂停状态；界面只提供暂停请求，物理步进由上层决定。
     [[nodiscard]] bool paused() const;
 
+    // 翻转官方界面的运行状态，供外部手柄或 ROS 2 指令复用 GUI 暂停能力。
+    void toggle_pause();
+
     // 把自由相机重新对准机器人躯干；只在加载和 reset 时调用，不持续跟随。
     void focus_on_robot(const mjModel* model, const mjData* data);
 

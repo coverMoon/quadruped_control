@@ -20,6 +20,7 @@ Rendering、Joint、Control、Sensor 和 Profiler 等原生面板。为避免与
 | `W/S` | `vx` 每次增加/减少 `0.1 m/s` |
 | `A/D` | `vy` 每次增加/减少 `0.1 m/s` |
 | `Q/E` | `wz` 每次增加/减少 `0.1 rad/s` |
+| `2` 或 `3` | 切换到 `policy_switch.yaml` 中的下一个策略 |
 | `9` | 趴下 |
 | `P` | 进入 Passive |
 | `R` | 重置仿真并建立新会话 |
@@ -60,7 +61,8 @@ TorchScript 策略目标频率                50 Hz（20 ms）
 
 ## 4. 模型选择
 
-- 默认交互运行加载 `assets/policies/black/flat/Flat_Jul03_15-01-07.pt`；
-- obstacle 模型保留在资产目录并有参考输出测试，可在 `rl_locomotion` Running 期间通过
-  `SwitchPolicy` 切换；姿态接近时直接 reload，否则先做固定周期位置阻抗过渡；
+- 策略循环由 `configs/policies/<robot>/policy_switch.yaml` 的 `policy_config_cycle` 定义；
+- 列表项对应同目录下的 `<name>.yaml`，只列入循环的策略才会在启动时加载和允许 toggle/Y 切换；
+- 默认启动使用列表中的第一个策略，也可以通过 `motion.sh [robot] [policy]` 指定循环内的初始策略；
+- `posture_transition_cycles` 控制策略默认姿态不同于当前姿态时的位置阻抗过渡周期；
 - 策略文件来源记录在 `assets/policies/black/SOURCE.md`。

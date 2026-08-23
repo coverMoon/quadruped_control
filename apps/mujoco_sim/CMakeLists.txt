@@ -67,8 +67,7 @@ if(QUADRUPED_ENABLE_TORCH)
     target_compile_definitions(quadruped_mujoco_sim PRIVATE
         QUADRUPED_WITH_TORCH=1
         QUADRUPED_PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
-        QUADRUPED_FLAT_POLICY_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/black/flat.yaml"
-        QUADRUPED_OBSTACLE_POLICY_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/black/obstacle.yaml"
+        QUADRUPED_DEFAULT_POLICY_SWITCH_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/black/policy_switch.yaml"
     )
 endif()
 

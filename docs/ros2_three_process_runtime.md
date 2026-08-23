@@ -37,7 +37,8 @@ backend authoritative mjData；GUI reset 由 backend 转换为新的 session。
 
 ### 2.2 `motiond`
 
-- 加载 black 的 RobotModel、ControllerConfig、flat 和 obstacle 策略；
+- 加载 black 的 RobotModel、ControllerConfig，以及
+  `configs/policies/black/policy_switch.yaml` 中列出的策略；
 - 创建并周期调用 `MotionRuntime`；
 - 通过 `RemoteRobotIO` 读取 StateFrame、提交 CommandFrame；
 - 消费 BaseCommand 和 ModeRequest，发布 MotionStatus 和 ModeResult；
@@ -135,22 +136,35 @@ ros2 run quadruped_gateway quadruped_ipc_control \
 ```
 
 `core` 使用 default profile，`backend` 使用 MuJoCo profile，`motion` 使用 MuJoCo + LibTorch
-RL profile，`command` 使用仓库外 `/tmp/quadruped_control_ros2_ws_stage8/` 下的独立 colcon
-工作区。旧的 `--mujoco`、`--rl` 参数仍兼容。
+RL profile，`command` 使用 `.build/ros2/` 下的固定 colcon 工作区，安装环境为
+`.build/ros2/install/setup.bash`。默认 `./scripts/build.sh` 先完成 RL CMake 构建和 CTest，
+再执行 ROS 2 colcon；`--target command` 只执行 ROS 2 构建，`./scripts/setup/ros2.sh` 可单独
+构建并安装 ROS 2 包环境。旧的 `--mujoco`、`--rl` 参数仍兼容。
 
 人工运行按职责拆成三个独立终端，后端创建共享内存和 session：
 
 ```bash
 ./scripts/run/backend.sh black plain
-./scripts/run/motion.sh black flat
-./scripts/run/command.sh black
+./scripts/run/motion.sh black
+./scripts/run/command.sh black keyboard
+# 使用手柄时显式选择，避免键盘和手柄同时抢占输入
+./scripts/run/command.sh joystick
+# 也可以显式写机器人名称：
+./scripts/run/command.sh black joystick
 ```
 
 backend 不依赖 ROS 2，支持 `plain|terrain`、`gui|headless`、共享内存、MJCF、robot config
-和实时倍率覆盖；motion 不读取终端、不启动 ROS 2 或 GUI，只负责 MotionRuntime 和 flat/
-obstacle 策略；command 负责 `/cmd_vel`、action/service、键盘和规范化 `/joy`。command 在
-TTY 中默认打开键盘，非 TTY 自动关闭；`--controller auto|off|external|explicit` 分别表示
-自动启动配置化 `controller_input`、不启动、使用外部 `/joy`、显式 profile 输入。
+和实时倍率覆盖；motion 不读取终端、不启动 ROS 2 或 GUI，只负责 MotionRuntime 和
+`policy_switch.yaml` 中列出的策略；command 负责 `/cmd_vel`、action/service、键盘和规范化 `/joy`。command 的
+主接口支持 `[robot] [keyboard|joystick]` 或直接使用 `[keyboard|joystick]`，默认只启动键盘；如果工程 ROS 2 安装环境或 gateway
+产物缺失，脚本会自动调用 `scripts/setup/ros2.sh` 完成构建安装，系统基础环境仍需存在于
+`/opt/ros/humble/setup.bash`（或由 `ROS_SETUP` 指定）。joystick 模式才会启动
+`controller_input`。`--shm` 只用于测试或多实例，ROS 2 特殊参数通过 `--ros-args` 传递。
+
+策略循环读取 `configs/policies/<robot>/policy_switch.yaml`：`policy_config_cycle` 中的每一项
+对应同目录下的 `<name>.yaml`，同时决定启动加载白名单和 toggle/Y 的循环顺序；未列出的策略
+不会进入运行时循环。`posture_transition_cycles` 传给 MotionRuntime，用于策略默认姿态不同
+时的插值过渡。
 
 `configs/input/gamepads.yaml` 只保存物理手柄到固定 8 轴/12 按钮 `Joy` 数组的映射，不保存
 动作或 MotionMode 语义。正式入口统一位于 `scripts/run/`、`scripts/test/` 和 `scripts/debug/`；

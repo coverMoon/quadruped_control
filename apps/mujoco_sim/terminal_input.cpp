@@ -90,10 +90,10 @@ void TerminalInput::handle_character(
         input.start_rl = true;
         break;
     case '2':
-        input.switch_flat = true;
+        input.switch_policy = true;
         break;
     case '3':
-        input.switch_obstacle = true;
+        input.switch_policy = true;
         break;
     case '9':
         input.getdown = true;

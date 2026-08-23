@@ -5,8 +5,8 @@
 set -euo pipefail
 project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 ros_setup="${ROS_SETUP:-/opt/ros/humble/setup.bash}"
-workspace_root="${QUADRUPED_ROS2_WORKSPACE_ROOT:-/tmp/quadruped_control_ros2_ws_stage8}"
-ros_install="${QUADRUPED_ROS2_INSTALL:-${workspace_root}/latest/install}"
+workspace_root="${QUADRUPED_ROS2_WORKSPACE_ROOT:-${project_dir}/.build/ros2}"
+ros_install="${QUADRUPED_ROS2_INSTALL:-${workspace_root}/install}"
 for required in "${ros_setup}" "${ros_install}/setup.bash" \
     "${project_dir}/.build/rl/apps/runtime_daemons/quadruped_mujoco_backendd" \
     "${project_dir}/.build/rl/apps/runtime_daemons/quadruped_motiond"; do

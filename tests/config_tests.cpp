@@ -4,9 +4,11 @@
  */
 
 #include "quadruped/config/robot_config.hpp"
+#include "quadruped/config/policy_switch_loader.hpp"
 #include "quadruped/config/simulation_config.hpp"
 
 #include <iostream>
+#include <filesystem>
 #include <string>
 
 namespace
@@ -46,6 +48,22 @@ int main()
     }
     expect(!quadruped::config::load_robot_model("/missing/quadruped.yaml").ok(),
         "缺失配置文件应拒绝");
+
+    const std::filesystem::path policy_switch_path(QUADRUPED_POLICY_SWITCH_CONFIG_PATH);
+    const auto policy_switch = quadruped::config::load_policy_switch_config(
+        policy_switch_path.string(), "black", policy_switch_path.parent_path().string());
+    expect(policy_switch.ok(), "策略循环配置应加载成功：" + policy_switch.error_message);
+    if (policy_switch.ok())
+    {
+        expect(policy_switch.config.policy_names.size() == 2,
+            "black 策略循环应包含两个策略");
+        expect(policy_switch.config.policy_names[0] == "flat",
+            "策略循环第一项应为 flat");
+        expect(policy_switch.config.policy_names[1] == "obstacle",
+            "策略循环第二项应为 obstacle");
+        expect(policy_switch.config.posture_transition_cycles == 150,
+            "策略姿态过渡周期应从 policy_switch.yaml 加载");
+    }
 
     const auto simulation =
         quadruped::config::load_simulation_config(QUADRUPED_SIMULATION_CONFIG_PATH);

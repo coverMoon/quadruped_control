@@ -32,8 +32,7 @@ if(QUADRUPED_ENABLE_TORCH)
         QUADRUPED_PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
         QUADRUPED_DEFAULT_ROBOT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/robots/black.yaml"
         QUADRUPED_DEFAULT_CONTROLLER_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/controllers/black.yaml"
-        QUADRUPED_FLAT_POLICY_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/black/flat.yaml"
-        QUADRUPED_OBSTACLE_POLICY_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/black/obstacle.yaml"
+        QUADRUPED_DEFAULT_POLICY_SWITCH_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/black/policy_switch.yaml"
     )
 endif()
 

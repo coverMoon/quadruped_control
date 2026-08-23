@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace quadruped::motion
 {
@@ -93,6 +94,15 @@ public:
     // 绑定一个由调用方持有的同步策略并立即选为当前策略。
     // 该接口保留给单策略调用方，重复名称会被拒绝；运行中切换使用 SwitchPolicy。
     bool attach_policy(RlConfig config, Policy& policy, std::string& error_message);
+
+    // 设置按键 toggle 使用的策略循环；策略必须已经注册且名称唯一。
+    bool set_policy_cycle(
+        const std::vector<std::string>& policy_names,
+        std::uint32_t posture_transition_cycles,
+        std::string& error_message);
+
+    // 返回当前策略在循环中的下一个策略；没有配置循环时返回空字符串。
+    [[nodiscard]] std::string next_policy_name() const;
 
     // 执行一个控制周期：读取最新状态、处理请求、生成并提交命令。
     // 不抛出异常；所有 RobotIO 错误都通过输出结果表达。
@@ -248,12 +258,16 @@ private:
         std::unique_ptr<RlController> controller{};
     };
 
-    static constexpr std::size_t kMaxPolicies = 4;
+    // 策略数量是启动期低频配置，容量覆盖 rl_sar 当前 blackW 的五项循环。
+    static constexpr std::size_t kMaxPolicies = 8;
     static constexpr std::size_t kInvalidPolicyIndex = kMaxPolicies;
-    static constexpr std::uint32_t kPolicyTransitionCycles = 20;
+    static constexpr std::uint32_t kDefaultPolicyTransitionCycles = 20;
     static constexpr double kPolicyPoseTolerance = 0.15;
 
     std::array<RegisteredPolicy, kMaxPolicies> policies_{};
+    std::array<std::string, kMaxPolicies> policy_cycle_{};
+    std::size_t policy_cycle_size_{0};
+    std::uint32_t policy_transition_cycles_{kDefaultPolicyTransitionCycles};
     std::size_t current_policy_index_{kInvalidPolicyIndex};
     std::size_t pending_policy_index_{kInvalidPolicyIndex};
     bool policy_transition_active_{false};

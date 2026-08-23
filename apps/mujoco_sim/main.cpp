@@ -15,6 +15,7 @@
 
 #if defined(QUADRUPED_WITH_TORCH)
 #include "quadruped/config/rl_config_loader.hpp"
+#include "quadruped/config/policy_switch_loader.hpp"
 #include "quadruped/policy/torch_policy.hpp"
 #endif
 
@@ -22,10 +23,15 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <algorithm>
 #include <cstdlib>
+#include <filesystem>
+#include <memory>
 #include <iostream>
 #include <string>
 #include <thread>
+#include <vector>
+#include <utility>
 
 namespace qc = quadruped::core;
 namespace qm = quadruped::motion;
@@ -40,8 +46,8 @@ constexpr const char* kDefaultRobotConfigPath = QUADRUPED_DEFAULT_ROBOT_CONFIG_P
 constexpr const char* kDefaultControllerConfigPath = QUADRUPED_DEFAULT_CONTROLLER_CONFIG_PATH;
 constexpr const char* kDefaultSimulationConfigPath = QUADRUPED_DEFAULT_SIMULATION_CONFIG_PATH;
 #if defined(QUADRUPED_WITH_TORCH)
-constexpr const char* kFlatPolicyConfigPath = QUADRUPED_FLAT_POLICY_CONFIG_PATH;
-constexpr const char* kObstaclePolicyConfigPath = QUADRUPED_OBSTACLE_POLICY_CONFIG_PATH;
+constexpr const char* kDefaultPolicySwitchConfigPath =
+    QUADRUPED_DEFAULT_POLICY_SWITCH_CONFIG_PATH;
 #endif
 
 // 程序启动标识固定为非零值；会话号由 SimController 从 1 开始递增。
@@ -51,6 +57,84 @@ struct Options
 {
     std::string scene_path = kDefaultScenePath;
 };
+
+struct LoadedPolicy
+{
+    quadruped::motion::RlConfig config{};
+    std::unique_ptr<quadruped::policy::TorchPolicy> policy{};
+};
+
+bool load_policies(
+    const qc::RobotModel& model,
+    qm::MotionRuntime& runtime,
+    std::vector<LoadedPolicy>& policies,
+    std::array<double, 3>& command_limits,
+    std::string& error_message)
+{
+    const std::filesystem::path switch_path(kDefaultPolicySwitchConfigPath);
+    const auto switch_config = quadruped::config::load_policy_switch_config(
+        kDefaultPolicySwitchConfigPath, model.name, switch_path.parent_path().string());
+    for (const std::string& warning : switch_config.warnings)
+    {
+        std::cerr << "策略配置警告: " << warning << '\n';
+    }
+    if (!switch_config.ok())
+    {
+        error_message = switch_config.error_message;
+        return false;
+    }
+
+    policies.reserve(switch_config.config.policy_names.size());
+    for (const std::string& policy_name : switch_config.config.policy_names)
+    {
+        const std::filesystem::path policy_path = switch_path.parent_path() / (policy_name + ".yaml");
+        const auto loaded = quadruped::config::load_rl_config(
+            policy_path.string(), QUADRUPED_PROJECT_SOURCE_DIR, model);
+        if (!loaded.ok())
+        {
+            error_message = loaded.error_message;
+            return false;
+        }
+        if (loaded.config.name != policy_name)
+        {
+            error_message = "policy config name does not match cycle item: " + policy_name;
+            return false;
+        }
+        auto policy = quadruped::policy::TorchPolicy::create(loaded.config);
+        if (!policy.ok())
+        {
+            error_message = policy.error_message;
+            return false;
+        }
+        policies.push_back({loaded.config, std::move(policy.policy)});
+    }
+
+    if (policies.empty())
+    {
+        error_message = "policy switch cycle is empty";
+        return false;
+    }
+    command_limits = policies.front().config.command_limits;
+    if (!runtime.attach_policy(policies.front().config, *policies.front().policy, error_message))
+    {
+        return false;
+    }
+    for (std::size_t i = 1; i < policies.size(); ++i)
+    {
+        if (!runtime.register_policy(policies[i].config, *policies[i].policy, error_message))
+        {
+            return false;
+        }
+    }
+    if (!runtime.set_policy_cycle(
+            switch_config.config.policy_names,
+            switch_config.config.posture_transition_cycles,
+            error_message))
+    {
+        return false;
+    }
+    return true;
+}
 
 void print_usage(const char* program)
 {
@@ -248,36 +332,13 @@ int run(const Options& options)
         return 1;
     }
 #if defined(QUADRUPED_WITH_TORCH)
-    const auto flat_config = quadruped::config::load_rl_config(
-        kFlatPolicyConfigPath, QUADRUPED_PROJECT_SOURCE_DIR, model.model);
-    const auto obstacle_config = quadruped::config::load_rl_config(
-        kObstaclePolicyConfigPath, QUADRUPED_PROJECT_SOURCE_DIR, model.model);
-    if (!flat_config.ok() || !obstacle_config.ok())
+    std::vector<LoadedPolicy> policies;
+    std::string policy_error;
+    if (!load_policies(model.model, *runtime.runtime, policies, command_limits, policy_error))
     {
-        std::cerr << "加载 RL 配置失败: "
-                  << (flat_config.ok() ? obstacle_config.error_message : flat_config.error_message)
-                  << '\n';
+        std::cerr << "加载 RL 策略失败: " << policy_error << '\n';
         return 1;
     }
-    auto flat_policy = quadruped::policy::TorchPolicy::create(flat_config.config);
-    auto obstacle_policy = quadruped::policy::TorchPolicy::create(obstacle_config.config);
-    if (!flat_policy.ok() || !obstacle_policy.ok())
-    {
-        std::cerr << "加载 RL 策略失败: "
-                  << (flat_policy.ok() ? obstacle_policy.error_message : flat_policy.error_message)
-                  << '\n';
-        return 1;
-    }
-    std::string attach_error;
-    if (!runtime.runtime->attach_policy(
-            flat_config.config, *flat_policy.policy, attach_error) ||
-        !runtime.runtime->register_policy(
-            obstacle_config.config, *obstacle_policy.policy, attach_error))
-    {
-        std::cerr << "接入 RL 策略失败: " << attach_error << '\n';
-        return 1;
-    }
-    command_limits = flat_config.config.command_limits;
     policy_ready = true;
 #endif
     qsim::TerminalInput terminal(command_limits);

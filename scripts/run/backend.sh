@@ -6,7 +6,7 @@ set -euo pipefail
 
 project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 robot_name="black"
-scene_name="plain"
+scene_name="terrain"
 backend_name="mujoco"
 mode="gui"
 shm_name=""
@@ -24,7 +24,7 @@ usage() {
 
 位置参数:
   robot                 机器人名称，默认 black
-  scene                 场景变体 plain|terrain，默认 plain
+  scene                 场景变体 plain|terrain，默认 terrain
 
 选项:
   --robot NAME          覆盖机器人名称

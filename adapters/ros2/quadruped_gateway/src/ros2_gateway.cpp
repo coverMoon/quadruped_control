@@ -29,6 +29,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -68,6 +69,20 @@ constexpr std::int64_t kDefaultJoyTimeoutNs = 250'000'000;
 constexpr double kKeyboardIncrement = 0.1;
 constexpr std::array<double, 3> kManualCommandLimits{3.0, 1.0, 3.0};
 
+struct JoyEdgeState
+{
+    bool a{false};
+    bool b{false};
+    bool x{false};
+    bool y{false};
+    bool lb{false};
+    bool rb{false};
+    bool passive_combo{false};
+    bool reset_combo{false};
+    bool rl_combo{false};
+    bool pause_combo{false};
+};
+
 std::uint64_t make_startup_id()
 {
     const auto value = static_cast<std::uint64_t>(qi::monotonic_now_ns());
@@ -102,6 +117,25 @@ bool is_terminal(const std::uint8_t state)
         state == static_cast<std::uint8_t>(qc::ModeResultState::Failed);
 }
 
+const char* motion_mode_name(const qc::MotionMode mode) noexcept
+{
+    switch (mode)
+    {
+    case qc::MotionMode::Passive:
+        return "Passive";
+    case qc::MotionMode::GetUp:
+        return "GetUp";
+    case qc::MotionMode::Stand:
+        return "Stand";
+    case qc::MotionMode::Running:
+        return "Running";
+    case qc::MotionMode::GetDown:
+        return "GetDown";
+    default:
+        return "Unknown";
+    }
+}
+
 
 }  // 匿名命名空间
 
@@ -129,6 +163,8 @@ public:
         joy_require_connection_frame_ = declare_parameter<bool>(
             "joy_require_connection_frame", true);
         joy_topic_ = declare_parameter<std::string>("joy_topic", "/joy");
+        // 指令终端不仅负责键盘输入，手柄模式也需要显示 RL 当前速度指令。
+        terminal_ui_enabled_ = isatty(STDOUT_FILENO) != 0;
 
         auto opened = qi::SharedMemory::open_existing(shared_memory_name_);
         if (!opened.ok())
@@ -253,6 +289,11 @@ public:
     {
         stopping_.store(true);
         result_condition_.notify_all();
+        if (terminal_ui_enabled_)
+        {
+            std::lock_guard<std::mutex> lock(terminal_output_mutex_);
+            std::cout << '\n' << std::flush;
+        }
         restore_terminal();
         if (keyboard_thread_.joinable())
         {
@@ -377,9 +418,18 @@ private:
         command.expires_at_ns = state_timestamp_ns + command_timeout_ns_;
         command.source = source;
         command.priority = priority;
-        command.vx = std::isfinite(vx) ? std::clamp(vx, -kManualCommandLimits[0], kManualCommandLimits[0]) : 0.0;
-        command.vy = std::isfinite(vy) ? std::clamp(vy, -kManualCommandLimits[1], kManualCommandLimits[1]) : 0.0;
-        command.wz = std::isfinite(wz) ? std::clamp(wz, -kManualCommandLimits[2], kManualCommandLimits[2]) : 0.0;
+        command.vx = std::isfinite(vx)
+            ? std::clamp(vx, -kManualCommandLimits[0], kManualCommandLimits[0])
+            : 0.0;
+        command.vy = std::isfinite(vy)
+            ? std::clamp(vy, -kManualCommandLimits[1], kManualCommandLimits[1])
+            : 0.0;
+        command.wz = std::isfinite(wz)
+            ? std::clamp(wz, -kManualCommandLimits[2], kManualCommandLimits[2])
+            : 0.0;
+        published_command_vx_.store(command.vx);
+        published_command_vy_.store(command.vy);
+        published_command_wz_.store(command.wz);
         qi::WireBaseCommand wire = qi::to_wire(command);
         wire.startup_id = gateway_startup_id_;
         wire.session_id = session_id;
@@ -409,12 +459,16 @@ private:
             message.header.frame_id.rfind("joy_disconnected", 0) == 0;
         const bool connected = !marked_disconnected &&
             (!joy_require_connection_frame_ || marked_connected);
-        const bool valid_axes = message.axes.size() >= 4;
-        const bool valid_buttons = message.buttons.size() >= 4;
+        const bool valid_axes = message.axes.size() >= 8;
+        const bool valid_buttons = message.buttons.size() >= 6;
         if (!connected || !valid_axes || !valid_buttons)
         {
             const bool was_online = joy_online_.exchange(false);
-            last_joy_buttons_.fill(false);
+            {
+                std::lock_guard<std::mutex> lock(joy_info_mutex_);
+                joy_profile_name_.clear();
+            }
+            last_joy_buttons_ = {};
             if (was_online)
             {
                 manual_input_active_.store(false);
@@ -423,9 +477,21 @@ private:
             return;
         }
         const bool was_online = joy_online_.exchange(true);
+        {
+            const std::string prefix = "joy_connected:";
+            std::lock_guard<std::mutex> lock(joy_info_mutex_);
+            if (message.header.frame_id.rfind(prefix, 0) == 0)
+            {
+                joy_profile_name_ = message.header.frame_id.substr(prefix.size());
+            }
+            else if (joy_profile_name_.empty())
+            {
+                joy_profile_name_ = "标准手柄";
+            }
+        }
         if (!was_online)
         {
-            last_joy_buttons_.fill(false);
+            last_joy_buttons_ = {};
             manual_input_active_.store(true);
         }
         last_joy_ns_.store(qi::monotonic_now_ns());
@@ -457,9 +523,13 @@ private:
             now_ns - last_joy_ns > joy_timeout_ns_)
         {
             joy_online_.store(false);
+            {
+                std::lock_guard<std::mutex> lock(joy_info_mutex_);
+                joy_profile_name_.clear();
+            }
             manual_input_active_.store(false);
             set_manual_command(0.0, 0.0, 0.0);
-            last_joy_buttons_.fill(false);
+            last_joy_buttons_ = {};
         }
         if (manual_input_active_.load())
         {
@@ -489,46 +559,65 @@ private:
         const bool b = message.buttons[1] != 0;
         const bool x = message.buttons[2] != 0;
         const bool y = message.buttons[3] != 0;
-        const bool lb = message.buttons.size() > 4 && message.buttons[4] != 0;
-        const bool rb = message.buttons.size() > 5 && message.buttons[5] != 0;
-        if (a && !last_joy_buttons_[0])
+        const bool lb = message.buttons[4] != 0;
+        const bool rb = message.buttons[5] != 0;
+        const bool dpad_up = message.axes[7] > 0.5;
+        const bool dpad_down = message.axes[7] < -0.5;
+        const bool dpad_left = message.axes[6] < -0.5;
+        const bool dpad_right = message.axes[6] > 0.5;
+        const bool passive_combo = lb && x;
+        const bool reset_combo = rb && y;
+        const bool rl_combo = rb && dpad_up;
+        const bool pause_combo = rb && x;
+
+        if (a && !last_joy_buttons_.a)
         {
             submit_keyboard_request(qc::ModeRequestType::GetUp);
         }
-        if (b && !last_joy_buttons_[1])
+        if (b && !last_joy_buttons_.b)
         {
             submit_keyboard_request(qc::ModeRequestType::GetDown);
         }
-        if (x && !lb && !last_joy_buttons_[2])
+        if (x && !lb && !rb && !last_joy_buttons_.x)
         {
             manual_input_active_.store(!manual_input_active_.load());
         }
-        if (y && !rb && !last_joy_buttons_[3])
+        if (y && !rb && !last_joy_buttons_.y)
         {
-            std::string current_policy;
-            {
-                std::lock_guard<std::mutex> lock(policy_mutex_);
-                current_policy = current_policy_;
-            }
-            const std::string target = current_policy == "flat" ? "obstacle" : "flat";
-            submit_keyboard_request(qc::ModeRequestType::SwitchPolicy, {}, target);
+            submit_keyboard_request(qc::ModeRequestType::SwitchPolicy, {}, "toggle");
         }
-        const bool passive_combo = lb && x;
-        const bool reset_combo = rb && y;
-        if (passive_combo && !last_joy_buttons_[4])
+        if (passive_combo && !last_joy_buttons_.passive_combo)
         {
             submit_keyboard_request(qc::ModeRequestType::EnterPassive);
         }
-        if (reset_combo && !last_joy_buttons_[5])
+        if (reset_combo && !last_joy_buttons_.reset_combo)
         {
             submit_backend_reset();
         }
-        last_joy_buttons_[0] = a;
-        last_joy_buttons_[1] = b;
-        last_joy_buttons_[2] = x;
-        last_joy_buttons_[3] = y;
-        last_joy_buttons_[4] = passive_combo;
-        last_joy_buttons_[5] = reset_combo;
+        if (rl_combo && !last_joy_buttons_.rl_combo)
+        {
+            // 旧 rl_sar 使用 RB+DPadUp 进入基础 locomotion，不能只依赖单独的数字键。
+            submit_start_rl_behavior();
+        }
+        if (pause_combo && !last_joy_buttons_.pause_combo)
+        {
+            submit_backend_pause_toggle();
+        }
+
+        // 这些组合属于 blackW 专用行为；black 当前没有对应行为名，因此不伪造公共模式。
+        static_cast<void>(dpad_down);
+        static_cast<void>(dpad_left);
+        static_cast<void>(dpad_right);
+        last_joy_buttons_.a = a;
+        last_joy_buttons_.b = b;
+        last_joy_buttons_.x = x;
+        last_joy_buttons_.y = y;
+        last_joy_buttons_.lb = lb;
+        last_joy_buttons_.rb = rb;
+        last_joy_buttons_.passive_combo = passive_combo;
+        last_joy_buttons_.reset_combo = reset_combo;
+        last_joy_buttons_.rl_combo = rl_combo;
+        last_joy_buttons_.pause_combo = pause_combo;
     }
 
 
@@ -842,6 +931,15 @@ private:
         }
     }
 
+    void submit_start_rl_behavior()
+    {
+        // MotionRuntime 要求启动 RL 前已有有效 BaseCommand；键盘模式也先发布零速度。
+        set_manual_command(0.0, 0.0, 0.0);
+        manual_input_active_.store(true);
+        publish_base_command(0.0, 0.0, 0.0, qc::CommandSource::Gamepad, 110);
+        submit_keyboard_request(qc::ModeRequestType::StartBehavior, "rl_locomotion");
+    }
+
     void submit_keyboard_request(
         const qc::ModeRequestType type,
         const std::string& behavior_name = {},
@@ -882,6 +980,33 @@ private:
         }
     }
 
+    void submit_backend_pause_toggle()
+    {
+        std::uint64_t ignored_startup = 0;
+        std::uint64_t session_id = 0;
+        std::int64_t ignored_timestamp = 0;
+        if (!current_session(ignored_startup, session_id, ignored_timestamp))
+        {
+            return;
+        }
+        qi::WireHeartbeat heartbeat;
+        if (!qi::read_latest(memory_->layout().backend_heartbeat, heartbeat))
+        {
+            return;
+        }
+        qi::WireControlRequest request;
+        request.schema_version = qc::kFrameSchemaVersion;
+        request.startup_id = heartbeat.startup_id;
+        request.session_id = session_id;
+        request.request_id = ++local_request_id_;
+        request.type = static_cast<std::uint8_t>(qi::WireControlType::PauseToggle);
+        std::lock_guard<std::mutex> lock(request_mutex_);
+        if (!qi::queue_push(memory_->layout().control_requests, request))
+        {
+            RCLCPP_WARN(get_logger(), "后端暂停请求队列已满");
+        }
+    }
+
     void keyboard_loop()
     {
         termios original{};
@@ -912,10 +1037,24 @@ private:
                 continue;
             }
             char key = 0;
-            if (read(STDIN_FILENO, &key, 1) == 1)
+            if (read(STDIN_FILENO, &key, 1) != 1)
             {
-                process_keyboard_key(key);
+                continue;
             }
+            if (key == 27)
+            {
+                // Linux 方向键会发送 ESC [ A/B/C/D；读取并丢弃完整序列，
+                // 避免把方向键误判成退出，也不让控制字符进入运动映射。
+                timeval sequence_timeout{0, 10'000};
+                if (select(STDIN_FILENO + 1, &read_set, nullptr, nullptr, &sequence_timeout) > 0)
+                {
+                    char sequence[2]{};
+                    const ssize_t count = read(STDIN_FILENO, sequence, sizeof(sequence));
+                    static_cast<void>(count);
+                }
+                continue;
+            }
+            process_keyboard_key(key);
         }
         restore_terminal();
     }
@@ -934,18 +1073,26 @@ private:
         switch (key)
         {
         case '0': submit_keyboard_request(qc::ModeRequestType::GetUp); return;
-        case '1': submit_keyboard_request(qc::ModeRequestType::StartBehavior, "rl_locomotion"); return;
-        case '2': submit_keyboard_request(qc::ModeRequestType::SwitchPolicy, {}, "flat"); return;
-        case '3': submit_keyboard_request(qc::ModeRequestType::SwitchPolicy, {}, "obstacle"); return;
+        case '1': submit_start_rl_behavior(); return;
+        case '2': submit_keyboard_request(qc::ModeRequestType::SwitchPolicy, {}, "toggle"); return;
+        case '3': submit_keyboard_request(qc::ModeRequestType::SwitchPolicy, {}, "toggle"); return;
         case '9': submit_keyboard_request(qc::ModeRequestType::GetDown); return;
         case 'p': submit_keyboard_request(qc::ModeRequestType::EnterPassive); return;
         case 'r': submit_backend_reset(); return;
+        case '\n':
+        case '\r': submit_backend_pause_toggle(); return;
         case 'n': manual_input_active_.store(!manual_input_active_.load()); return;
         case ' ': set_manual_command(0.0, 0.0, 0.0); manual_input_active_.store(true); return;
-        case 'x':
-        case 27: stopping_.store(true); rclcpp::shutdown(); return;
+        case 'x': stopping_.store(true); rclcpp::shutdown(); return;
+        case 27:
+            // 方向键以 ESC [ A/B/C/D 开头；不能把 ESC 直接当作退出键。
+            return;
         case 'h':
-            RCLCPP_INFO(get_logger(), "0 起立 1 RL 2/3 策略 9 趴下 P 被动 R reset W/S A/D Q/E 速度 Space 清零 N 导航 X 退出");
+            RCLCPP_INFO(
+                get_logger(),
+                "0 Stand 1 RL locomotion 2/3 Switch policy 9 Lie down P Passive "
+                "R Reset Enter Pause/continue W/S A/D Q/E Command speed "
+                "Space Clear command N Navigation X Exit");
             return;
         default: break;
         }
@@ -965,6 +1112,65 @@ private:
         else return;
         set_manual_command(vx, vy, wz);
         manual_input_active_.store(true);
+    }
+
+    void render_terminal_status(const qc::MotionStatus& motion_status)
+    {
+        if (!terminal_ui_enabled_)
+        {
+            return;
+        }
+        const double vx = published_command_vx_.load();
+        const double vy = published_command_vy_.load();
+        const double wz = published_command_wz_.load();
+        const bool rl_running = motion_status.mode == qc::MotionMode::Running &&
+            motion_status.behavior_name == "rl_locomotion";
+        const char* const policy = motion_status.policy_name.empty()
+            ? "-"
+            : motion_status.policy_name.c_str();
+        const char* const input = manual_input_active_.load() ? "manual" : "navigation";
+        std::string joy_profile;
+        {
+            std::lock_guard<std::mutex> lock(joy_info_mutex_);
+            joy_profile = joy_profile_name_;
+        }
+        std::lock_guard<std::mutex> lock(terminal_output_mutex_);
+        if (terminal_status_rendered_)
+        {
+            // 光标当前位于第二行；回到第一行后整体刷新两行状态。
+            std::cout << "\033[1A";
+        }
+        std::cout << "\r\033[2K[Controller] ";
+        if (joy_online_.load())
+        {
+            std::cout << "Connected";
+            if (!joy_profile.empty())
+            {
+                std::cout << ": " << joy_profile;
+            }
+        }
+        else
+        {
+            std::cout << "\033[33mNot connected\033[0m";
+        }
+        std::cout << "\n\r\033[2K" << std::fixed << std::setprecision(2);
+        if (rl_running)
+        {
+            // 指令单位分别为 m/s、m/s、rad/s。
+            std::cout << "RL Controller policy=" << policy
+                      << " x:" << vx
+                      << " y:" << vy
+                      << " yaw:" << wz;
+        }
+        else
+        {
+            std::cout << "mode=" << motion_mode_name(motion_status.mode)
+                      << " policy=" << policy
+                      << " input=" << input
+                      << " command=" << vx << "," << vy << "," << wz;
+        }
+        std::cout << std::flush;
+        terminal_status_rendered_ = true;
     }
 
     void publish_status()
@@ -1001,6 +1207,7 @@ private:
                 current_policy_ = motion_status.policy_name;
             }
             motion_status_publisher_->publish(output);
+            render_terminal_status(motion_status);
         }
 
         qi::WireRobotIOStatus wire_io_status;
@@ -1060,29 +1267,38 @@ private:
     std::int64_t joy_timeout_ns_{kDefaultJoyTimeoutNs};
     bool keyboard_enabled_{true};
     bool joy_require_connection_frame_{true};
+    bool terminal_ui_enabled_{false};
     std::uint64_t gateway_startup_id_{0};
     std::atomic<std::uint64_t> base_command_sequence_{0};
     std::atomic<std::uint64_t> local_request_id_{1};
     std::atomic<std::uint64_t> active_action_request_id_{0};
     std::atomic<std::uint8_t> current_mode_{static_cast<std::uint8_t>(qc::MotionMode::Passive)};
     std::atomic<bool> joy_online_{false};
+    std::mutex joy_info_mutex_{};
+    std::string joy_profile_name_{};
     std::atomic<bool> manual_input_active_{false};
     std::atomic<double> manual_vx_{0.0};
     std::atomic<double> manual_vy_{0.0};
     std::atomic<double> manual_wz_{0.0};
+    // 最近一次实际发布给 MotionRuntime 的机体速度指令，单位为 m/s、m/s、rad/s。
+    std::atomic<double> published_command_vx_{0.0};
+    std::atomic<double> published_command_vy_{0.0};
+    std::atomic<double> published_command_wz_{0.0};
     std::atomic<double> navigation_vx_{0.0};
     std::atomic<double> navigation_vy_{0.0};
     std::atomic<double> navigation_wz_{0.0};
     std::atomic<std::int64_t> last_cmd_vel_ns_{0};
     std::atomic<std::int64_t> last_joy_ns_{0};
-    std::array<bool, 6> last_joy_buttons_{};
+    JoyEdgeState last_joy_buttons_{};
     termios original_termios_{};
     std::atomic<bool> terminal_active_{false};
+    bool terminal_status_rendered_{false};
     std::mutex command_mutex_{};
     std::mutex policy_mutex_{};
     std::string current_policy_{};
     std::unique_ptr<qi::SharedMemory> memory_{};
     std::atomic<bool> stopping_{false};
+    std::mutex terminal_output_mutex_{};
 
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_subscription_{};
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_subscription_{};

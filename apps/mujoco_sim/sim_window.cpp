@@ -130,6 +130,12 @@ bool SimWindow::paused() const
     return impl_->simulate->run == 0;
 }
 
+void SimWindow::toggle_pause()
+{
+    mujoco::MutexLock lock(impl_->simulate->mtx);
+    impl_->simulate->run = impl_->simulate->run == 0 ? 1 : 0;
+}
+
 void SimWindow::focus_on_robot(const mjModel* const model, const mjData* const data)
 {
     if (model == nullptr || data == nullptr)

@@ -209,7 +209,8 @@ void process_control_requests(
     qmj::MujocoRobotIO& io,
     const std::uint64_t startup_id,
     std::uint64_t& session_id,
-    std::uint64_t& command_version)
+    std::uint64_t& command_version,
+    qsim::SimWindow* const window)
 {
     qi::WireControlRequest request;
     while (qi::queue_pop(layout.control_requests, request))
@@ -220,15 +221,36 @@ void process_control_requests(
         result.session_id = session_id;
         result.request_id = request.request_id;
 
+        const bool is_reset =
+            request.type == static_cast<std::uint8_t>(qi::WireControlType::Reset);
+        const bool is_pause_toggle =
+            request.type == static_cast<std::uint8_t>(qi::WireControlType::PauseToggle);
         const bool valid_request = request.schema_version == qc::kFrameSchemaVersion &&
             request.startup_id == startup_id && request.session_id == session_id &&
-            request.request_id != 0 &&
-            request.type == static_cast<std::uint8_t>(qi::WireControlType::Reset);
+            request.request_id != 0 && (is_reset || is_pause_toggle);
         if (!valid_request)
         {
             result.success = 0;
             const std::string message = "invalid or stale backend control request";
             std::copy(message.begin(), message.end(), result.message.begin());
+        }
+        else if (is_pause_toggle)
+        {
+            if (window == nullptr)
+            {
+                result.success = 0;
+                const std::string message = "pause toggle requires GUI mode";
+                std::copy(message.begin(), message.end(), result.message.begin());
+            }
+            else
+            {
+                window->toggle_pause();
+                result.success = 1;
+                const std::string message = window->paused()
+                    ? "simulation paused"
+                    : "simulation resumed";
+                std::copy(message.begin(), message.end(), result.message.begin());
+            }
         }
         else
         {
@@ -296,7 +318,8 @@ int run_physics_loop(
     std::uint64_t command_version = 0;
     while (!stop_requested.load() && (window == nullptr || !window->should_close()))
     {
-        process_control_requests(layout, io, startup_id, session_id, command_version);
+        process_control_requests(
+            layout, io, startup_id, session_id, command_version, window);
 
         const auto now = clock::now();
         if (window != nullptr && now >= next_visual_sync)

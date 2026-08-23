@@ -8,7 +8,7 @@ output:
 
 profiles:
   xbox:
-    match: ["xbox", "xinput", "f710", "gamepad"]
+    match: ["xbox", "xinput", "f710"]
     axes:
       lx: {index: 0, scale: -1.0}
       ly: {index: 1, scale: -1.0}
@@ -54,7 +54,7 @@ profiles:
       right_stick: 14
 
   beitong_btp_kp20d:
-    match: ["beitong", "btp-kp20d", "北通"]
+    match: ["beitong", "betop", "btp", "btp-kp20d", "kp20", "北通"]
     axes:
       lx: {index: 0, scale: -1.0}
       ly: {index: 1, scale: -1.0}
@@ -66,14 +66,14 @@ profiles:
     buttons:
       a: 0
       b: 1
-      x: 2
+      x: [2, 3]
       y: 4
       lb: 6
-      rb: 5
+      rb: [5, 7]
       back: 10
       start: 11
-      guide: 8
-      left_stick: 9
+      guide: [8, 12]
+      left_stick: [9, 13]
       right_stick: 14
 
   shamohu:

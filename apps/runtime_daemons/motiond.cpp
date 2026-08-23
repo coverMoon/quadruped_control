@@ -5,21 +5,26 @@
 
 #include "quadruped/config/rl_config_loader.hpp"
 #include "quadruped/config/robot_config.hpp"
+#include "quadruped/config/policy_switch_loader.hpp"
 #include "quadruped/ipc/conversions.hpp"
 #include "quadruped/ipc/remote_robot_io.hpp"
 #include "quadruped/ipc/shared_memory.hpp"
 #include "quadruped/motion/motion_runtime.hpp"
 #include "quadruped/policy/torch_policy.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <csignal>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <thread>
+#include <vector>
+#include <utility>
 
 namespace qc = quadruped::core;
 namespace qi = quadruped::ipc;
@@ -31,8 +36,7 @@ namespace
 constexpr const char* kDefaultSharedMemoryName = "/quadruped_control_black";
 constexpr const char* kDefaultRobotConfigPath = QUADRUPED_DEFAULT_ROBOT_CONFIG_PATH;
 constexpr const char* kDefaultControllerConfigPath = QUADRUPED_DEFAULT_CONTROLLER_CONFIG_PATH;
-constexpr const char* kFlatPolicyConfigPath = QUADRUPED_FLAT_POLICY_CONFIG_PATH;
-constexpr const char* kObstaclePolicyConfigPath = QUADRUPED_OBSTACLE_POLICY_CONFIG_PATH;
+constexpr const char* kDefaultPolicySwitchConfigPath = QUADRUPED_DEFAULT_POLICY_SWITCH_CONFIG_PATH;
 constexpr std::int64_t kOpenTimeoutNs = 10'000'000'000;
 constexpr auto kPollInterval = std::chrono::microseconds(250);
 
@@ -43,15 +47,19 @@ struct Options
     std::string shared_memory_name{kDefaultSharedMemoryName};
     std::string robot_config_path{kDefaultRobotConfigPath};
     std::string controller_config_path{kDefaultControllerConfigPath};
-    std::string flat_policy_config_path{kFlatPolicyConfigPath};
-    std::string obstacle_policy_config_path{kObstaclePolicyConfigPath};
-    std::string initial_policy{"flat"};
+    std::string policy_switch_config_path{kDefaultPolicySwitchConfigPath};
+    std::string initial_policy{};
+};
+
+struct LoadedPolicy
+{
+    quadruped::motion::RlConfig config{};
+    std::unique_ptr<quadruped::policy::TorchPolicy> policy{};
 };
 
 struct Policies
 {
-    std::unique_ptr<quadruped::policy::TorchPolicy> flat{};
-    std::unique_ptr<quadruped::policy::TorchPolicy> obstacle{};
+    std::vector<LoadedPolicy> entries{};
 };
 
 void handle_signal(int)
@@ -68,9 +76,8 @@ bool parse_args(int argc, char** argv, Options& options)
         {
             std::cout << "用法: " << argv[0]
                       << " [--shm <名称>] [--robot-config <路径>]"
-                      << " [--controller-config <路径>] [--flat-policy-config <路径>]"
-                      << " [--obstacle-policy-config <路径>]"
-                      << " [--initial-policy flat|obstacle]\n";
+                      << " [--controller-config <路径>] [--policy-switch-config <路径>]"
+                      << " [--initial-policy <策略名>]\n";
             std::exit(0);
         }
         if (i + 1 >= argc)
@@ -90,13 +97,9 @@ bool parse_args(int argc, char** argv, Options& options)
         {
             options.controller_config_path = value;
         }
-        else if (arg == "--flat-policy-config")
+        else if (arg == "--policy-switch-config")
         {
-            options.flat_policy_config_path = value;
-        }
-        else if (arg == "--obstacle-policy-config")
-        {
-            options.obstacle_policy_config_path = value;
+            options.policy_switch_config_path = value;
         }
         else if (arg == "--initial-policy")
         {
@@ -107,7 +110,7 @@ bool parse_args(int argc, char** argv, Options& options)
             return false;
         }
     }
-    return options.initial_policy == "flat" || options.initial_policy == "obstacle";
+    return true;
 }
 
 qi::SharedMemory::OpenResult wait_for_shared_memory(const std::string& name)
@@ -133,42 +136,91 @@ bool load_policies(
     Policies& policies,
     std::string& error_message)
 {
-    const auto flat_config = quadruped::config::load_rl_config(
-        options.flat_policy_config_path, QUADRUPED_PROJECT_SOURCE_DIR, model);
-    const auto obstacle_config = quadruped::config::load_rl_config(
-        options.obstacle_policy_config_path, QUADRUPED_PROJECT_SOURCE_DIR, model);
-    if (!flat_config.ok() || !obstacle_config.ok())
+    const std::filesystem::path switch_path(options.policy_switch_config_path);
+    const auto switch_config = quadruped::config::load_policy_switch_config(
+        options.policy_switch_config_path, model.name, switch_path.parent_path().string());
+    for (const std::string& warning : switch_config.warnings)
     {
-        error_message = flat_config.ok() ? obstacle_config.error_message : flat_config.error_message;
+        std::cerr << "策略配置警告: " << warning << '\n';
+    }
+    if (!switch_config.ok())
+    {
+        error_message = switch_config.error_message;
         return false;
     }
 
-    auto flat = quadruped::policy::TorchPolicy::create(flat_config.config);
-    auto obstacle = quadruped::policy::TorchPolicy::create(obstacle_config.config);
-    if (!flat.ok() || !obstacle.ok())
+    const std::string initial_policy = options.initial_policy.empty()
+        ? switch_config.config.policy_names.front()
+        : options.initial_policy;
+    if (std::find(
+            switch_config.config.policy_names.begin(),
+            switch_config.config.policy_names.end(),
+            initial_policy) == switch_config.config.policy_names.end())
     {
-        error_message = flat.ok() ? obstacle.error_message : flat.error_message;
+        error_message = "initial policy is not in policy_config_cycle: " + initial_policy;
         return false;
     }
 
-    if (options.initial_policy == "obstacle")
+    policies.entries.reserve(switch_config.config.policy_names.size());
+    for (const std::string& policy_name : switch_config.config.policy_names)
     {
-        if (!runtime.attach_policy(obstacle_config.config, *obstacle.policy, error_message) ||
-            !runtime.register_policy(flat_config.config, *flat.policy, error_message))
+        const std::filesystem::path policy_path = switch_path.parent_path() / (policy_name + ".yaml");
+        const auto loaded = quadruped::config::load_rl_config(
+            policy_path.string(), QUADRUPED_PROJECT_SOURCE_DIR, model);
+        if (!loaded.ok())
+        {
+            error_message = loaded.error_message;
+            return false;
+        }
+        if (loaded.config.name != policy_name)
+        {
+            error_message = "policy config name does not match cycle item: " + policy_name;
+            return false;
+        }
+        auto policy = quadruped::policy::TorchPolicy::create(loaded.config);
+        if (!policy.ok())
+        {
+            error_message = policy.error_message;
+            return false;
+        }
+        policies.entries.push_back({loaded.config, std::move(policy.policy)});
+    }
+
+    auto initial = std::find_if(
+        policies.entries.begin(), policies.entries.end(),
+        [&initial_policy](const LoadedPolicy& entry)
+        {
+            return entry.config.name == initial_policy;
+        });
+    if (initial == policies.entries.end())
+    {
+        error_message = "initial policy was not loaded: " + initial_policy;
+        return false;
+    }
+    if (!runtime.attach_policy(initial->config, *initial->policy, error_message))
+    {
+        return false;
+    }
+    for (auto& entry : policies.entries)
+    {
+        if (&entry == &*initial)
+        {
+            continue;
+        }
+        if (!runtime.register_policy(entry.config, *entry.policy, error_message))
         {
             return false;
         }
     }
-    else
+    std::string configure_error;
+    if (!runtime.set_policy_cycle(
+            switch_config.config.policy_names,
+            switch_config.config.posture_transition_cycles,
+            configure_error))
     {
-        if (!runtime.attach_policy(flat_config.config, *flat.policy, error_message) ||
-            !runtime.register_policy(obstacle_config.config, *obstacle.policy, error_message))
-        {
-            return false;
-        }
+        error_message = configure_error;
+        return false;
     }
-    policies.flat = std::move(flat.policy);
-    policies.obstacle = std::move(obstacle.policy);
     return true;
 }
 

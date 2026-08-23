@@ -322,7 +322,16 @@ core::ModeResult MotionRuntime::dispatch_switch_policy(
             reason.c_str());
     }
 
-    const std::size_t target_index = find_policy(request.policy_name);
+    const std::string target_name =
+        request.policy_name == "toggle" || request.policy_name == "next"
+        ? next_policy_name()
+        : request.policy_name;
+    if (target_name.empty())
+    {
+        return make_result(request.request_id, core::ModeResultState::Rejected,
+            "policy switch cycle is not configured");
+    }
+    const std::size_t target_index = find_policy(target_name);
     if (target_index == kInvalidPolicyIndex)
     {
         return make_result(request.request_id, core::ModeResultState::Rejected,
@@ -364,7 +373,7 @@ core::ModeResult MotionRuntime::dispatch_switch_policy(
     {
         interp_target_[i] = target.config.default_joint_positions[i];
     }
-    interp_total_cycles_ = kPolicyTransitionCycles;
+    interp_total_cycles_ = policy_transition_cycles_;
     interp_elapsed_cycles_ = 0;
     status_.behavior_phase = "policy_transition";
     return make_result(request.request_id, core::ModeResultState::Accepted,

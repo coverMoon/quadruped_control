@@ -21,6 +21,7 @@ target_compile_definitions(quadruped_config_tests PRIVATE
     QUADRUPED_ROBOT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/robots/black.yaml"
     QUADRUPED_CONTROLLER_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/controllers/black.yaml"
     QUADRUPED_SIMULATION_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/simulation/black_mujoco.yaml"
+    QUADRUPED_POLICY_SWITCH_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/black/policy_switch.yaml"
 )
 
 quadruped_add_test(quadruped_motion_tests motion_tests.cpp)

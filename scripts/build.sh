@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 文件：build.sh
-# 作用：提供 core、backend、motion、command 和默认全量构建的唯一公共入口。
+# 作用：提供 CMake、ROS 2 和默认全量构建的唯一公共入口。
 
 set -euo pipefail
 
@@ -21,7 +21,7 @@ usage() {
   --backend NAME      backend 类型，目前仅支持 mujoco
   --mujoco            兼容入口，等价 --target backend --backend mujoco
   --rl                兼容入口，构建 backend 和 motion 的 RL profile
-  --clean             清理所选 CMake profile；command 清理 ROS 2 临时工作区
+  --clean             清理所选 CMake profile；command 清理固定 ROS 2 工作区
   --no-test           构建后不运行 CTest
 USAGE
 }
@@ -87,13 +87,14 @@ build_cmake_profile() {
 
 build_command() {
     local ros_setup="${ROS_SETUP:-/opt/ros/humble/setup.bash}"
-    local workspace_root="${QUADRUPED_ROS2_WORKSPACE_ROOT:-/tmp/quadruped_control_ros2_ws_stage8}"
-    if [[ ! -f "${ros_setup}" ]]; then
-        echo "未找到 ROS 2 环境脚本: ${ros_setup}" >&2; exit 1
+    local workspace_root="${QUADRUPED_ROS2_WORKSPACE_ROOT:-${build_root}/ros2}"
+    local clean_option=()
+    if [[ "${clean_build}" == true ]]; then
+        clean_option=(--clean)
     fi
-    if [[ "${clean_build}" == true ]]; then cmake -E remove_directory "${workspace_root}"; fi
-    QUADRUPED_ROS2_WORKSPACE_ROOT="${workspace_root}" \
-        "${project_dir}/scripts/build/ros2.sh"
+    ROS_SETUP="${ros_setup}" \
+        QUADRUPED_ROS2_WORKSPACE_ROOT="${workspace_root}" \
+        "${project_dir}/scripts/setup/ros2.sh" "${clean_option[@]}"
 }
 
 case "${target}" in
