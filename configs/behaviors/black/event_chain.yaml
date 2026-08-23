@@ -1,0 +1,19 @@
+# 文件：event_chain.yaml
+# 作用：预留 black 与 blackW 一致的 Event chain 配置结构并明确禁用轮式事件。
+robot_name: black
+joint_names:
+  [FL_hip_joint, FL_thigh_joint, FL_calf_joint,
+   FR_hip_joint, FR_thigh_joint, FR_calf_joint,
+   RL_hip_joint, RL_thigh_joint, RL_calf_joint,
+   RR_hip_joint, RR_thigh_joint, RR_calf_joint]
+exit_to_rl_cycles: 300
+interpolation: smoothstep
+
+# black 没有 Wheel 关节，轮参数不伪造；空事件列表表示阶段 9 尚未启用具体任务。
+wheel_radius: null
+wheel_velocity_sign: []
+kp: [80.0, 80.0, 80.0, 80.0, 80.0, 80.0,
+     80.0, 80.0, 80.0, 80.0, 80.0, 80.0]
+kd: [3.0, 3.0, 3.0, 3.0, 3.0, 3.0,
+     3.0, 3.0, 3.0, 3.0, 3.0, 3.0]
+events: []

@@ -305,6 +305,9 @@ struct MotionStatus
 
     // 当前策略是否已经完成加载并可以执行推理。
     bool policy_ready{false};
+
+    // 当前策略允许的 vx、vy、wz 绝对值上限；未加载策略时均为 0。
+    std::array<double, 3> command_limits{};
 };
 
 }  // 命名空间 quadruped::core

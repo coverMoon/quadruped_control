@@ -67,7 +67,7 @@ constexpr auto kStatusPeriod = std::chrono::milliseconds(50);
 constexpr auto kKeyboardPollPeriod = std::chrono::milliseconds(50);
 constexpr std::int64_t kDefaultJoyTimeoutNs = 250'000'000;
 constexpr double kKeyboardIncrement = 0.1;
-constexpr std::array<double, 3> kManualCommandLimits{3.0, 1.0, 3.0};
+constexpr std::array<double, 3> kFallbackCommandLimits{3.0, 1.0, 3.0};
 
 struct JoyEdgeState
 {
@@ -80,6 +80,10 @@ struct JoyEdgeState
     bool passive_combo{false};
     bool reset_combo{false};
     bool rl_combo{false};
+    bool event_chain_combo{false};
+    bool bridge_combo{false};
+    bool low_bar_combo{false};
+    bool car_combo{false};
     bool pause_combo{false};
 };
 
@@ -160,6 +164,8 @@ public:
             joy_timeout_ns_ = kDefaultJoyTimeoutNs;
         }
         keyboard_enabled_ = declare_parameter<bool>("keyboard_enabled", true);
+        fixed_drive_keys_enabled_ = declare_parameter<bool>(
+            "fixed_drive_keys_enabled", false);
         joy_require_connection_frame_ = declare_parameter<bool>(
             "joy_require_connection_frame", true);
         joy_topic_ = declare_parameter<std::string>("joy_topic", "/joy");
@@ -419,13 +425,13 @@ private:
         command.source = source;
         command.priority = priority;
         command.vx = std::isfinite(vx)
-            ? std::clamp(vx, -kManualCommandLimits[0], kManualCommandLimits[0])
+            ? std::clamp(vx, -command_limit(0), command_limit(0))
             : 0.0;
         command.vy = std::isfinite(vy)
-            ? std::clamp(vy, -kManualCommandLimits[1], kManualCommandLimits[1])
+            ? std::clamp(vy, -command_limit(1), command_limit(1))
             : 0.0;
         command.wz = std::isfinite(wz)
-            ? std::clamp(wz, -kManualCommandLimits[2], kManualCommandLimits[2])
+            ? std::clamp(wz, -command_limit(2), command_limit(2))
             : 0.0;
         published_command_vx_.store(command.vx);
         published_command_vy_.store(command.vy);
@@ -498,11 +504,11 @@ private:
         if (manual_input_active_.load())
         {
             const double vx = std::clamp(static_cast<double>(message.axes[1]), -1.0, 1.0) *
-                kManualCommandLimits[0];
+                command_limit(0);
             const double vy = std::clamp(static_cast<double>(message.axes[0]), -1.0, 1.0) *
-                kManualCommandLimits[1];
+                command_limit(1);
             const double wz = std::clamp(static_cast<double>(message.axes[3]), -1.0, 1.0) *
-                kManualCommandLimits[2];
+                command_limit(2);
             set_manual_command(vx, vy, wz);
         }
         publish_joy_edges(message);
@@ -510,9 +516,30 @@ private:
 
     void set_manual_command(const double vx, const double vy, const double wz)
     {
-        manual_vx_.store(std::clamp(vx, -kManualCommandLimits[0], kManualCommandLimits[0]));
-        manual_vy_.store(std::clamp(vy, -kManualCommandLimits[1], kManualCommandLimits[1]));
-        manual_wz_.store(std::clamp(wz, -kManualCommandLimits[2], kManualCommandLimits[2]));
+        manual_vx_.store(std::clamp(vx, -command_limit(0), command_limit(0)));
+        manual_vy_.store(std::clamp(vy, -command_limit(1), command_limit(1)));
+        manual_wz_.store(std::clamp(wz, -command_limit(2), command_limit(2)));
+    }
+
+    [[nodiscard]] double command_limit(const std::size_t axis) const noexcept
+    {
+        return command_limits_[axis].load();
+    }
+
+    void update_command_limits(const std::array<double, 3>& limits)
+    {
+        for (std::size_t axis = 0; axis < limits.size(); ++axis)
+        {
+            if (!std::isfinite(limits[axis]) || limits[axis] <= 0.0)
+            {
+                return;
+            }
+        }
+        for (std::size_t axis = 0; axis < limits.size(); ++axis)
+        {
+            command_limits_[axis].store(limits[axis]);
+        }
+        set_manual_command(manual_vx_.load(), manual_vy_.load(), manual_wz_.load());
     }
 
     void refresh_manual_command()
@@ -568,6 +595,10 @@ private:
         const bool passive_combo = lb && x;
         const bool reset_combo = rb && y;
         const bool rl_combo = rb && dpad_up;
+        const bool event_chain_combo = lb && dpad_up;
+        const bool bridge_combo = rb && dpad_right;
+        const bool low_bar_combo = rb && dpad_down;
+        const bool car_combo = rb && dpad_left;
         const bool pause_combo = rb && x;
 
         if (a && !last_joy_buttons_.a)
@@ -599,15 +630,29 @@ private:
             // 旧 rl_sar 使用 RB+DPadUp 进入基础 locomotion，不能只依赖单独的数字键。
             submit_start_rl_behavior();
         }
+        if (event_chain_combo && !last_joy_buttons_.event_chain_combo)
+        {
+            submit_keyboard_request(qc::ModeRequestType::StartBehavior, "event_chain");
+        }
+        if (fixed_drive_keys_enabled_ && bridge_combo &&
+            !last_joy_buttons_.bridge_combo)
+        {
+            submit_keyboard_request(qc::ModeRequestType::StartBehavior, "bridge_drive");
+        }
+        if (fixed_drive_keys_enabled_ && low_bar_combo &&
+            !last_joy_buttons_.low_bar_combo)
+        {
+            submit_keyboard_request(qc::ModeRequestType::StartBehavior, "low_bar_drive");
+        }
+        if (fixed_drive_keys_enabled_ && car_combo && !last_joy_buttons_.car_combo)
+        {
+            submit_keyboard_request(qc::ModeRequestType::StartBehavior, "car_drive");
+        }
         if (pause_combo && !last_joy_buttons_.pause_combo)
         {
             submit_backend_pause_toggle();
         }
 
-        // 这些组合属于 blackW 专用行为；black 当前没有对应行为名，因此不伪造公共模式。
-        static_cast<void>(dpad_down);
-        static_cast<void>(dpad_left);
-        static_cast<void>(dpad_right);
         last_joy_buttons_.a = a;
         last_joy_buttons_.b = b;
         last_joy_buttons_.x = x;
@@ -617,6 +662,10 @@ private:
         last_joy_buttons_.passive_combo = passive_combo;
         last_joy_buttons_.reset_combo = reset_combo;
         last_joy_buttons_.rl_combo = rl_combo;
+        last_joy_buttons_.event_chain_combo = event_chain_combo;
+        last_joy_buttons_.bridge_combo = bridge_combo;
+        last_joy_buttons_.low_bar_combo = low_bar_combo;
+        last_joy_buttons_.car_combo = car_combo;
         last_joy_buttons_.pause_combo = pause_combo;
     }
 
@@ -972,7 +1021,9 @@ private:
         request.startup_id = heartbeat.startup_id;
         request.session_id = session_id;
         request.request_id = ++local_request_id_;
-        request.type = static_cast<std::uint8_t>(qi::WireControlType::Reset);
+        // 用户按键只复位仿真姿态，不建立新会话，保持当前运动行为。
+        request.type =
+            static_cast<std::uint8_t>(qi::WireControlType::SimulationStateReset);
         std::lock_guard<std::mutex> lock(request_mutex_);
         if (!qi::queue_push(memory_->layout().control_requests, request))
         {
@@ -1074,8 +1125,28 @@ private:
         {
         case '0': submit_keyboard_request(qc::ModeRequestType::GetUp); return;
         case '1': submit_start_rl_behavior(); return;
-        case '2': submit_keyboard_request(qc::ModeRequestType::SwitchPolicy, {}, "toggle"); return;
-        case '3': submit_keyboard_request(qc::ModeRequestType::SwitchPolicy, {}, "toggle"); return;
+        case '2':
+            submit_keyboard_request(fixed_drive_keys_enabled_
+                    ? qc::ModeRequestType::StartBehavior
+                    : qc::ModeRequestType::SwitchPolicy,
+                fixed_drive_keys_enabled_ ? "bridge_drive" : "",
+                fixed_drive_keys_enabled_ ? "" : "toggle");
+            return;
+        case '3':
+            submit_keyboard_request(fixed_drive_keys_enabled_
+                    ? qc::ModeRequestType::StartBehavior
+                    : qc::ModeRequestType::SwitchPolicy,
+                fixed_drive_keys_enabled_ ? "low_bar_drive" : "",
+                fixed_drive_keys_enabled_ ? "" : "toggle");
+            return;
+        case '4':
+            if (fixed_drive_keys_enabled_)
+            {
+                submit_keyboard_request(qc::ModeRequestType::StartBehavior, "car_drive");
+            }
+            return;
+        case '6': submit_keyboard_request(
+            qc::ModeRequestType::StartBehavior, "event_chain"); return;
         case '9': submit_keyboard_request(qc::ModeRequestType::GetDown); return;
         case 'p': submit_keyboard_request(qc::ModeRequestType::EnterPassive); return;
         case 'r': submit_backend_reset(); return;
@@ -1090,7 +1161,9 @@ private:
         case 'h':
             RCLCPP_INFO(
                 get_logger(),
-                "0 Stand 1 RL locomotion 2/3 Switch policy 9 Lie down P Passive "
+                "0 Stand 1 RL locomotion 2/3 Switch policy or Bridge/Low-bar "
+                "4 Car 6 Event chain "
+                "9 Lie down P Passive "
                 "R Reset Enter Pause/continue W/S A/D Q/E Command speed "
                 "Space Clear command N Navigation X Exit");
             return;
@@ -1168,6 +1241,10 @@ private:
                       << " policy=" << policy
                       << " input=" << input
                       << " command=" << vx << "," << vy << "," << wz;
+            if (!motion_status.error_message.empty())
+            {
+                std::cout << " error=" << motion_status.error_message;
+            }
         }
         std::cout << std::flush;
         terminal_status_rendered_ = true;
@@ -1201,6 +1278,11 @@ private:
             output.policy_name = motion_status.policy_name;
             output.error_message = motion_status.error_message;
             output.policy_ready = motion_status.policy_ready;
+            output.command_limits = motion_status.command_limits;
+            if (motion_status.policy_ready)
+            {
+                update_command_limits(motion_status.command_limits);
+            }
             current_mode_.store(static_cast<std::uint8_t>(motion_status.mode));
             {
                 std::lock_guard<std::mutex> lock(policy_mutex_);
@@ -1266,6 +1348,7 @@ private:
     std::int64_t command_timeout_ns_{kDefaultCommandTimeoutNs};
     std::int64_t joy_timeout_ns_{kDefaultJoyTimeoutNs};
     bool keyboard_enabled_{true};
+    bool fixed_drive_keys_enabled_{false};
     bool joy_require_connection_frame_{true};
     bool terminal_ui_enabled_{false};
     std::uint64_t gateway_startup_id_{0};
@@ -1280,6 +1363,8 @@ private:
     std::atomic<double> manual_vx_{0.0};
     std::atomic<double> manual_vy_{0.0};
     std::atomic<double> manual_wz_{0.0};
+    std::array<std::atomic<double>, 3> command_limits_{
+        kFallbackCommandLimits[0], kFallbackCommandLimits[1], kFallbackCommandLimits[2]};
     // 最近一次实际发布给 MotionRuntime 的机体速度指令，单位为 m/s、m/s、rad/s。
     std::atomic<double> published_command_vx_{0.0};
     std::atomic<double> published_command_vy_{0.0};

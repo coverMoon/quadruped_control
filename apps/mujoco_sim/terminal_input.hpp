@@ -18,13 +18,16 @@ namespace quadruped::apps::mujoco_sim
 class TerminalInput
 {
 public:
-    explicit TerminalInput(std::array<double, 3> command_limits);
+    TerminalInput(std::array<double, 3> command_limits, bool fixed_drive_enabled);
     TerminalInput(const TerminalInput&) = delete;
     TerminalInput& operator=(const TerminalInput&) = delete;
     ~TerminalInput();
 
     // 消费当前已经到达的全部字符，并返回持久速度和一次性模式事件。
     [[nodiscard]] SimInput poll(bool velocity_enabled);
+
+    // 更新当前策略的速度上限，并立即收紧已经累积的键盘速度。
+    void set_command_limits(const std::array<double, 3>& command_limits);
 
     [[nodiscard]] bool interactive() const noexcept
     {
@@ -48,6 +51,7 @@ private:
     termios original_termios_{};
     bool interactive_{false};
     bool warned_outside_running_{false};
+    bool fixed_drive_enabled_{false};
 };
 
 }  // 命名空间 quadruped::apps::mujoco_sim

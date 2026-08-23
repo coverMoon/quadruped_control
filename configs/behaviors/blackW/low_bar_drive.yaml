@@ -1,0 +1,31 @@
+# 文件：low_bar_drive.yaml
+# 作用：配置直接对照 rl_sar 的 blackW 低矮通道固定姿态差速轮行为。
+behavior_name: low_bar_drive
+robot_name: blackW
+joint_names:
+  [FL_hip_joint, FL_thigh_joint, FL_calf_joint, FL_wheel_joint,
+   FR_hip_joint, FR_thigh_joint, FR_calf_joint, FR_wheel_joint,
+   RL_hip_joint, RL_thigh_joint, RL_calf_joint, RL_wheel_joint,
+   RR_hip_joint, RR_thigh_joint, RR_calf_joint, RR_wheel_joint]
+prepare_cycles: 150
+exit_to_rl_cycles: 150
+max_x: 2.0
+max_yaw: 3.0
+wheel_velocity_scale: 10.0
+yaw_to_wheel_velocity: 5.0
+wheel_velocity_sign: [1.0, -1.0, 1.0, -1.0]
+wheel_sides: [left, right, left, right]
+# 原配置前小腿目标为 ±2.52 rad；按本仓库显式 URDF 限位收敛到 ±2.5 rad。
+target_joint_positions:
+  [0.32, 1.4, -2.5, 0.0,
+   -0.32, -1.4, 2.5, 0.0,
+   -0.32, 1.4, -2.48, 0.0,
+   0.32, -1.4, 2.48, 0.0]
+kp: [100.0, 100.0, 100.0, 0.0,
+     100.0, 100.0, 100.0, 0.0,
+     100.0, 100.0, 100.0, 0.0,
+     100.0, 100.0, 100.0, 0.0]
+kd: [5.0, 5.0, 5.0, 2.0,
+     5.0, 5.0, 5.0, 2.0,
+     5.0, 5.0, 5.0, 2.0,
+     5.0, 5.0, 5.0, 2.0]

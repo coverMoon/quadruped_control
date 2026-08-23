@@ -155,10 +155,15 @@ joy_require_connection_frame=true
 if [[ "${start_controller}" != true ]]; then
     joy_require_connection_frame=false
 fi
+fixed_drive_keys_enabled=false
+if [[ "${robot_name}" == "blackW" ]]; then
+    fixed_drive_keys_enabled=true
+fi
 "${gateway}" \
     --ros-args \
     -p "shared_memory_name:=${shm_name}" \
     -p "keyboard_enabled:=${keyboard_enabled}" \
+    -p "fixed_drive_keys_enabled:=${fixed_drive_keys_enabled}" \
     -p "joy_require_connection_frame:=${joy_require_connection_frame}" \
     -p "joy_topic:=/joy" \
     "${extra_ros_args[@]}" &

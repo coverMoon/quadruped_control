@@ -7,6 +7,7 @@
 
 #include "quadruped/core/validation.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <string>
@@ -62,6 +63,286 @@ MotionRuntime::CreateResult MotionRuntime::create(
     }
     result.runtime.reset(new MotionRuntime(std::move(model), config));
     return result;
+}
+
+bool MotionRuntime::configure_retry(RetryConfig config, std::string& error_message)
+{
+    if (config.robot_name != model_.name || config.joint_count != model_.joint_count)
+    {
+        error_message = "Retry config does not match RobotModel";
+        return false;
+    }
+    if (config.prepare_cycles == 0)
+    {
+        error_message = "Retry prepare_cycles must be positive";
+        return false;
+    }
+    for (std::size_t i = 0; i < model_.joint_count; ++i)
+    {
+        const auto& joint = model_.joints[i];
+        if (config.joint_names[i] != joint.name)
+        {
+            error_message = "Retry joint order mismatch at index " + std::to_string(i);
+            return false;
+        }
+        const double position = config.target_positions[i];
+        if (!std::isfinite(position) || !std::isfinite(config.kp[i]) ||
+            !std::isfinite(config.kd[i]) || config.kp[i] < 0.0 || config.kd[i] < 0.0 ||
+            config.kp[i] > joint.limits.max_kp || config.kd[i] > joint.limits.max_kd)
+        {
+            error_message = "Retry joint values are invalid at index " + std::to_string(i);
+            return false;
+        }
+        if (joint.limits.position_limited &&
+            (position < joint.limits.min_position || position > joint.limits.max_position))
+        {
+            error_message = "Retry target exceeds position limits at index " +
+                std::to_string(i);
+            return false;
+        }
+        if (joint.role == core::JointRole::Wheel && config.kp[i] != 0.0)
+        {
+            error_message = "Retry wheel KP must be zero at index " + std::to_string(i);
+            return false;
+        }
+    }
+    retry_config_ = std::move(config);
+    retry_configured_ = true;
+    error_message.clear();
+    return true;
+}
+
+bool MotionRuntime::configure_fixed_drive(
+    FixedDriveConfig config,
+    std::string& error_message)
+{
+    if (config.behavior_name != "car_drive" &&
+        config.behavior_name != "bridge_drive" &&
+        config.behavior_name != "low_bar_drive")
+    {
+        error_message = "Fixed drive behavior name is invalid";
+        return false;
+    }
+    if (config.robot_name != model_.name || config.joint_count != model_.joint_count ||
+        config.prepare_cycles == 0 || config.exit_to_rl_cycles == 0)
+    {
+        error_message = "Fixed drive config does not match RobotModel";
+        return false;
+    }
+    if (find_fixed_drive(config.behavior_name) != kInvalidFixedDriveIndex)
+    {
+        error_message = "Fixed drive behavior is already configured";
+        return false;
+    }
+    if (!std::isfinite(config.max_x) || config.max_x <= 0.0 ||
+        !std::isfinite(config.max_yaw) || config.max_yaw <= 0.0 ||
+        !std::isfinite(config.wheel_velocity_scale) ||
+        config.wheel_velocity_scale <= 0.0 ||
+        !std::isfinite(config.yaw_to_wheel_velocity) ||
+        config.yaw_to_wheel_velocity <= 0.0)
+    {
+        error_message = "Fixed drive limits and velocity scales are invalid";
+        return false;
+    }
+
+    std::size_t wheel_count = 0;
+    bool has_left = false;
+    bool has_right = false;
+    for (std::size_t i = 0; i < model_.joint_count; ++i)
+    {
+        const auto& joint = model_.joints[i];
+        if (config.joint_names[i] != joint.name ||
+            !std::isfinite(config.target_positions[i]) ||
+            !std::isfinite(config.kp[i]) || !std::isfinite(config.kd[i]) ||
+            config.kp[i] < 0.0 || config.kd[i] < 0.0 ||
+            config.kp[i] > joint.limits.max_kp || config.kd[i] > joint.limits.max_kd)
+        {
+            error_message = "Fixed drive joint values are invalid at index " +
+                std::to_string(i);
+            return false;
+        }
+        if (joint.limits.position_limited &&
+            (config.target_positions[i] < joint.limits.min_position ||
+                config.target_positions[i] > joint.limits.max_position))
+        {
+            error_message = "Fixed drive pose exceeds limits at index " +
+                std::to_string(i);
+            return false;
+        }
+        if (joint.role == core::JointRole::Wheel)
+        {
+            if (config.kp[i] != 0.0 || wheel_count >= config.wheel_count ||
+                !std::isfinite(config.wheel_velocity_sign[wheel_count]) ||
+                config.wheel_velocity_sign[wheel_count] == 0.0 ||
+                (config.wheel_sides[wheel_count] != WheelSide::Left &&
+                    config.wheel_sides[wheel_count] != WheelSide::Right))
+            {
+                error_message = "Fixed drive Wheel mapping is invalid";
+                return false;
+            }
+            has_left = has_left ||
+                config.wheel_sides[wheel_count] == WheelSide::Left;
+            has_right = has_right ||
+                config.wheel_sides[wheel_count] == WheelSide::Right;
+            ++wheel_count;
+        }
+    }
+    if (wheel_count == 0 || config.wheel_count != wheel_count || !has_left || !has_right)
+    {
+        error_message = "Fixed drive Wheel count or side mapping is invalid";
+        return false;
+    }
+    const double worst_velocity = config.wheel_velocity_scale * config.max_x +
+        config.yaw_to_wheel_velocity * config.max_yaw;
+    for (std::size_t i = 0; i < model_.joint_count; ++i)
+    {
+        if (model_.joints[i].role == core::JointRole::Wheel &&
+            worst_velocity > model_.joints[i].limits.max_velocity)
+        {
+            error_message = "Fixed drive maximum Wheel velocity exceeds limits";
+            return false;
+        }
+    }
+
+    for (std::size_t i = 0; i < fixed_drive_configs_.size(); ++i)
+    {
+        if (!fixed_drive_configured_[i])
+        {
+            fixed_drive_configs_[i] = std::move(config);
+            fixed_drive_configured_[i] = true;
+            error_message.clear();
+            return true;
+        }
+    }
+    error_message = "Fixed drive registry is full";
+    return false;
+}
+
+bool MotionRuntime::configure_event_chain(
+    EventChainConfig config,
+    std::string& error_message)
+{
+    if (config.robot_name != model_.name || config.joint_count != model_.joint_count)
+    {
+        error_message = "Event chain config does not match RobotModel";
+        return false;
+    }
+    if (config.exit_to_rl_cycles == 0 ||
+        (config.interpolation != "linear" && config.interpolation != "smoothstep"))
+    {
+        error_message = "Event chain timing or interpolation is invalid";
+        return false;
+    }
+    if (config.event_count == 0 || config.event_count > config.events.size())
+    {
+        error_message = "Event chain must contain at least one event";
+        return false;
+    }
+    std::size_t model_wheel_count = 0;
+    for (std::size_t i = 0; i < model_.joint_count; ++i)
+    {
+        const auto& joint = model_.joints[i];
+        if (config.joint_names[i] != joint.name)
+        {
+            error_message = "Event chain joint order mismatch at index " +
+                std::to_string(i);
+            return false;
+        }
+        if (!std::isfinite(config.kp[i]) || !std::isfinite(config.kd[i]) ||
+            config.kp[i] < 0.0 || config.kd[i] < 0.0 ||
+            config.kp[i] > joint.limits.max_kp || config.kd[i] > joint.limits.max_kd ||
+            (joint.role == core::JointRole::Wheel && config.kp[i] != 0.0))
+        {
+            error_message = "Event chain gains are invalid at index " + std::to_string(i);
+            return false;
+        }
+        if (joint.role == core::JointRole::Wheel)
+        {
+            ++model_wheel_count;
+        }
+    }
+    if (config.wheel_count != model_wheel_count ||
+        (model_wheel_count > 0 &&
+            (!std::isfinite(config.wheel_radius) || config.wheel_radius <= 0.0)))
+    {
+        error_message = "Event chain wheel parameters do not match RobotModel";
+        return false;
+    }
+    for (std::size_t i = 0; i < config.wheel_count; ++i)
+    {
+        if (!std::isfinite(config.wheel_velocity_sign[i]) ||
+            config.wheel_velocity_sign[i] == 0.0)
+        {
+            error_message = "Event chain wheel velocity sign is invalid";
+            return false;
+        }
+    }
+    for (std::size_t i = 0; i < config.event_count; ++i)
+    {
+        const auto& event = config.events[i];
+        if (event.type != EventType::Pose && event.type != EventType::Drive &&
+            event.type != EventType::PoseDrive)
+        {
+            error_message = "Event chain event type is unknown";
+            return false;
+        }
+        const bool uses_pose = event.type == EventType::Pose ||
+            event.type == EventType::PoseDrive;
+        const bool uses_wheel = event.type == EventType::Drive ||
+            event.type == EventType::PoseDrive;
+        if (event.name.empty())
+        {
+            error_message = "Event chain event name is empty";
+            return false;
+        }
+        if (uses_wheel && model_wheel_count == 0)
+        {
+            error_message = "Event chain wheel event is not supported by this RobotModel";
+            return false;
+        }
+        if (uses_wheel &&
+            ((event.wheel_group != WheelGroup::Front &&
+                 event.wheel_group != WheelGroup::Rear &&
+                 event.wheel_group != WheelGroup::All) ||
+                !std::isfinite(event.distance_m) || event.distance_m == 0.0 ||
+                !std::isfinite(event.speed_mps) || event.speed_mps <= 0.0 ||
+                event.timeout_cycles == 0))
+        {
+            error_message = "Event chain wheel event parameters are invalid";
+            return false;
+        }
+        if (uses_pose)
+        {
+            if (event.transition_cycles == 0)
+            {
+                error_message = "Event chain pose transition must be positive";
+                return false;
+            }
+            for (std::size_t joint_index = 0; joint_index < model_.joint_count; ++joint_index)
+            {
+                const double position = event.dof_positions[joint_index];
+                const auto& limits = model_.joints[joint_index].limits;
+                if (!std::isfinite(position) ||
+                    (limits.position_limited &&
+                        (position < limits.min_position || position > limits.max_position)))
+                {
+                    error_message = "Event chain pose is invalid at joint index " +
+                        std::to_string(joint_index);
+                    return false;
+                }
+            }
+        }
+        if (event.type == EventType::PoseDrive &&
+            event.timeout_cycles < event.transition_cycles)
+        {
+            error_message = "Event chain pose-drive timeout is shorter than transition";
+            return false;
+        }
+    }
+    event_chain_config_ = std::move(config);
+    event_chain_configured_ = true;
+    error_message.clear();
+    return true;
 }
 
 bool MotionRuntime::attach_policy(
@@ -202,14 +483,20 @@ void MotionRuntime::activate_policy(const std::size_t policy_index)
     current_policy_index_ = policy_index;
     pending_policy_index_ = kInvalidPolicyIndex;
     policy_transition_active_ = false;
+    event_to_rl_transition_ = false;
+    fixed_drive_to_rl_transition_ = false;
+    active_fixed_drive_index_ = kInvalidFixedDriveIndex;
+    retry_locked_ = false;
     rl_controller_ = entry.controller.get();
     policy_ = entry.policy;
     policy_name_ = entry.config.name;
     rl_control_cycle_ = 0;
     rl_command_ = {};
+    latest_inference_elapsed_ns_ = 0;
     rl_controller_->reset();
     status_.policy_name = policy_name_;
     status_.policy_ready = true;
+    status_.command_limits = entry.config.command_limits;
 }
 
 std::size_t MotionRuntime::find_policy(const std::string& name) const
@@ -224,13 +511,34 @@ std::size_t MotionRuntime::find_policy(const std::string& name) const
     return kInvalidPolicyIndex;
 }
 
+std::size_t MotionRuntime::find_fixed_drive(const std::string& name) const
+{
+    for (std::size_t i = 0; i < fixed_drive_configs_.size(); ++i)
+    {
+        if (fixed_drive_configured_[i] &&
+            fixed_drive_configs_[i].behavior_name == name)
+        {
+            return i;
+        }
+    }
+    return kInvalidFixedDriveIndex;
+}
+
 bool MotionRuntime::pose_close_to_policy(
     const RlConfig& config,
     const std::array<double, core::kMaxJoints>& positions) const
 {
-    for (std::size_t i = 0; i < kRlJointCount; ++i)
+    for (std::size_t action_index = 0;
+         action_index < config.action_dimension;
+         ++action_index)
     {
-        if (std::abs(positions[i] - config.default_joint_positions[i]) >
+        const std::size_t joint_index = config.policy_dof_indices[action_index];
+        if (model_.joints[joint_index].role == core::JointRole::Wheel)
+        {
+            continue;
+        }
+        if (std::abs(positions[joint_index] -
+                config.default_joint_positions[action_index]) >
             kPolicyPoseTolerance)
         {
             return false;
@@ -268,8 +576,15 @@ bool MotionRuntime::track_session(const core::StateFrame& state)
     getup_second_phase_ = false;
     rl_control_cycle_ = 0;
     rl_command_ = {};
+    latest_inference_elapsed_ns_ = 0;
     pending_policy_index_ = kInvalidPolicyIndex;
     policy_transition_active_ = false;
+    event_to_rl_transition_ = false;
+    fixed_drive_to_rl_transition_ = false;
+    active_fixed_drive_index_ = kInvalidFixedDriveIndex;
+    event_initialized_ = false;
+    event_motion_complete_ = false;
+    event_chain_complete_ = false;
     if (rl_controller_ != nullptr)
     {
         rl_controller_->reset();
@@ -302,6 +617,10 @@ void MotionRuntime::fail_active_motion(const std::string& reason)
     abort_active_request(reason);
     pending_policy_index_ = kInvalidPolicyIndex;
     policy_transition_active_ = false;
+    event_to_rl_transition_ = false;
+    fixed_drive_to_rl_transition_ = false;
+    active_fixed_drive_index_ = kInvalidFixedDriveIndex;
+    retry_locked_ = false;
     rl_control_cycle_ = 0;
     rl_command_ = {};
     if (rl_controller_ != nullptr)
@@ -343,11 +662,19 @@ core::RobotIOCode MotionRuntime::submit_command(
             continue;
         }
         joint.mode = core::ControlMode::JointImpedance;
-        joint.target_position = submission.positions[i];
-        joint.target_velocity = submission.velocities == nullptr
-            ? 0.0
-            : (*submission.velocities)[i];
-        joint.kp = submission.kp == nullptr ? config_.fixed_kp[i] : (*submission.kp)[i];
+        const bool is_wheel = model_.joints[i].role == core::JointRole::Wheel;
+        const auto& limits = model_.joints[i].limits;
+        joint.target_position = is_wheel
+            ? current_positions_[i]
+            : (limits.position_limited
+                      ? std::clamp(
+                            submission.positions[i], limits.min_position, limits.max_position)
+                      : submission.positions[i]);
+        joint.target_velocity = submission.velocities == nullptr ? 0.0
+                                                                  : (*submission.velocities)[i];
+        joint.kp = is_wheel ? 0.0
+                            : (submission.kp == nullptr ? config_.fixed_kp[i]
+                                                        : (*submission.kp)[i]);
         joint.kd = submission.kd == nullptr ? config_.fixed_kd[i] : (*submission.kd)[i];
         joint.feedforward_effort = 0.0;
     }
@@ -481,8 +808,12 @@ bool MotionRuntime::run_rl_mode(
         {
             return fail("RL observation failed: " + observation.error_message);
         }
-        rl_controller_->insert_observation(observation.observation);
+        if (!rl_controller_->insert_observation(observation))
+        {
+            return fail("RL observation history insertion failed");
+        }
         const auto inference = policy_->forward(rl_controller_->inference_input());
+        latest_inference_elapsed_ns_ = inference.elapsed_ns;
         if (!inference.ok)
         {
             return fail("RL inference failed: " + inference.error_message);
@@ -492,7 +823,7 @@ bool MotionRuntime::run_rl_mode(
             return fail("RL inference exceeded deadline: " +
                 std::to_string(inference.elapsed_ns / 1'000'000) + " ms");
         }
-        rl_command_ = rl_controller_->convert_actions(inference.actions, current_positions_);
+        rl_command_ = rl_controller_->convert_actions(inference, current_positions_);
         if (!rl_command_.ok)
         {
             return fail("RL action conversion failed: " + rl_command_.error_message);
@@ -525,6 +856,424 @@ bool MotionRuntime::run_rl_mode(
     return false;
 }
 
+bool MotionRuntime::run_retry_mode(
+    core::RobotIO& io,
+    const StateRead& state,
+    MotionUpdateOutput& output)
+{
+    if (!state.usable)
+    {
+        fail_active_motion(state.failure_reason);
+        return true;
+    }
+    if (std::string reason; !check_active_preconditions(reason))
+    {
+        fail_active_motion(reason);
+        output.submit_code = submit_command(io, {current_positions_, false, state.now_ns});
+        output.submitted = true;
+        return true;
+    }
+
+    if (has_active_request_ && active_result_.state == core::ModeResultState::Accepted)
+    {
+        active_result_.state = core::ModeResultState::Running;
+    }
+    std::array<double, core::kMaxJoints> positions = retry_config_.target_positions;
+    if (!retry_locked_)
+    {
+        ++interp_elapsed_cycles_;
+        const double percent = static_cast<double>(interp_elapsed_cycles_) /
+            static_cast<double>(interp_total_cycles_);
+        for (std::size_t i = 0; i < model_.joint_count; ++i)
+        {
+            positions[i] = (1.0 - percent) * interp_start_[i] +
+                percent * retry_config_.target_positions[i];
+        }
+        if (interp_elapsed_cycles_ >= interp_total_cycles_)
+        {
+            retry_locked_ = true;
+            status_.behavior_phase = "locked";
+            complete_active_request("retry locked");
+        }
+    }
+
+    std::array<double, core::kMaxJoints> velocities{};
+    status_.active_source = core::CommandSource::None;
+    output.submit_code = submit_command(io,
+        {positions,
+            true,
+            state.now_ns,
+            &velocities,
+            &retry_config_.kp,
+            &retry_config_.kd,
+            core::CommandSource::None});
+    output.submitted = true;
+    if (output.submit_code != core::RobotIOCode::Ok)
+    {
+        fail_active_motion("Retry command submit failed");
+        return true;
+    }
+    return false;
+}
+
+bool MotionRuntime::run_fixed_drive_mode(
+    core::RobotIO& io,
+    const StateRead& state,
+    const core::BaseCommand* const base_command,
+    MotionUpdateOutput& output)
+{
+    const auto fail = [&](const std::string& reason) {
+        fail_active_motion(reason);
+        if (state.usable)
+        {
+            output.submit_code = submit_command(io, {current_positions_, false, state.now_ns});
+            output.submitted = true;
+        }
+        return true;
+    };
+    if (!state.usable)
+    {
+        return fail(state.failure_reason);
+    }
+    if (std::string reason; !check_active_preconditions(reason))
+    {
+        return fail(reason);
+    }
+    if (active_fixed_drive_index_ == kInvalidFixedDriveIndex ||
+        !fixed_drive_configured_[active_fixed_drive_index_])
+    {
+        return fail("Fixed drive runtime state is invalid");
+    }
+    if (has_active_request_ && active_result_.state == core::ModeResultState::Accepted)
+    {
+        active_result_.state = core::ModeResultState::Running;
+    }
+
+    const auto& fixed = fixed_drive_configs_[active_fixed_drive_index_];
+    std::array<double, core::kMaxJoints> positions = fixed.target_positions;
+    if (interp_elapsed_cycles_ < interp_total_cycles_)
+    {
+        ++interp_elapsed_cycles_;
+        const double percent = static_cast<double>(interp_elapsed_cycles_) /
+            static_cast<double>(interp_total_cycles_);
+        for (std::size_t i = 0; i < model_.joint_count; ++i)
+        {
+            if (model_.joints[i].role != core::JointRole::Wheel)
+            {
+                positions[i] = (1.0 - percent) * interp_start_[i] +
+                    percent * fixed.target_positions[i];
+            }
+        }
+        status_.behavior_phase = interp_elapsed_cycles_ >= interp_total_cycles_
+            ? "driving"
+            : "preparing";
+        if (interp_elapsed_cycles_ >= interp_total_cycles_)
+        {
+            complete_active_request("fixed drive pose ready");
+        }
+    }
+    else
+    {
+        status_.behavior_phase = "driving";
+    }
+
+    const bool command_usable = base_command != nullptr &&
+        core::validate(*base_command, state.now_ns).ok();
+    const double x = command_usable
+        ? std::clamp(base_command->vx, -fixed.max_x, fixed.max_x)
+        : 0.0;
+    const double yaw = command_usable
+        ? std::clamp(base_command->wz, -fixed.max_yaw, fixed.max_yaw)
+        : 0.0;
+    const double left_velocity =
+        fixed.wheel_velocity_scale * x - fixed.yaw_to_wheel_velocity * yaw;
+    const double right_velocity =
+        fixed.wheel_velocity_scale * x + fixed.yaw_to_wheel_velocity * yaw;
+    std::array<double, core::kMaxJoints> velocities{};
+    std::size_t wheel_id = 0;
+    for (std::size_t i = 0; i < model_.joint_count; ++i)
+    {
+        if (model_.joints[i].role != core::JointRole::Wheel)
+        {
+            continue;
+        }
+        positions[i] = current_positions_[i];
+        const double side_velocity = fixed.wheel_sides[wheel_id] == WheelSide::Left
+            ? left_velocity
+            : right_velocity;
+        velocities[i] = fixed.wheel_velocity_sign[wheel_id] * side_velocity;
+        ++wheel_id;
+    }
+
+    status_.active_source = command_usable
+        ? base_command->source
+        : core::CommandSource::None;
+    output.submit_code = submit_command(io,
+        {positions,
+            true,
+            state.now_ns,
+            &velocities,
+            &fixed.kp,
+            &fixed.kd,
+            status_.active_source});
+    output.submitted = true;
+    if (output.submit_code != core::RobotIOCode::Ok)
+    {
+        return fail("Fixed drive command submit failed");
+    }
+    return false;
+}
+
+bool MotionRuntime::run_event_chain_mode(
+    core::RobotIO& io,
+    const StateRead& state,
+    MotionUpdateOutput& output)
+{
+    const auto fail = [&](const std::string& reason) {
+        fail_active_motion(reason);
+        if (state.usable)
+        {
+            output.submit_code = submit_command(io, {current_positions_, false, state.now_ns});
+            output.submitted = true;
+        }
+        return true;
+    };
+    if (!state.usable)
+    {
+        return fail(state.failure_reason);
+    }
+    if (std::string reason; !check_active_preconditions(reason))
+    {
+        return fail(reason);
+    }
+    if (!event_chain_configured_ || event_index_ >= event_chain_config_.event_count)
+    {
+        return fail("Event chain runtime state is invalid");
+    }
+    if (has_active_request_ && active_result_.state == core::ModeResultState::Accepted)
+    {
+        active_result_.state = core::ModeResultState::Running;
+    }
+
+    std::array<double, core::kMaxJoints> positions = event_active_pose_;
+    std::array<double, core::kMaxJoints> velocities{};
+    for (std::size_t i = 0; i < model_.joint_count; ++i)
+    {
+        if (model_.joints[i].role == core::JointRole::Wheel)
+        {
+            positions[i] = current_positions_[i];
+        }
+    }
+
+    if (event_chain_complete_)
+    {
+        status_.behavior_phase = "completed";
+    }
+    else
+    {
+        const auto& event = event_chain_config_.events[event_index_];
+        status_.behavior_phase = event.name;
+        if (!event_initialized_)
+        {
+            event_initialized_ = true;
+            event_motion_complete_ = false;
+            event_cycle_ = 0;
+            event_hold_cycle_ = 0;
+            event_segment_start_ = event_active_pose_;
+            std::size_t wheel_id = 0;
+            for (std::size_t i = 0; i < model_.joint_count; ++i)
+            {
+                if (model_.joints[i].role == core::JointRole::Wheel)
+                {
+                    event_drive_start_[wheel_id] = current_positions_[i];
+                    ++wheel_id;
+                }
+            }
+        }
+
+        const auto wheel_selected = [&](const std::size_t wheel_id) {
+            const std::size_t front_count = event_chain_config_.wheel_count / 2;
+            return event.wheel_group == WheelGroup::All ||
+                (event.wheel_group == WheelGroup::Front && wheel_id < front_count) ||
+                (event.wheel_group == WheelGroup::Rear && wheel_id >= front_count);
+        };
+        const auto drive_distance = [&]() {
+            double distance_sum = 0.0;
+            std::size_t selected_count = 0;
+            std::size_t wheel_id = 0;
+            for (std::size_t i = 0; i < model_.joint_count; ++i)
+            {
+                if (model_.joints[i].role != core::JointRole::Wheel)
+                {
+                    continue;
+                }
+                if (wheel_selected(wheel_id))
+                {
+                    const double direction =
+                        event_chain_config_.wheel_velocity_sign[wheel_id] > 0.0 ? 1.0 : -1.0;
+                    distance_sum += direction *
+                        (current_positions_[i] - event_drive_start_[wheel_id]) *
+                        event_chain_config_.wheel_radius;
+                    ++selected_count;
+                }
+                ++wheel_id;
+            }
+            return selected_count == 0
+                ? 0.0
+                : distance_sum / static_cast<double>(selected_count);
+        };
+        const auto apply_wheel_drive = [&]() {
+            const double travel_direction = event.distance_m > 0.0 ? 1.0 : -1.0;
+            const double wheel_speed = travel_direction * event.speed_mps /
+                event_chain_config_.wheel_radius;
+            std::size_t wheel_id = 0;
+            for (std::size_t i = 0; i < model_.joint_count; ++i)
+            {
+                if (model_.joints[i].role != core::JointRole::Wheel)
+                {
+                    continue;
+                }
+                if (wheel_selected(wheel_id))
+                {
+                    const double direction =
+                        event_chain_config_.wheel_velocity_sign[wheel_id] > 0.0 ? 1.0 : -1.0;
+                    velocities[i] = direction * wheel_speed;
+                }
+                ++wheel_id;
+            }
+        };
+        const auto apply_pose = [&](const double alpha) {
+            for (std::size_t i = 0; i < model_.joint_count; ++i)
+            {
+                if (model_.joints[i].role != core::JointRole::Wheel)
+                {
+                    positions[i] = (1.0 - alpha) * event_segment_start_[i] +
+                        alpha * event.dof_positions[i];
+                }
+            }
+        };
+        const auto target_reached = [&](const double distance) {
+            return event.distance_m > 0.0
+                ? distance >= event.distance_m
+                : distance <= event.distance_m;
+        };
+
+        if (event.type == EventType::Pose && !event_motion_complete_)
+        {
+            ++event_cycle_;
+            double alpha = static_cast<double>(event_cycle_) /
+                static_cast<double>(event.transition_cycles);
+            alpha = std::min(alpha, 1.0);
+            if (event_chain_config_.interpolation == "smoothstep")
+            {
+                alpha = alpha * alpha * (3.0 - 2.0 * alpha);
+            }
+            apply_pose(alpha);
+            if (event_cycle_ >= event.transition_cycles)
+            {
+                event_active_pose_ = event.dof_positions;
+                event_motion_complete_ = true;
+            }
+        }
+        else if (event.type == EventType::Drive && !event_motion_complete_)
+        {
+            const double distance = drive_distance();
+            if (target_reached(distance))
+            {
+                event_motion_complete_ = true;
+            }
+            else if (event_cycle_ >= event.timeout_cycles)
+            {
+                return fail("Event chain drive timed out: " + event.name);
+            }
+            else
+            {
+                apply_wheel_drive();
+                ++event_cycle_;
+            }
+        }
+        else if (event.type == EventType::PoseDrive && !event_motion_complete_)
+        {
+            const double distance = drive_distance();
+            const bool drive_complete = target_reached(distance);
+            const bool pose_complete_before_cycle =
+                event_cycle_ >= event.transition_cycles;
+            if ((!drive_complete || !pose_complete_before_cycle) &&
+                event_cycle_ >= event.timeout_cycles)
+            {
+                return fail("Event chain pose-drive timed out: " + event.name);
+            }
+
+            ++event_cycle_;
+            double alpha = std::min(
+                static_cast<double>(event_cycle_) /
+                    static_cast<double>(event.transition_cycles),
+                1.0);
+            if (event_chain_config_.interpolation == "smoothstep")
+            {
+                alpha = alpha * alpha * (3.0 - 2.0 * alpha);
+            }
+            apply_pose(alpha);
+            if (event_cycle_ >= event.transition_cycles)
+            {
+                event_active_pose_ = event.dof_positions;
+            }
+            if (!drive_complete)
+            {
+                apply_wheel_drive();
+            }
+            event_motion_complete_ =
+                event_cycle_ >= event.transition_cycles && drive_complete;
+        }
+
+        if (event_motion_complete_)
+        {
+            positions = event_active_pose_;
+            for (std::size_t i = 0; i < model_.joint_count; ++i)
+            {
+                if (model_.joints[i].role == core::JointRole::Wheel)
+                {
+                    positions[i] = current_positions_[i];
+                }
+            }
+            if (event_hold_cycle_ < event.hold_cycles)
+            {
+                ++event_hold_cycle_;
+            }
+            else if (event_index_ + 1 >= event_chain_config_.event_count)
+            {
+                event_chain_complete_ = true;
+                status_.behavior_phase = "completed";
+                complete_active_request("Event chain completed");
+            }
+            else
+            {
+                ++event_index_;
+                event_initialized_ = false;
+                event_motion_complete_ = false;
+                event_cycle_ = 0;
+                event_hold_cycle_ = 0;
+            }
+        }
+    }
+
+    status_.active_source = core::CommandSource::None;
+    output.submit_code = submit_command(io,
+        {positions,
+            true,
+            state.now_ns,
+            &velocities,
+            &event_chain_config_.kp,
+            &event_chain_config_.kd,
+            core::CommandSource::None});
+    output.submitted = true;
+    if (output.submit_code != core::RobotIOCode::Ok)
+    {
+        return fail("Event chain command submit failed");
+    }
+    return false;
+}
+
 bool MotionRuntime::run_policy_transition(
     core::RobotIO& io,
     const StateRead& state,
@@ -548,8 +1297,12 @@ bool MotionRuntime::run_policy_transition(
     if (interp_elapsed_cycles_ < interp_total_cycles_)
     {
         ++interp_elapsed_cycles_;
-        const double percent = static_cast<double>(interp_elapsed_cycles_) /
+        double percent = static_cast<double>(interp_elapsed_cycles_) /
             static_cast<double>(interp_total_cycles_);
+        if (event_to_rl_transition_ && event_chain_config_.interpolation == "smoothstep")
+        {
+            percent = percent * percent * (3.0 - 2.0 * percent);
+        }
         for (std::size_t i = 0; i < model_.joint_count; ++i)
         {
             positions[i] = (1.0 - percent) * interp_start_[i] +
@@ -559,7 +1312,21 @@ bool MotionRuntime::run_policy_transition(
 
     status_.active_source = core::CommandSource::None;
     status_.behavior_phase = "policy_transition";
-    output.submit_code = submit_command(io, {positions, true, state.now_ns});
+    const std::array<double, core::kMaxJoints>* kp = nullptr;
+    const std::array<double, core::kMaxJoints>* kd = nullptr;
+    if (event_to_rl_transition_)
+    {
+        kp = &event_chain_config_.kp;
+        kd = &event_chain_config_.kd;
+    }
+    else if (fixed_drive_to_rl_transition_ &&
+        active_fixed_drive_index_ != kInvalidFixedDriveIndex)
+    {
+        kp = &fixed_drive_configs_[active_fixed_drive_index_].kp;
+        kd = &fixed_drive_configs_[active_fixed_drive_index_].kd;
+    }
+    output.submit_code = submit_command(io,
+        {positions, true, state.now_ns, nullptr, kp, kd, core::CommandSource::None});
     output.submitted = true;
     if (output.submit_code != core::RobotIOCode::Ok)
     {
@@ -572,7 +1339,10 @@ bool MotionRuntime::run_policy_transition(
         const std::size_t target_index = pending_policy_index_;
         activate_policy(target_index);
         status_.behavior_phase = "starting";
-        complete_active_request("policy switched");
+        const char* message = active_request_type_ == core::ModeRequestType::SwitchPolicy
+            ? "policy switched"
+            : "behavior started";
+        complete_active_request(message);
     }
     return false;
 }
@@ -602,14 +1372,30 @@ MotionUpdateOutput MotionRuntime::update(core::RobotIO& io, const MotionUpdateIn
     }
     else if (mode_ == core::MotionMode::Running)
     {
-        failed_this_cycle = run_rl_mode(io, state, input.base_command, output);
+        if (status_.behavior_name == "retry")
+        {
+            failed_this_cycle = run_retry_mode(io, state, output);
+        }
+        else if (status_.behavior_name == "event_chain")
+        {
+            failed_this_cycle = run_event_chain_mode(io, state, output);
+        }
+        else if (find_fixed_drive(status_.behavior_name) != kInvalidFixedDriveIndex)
+        {
+            failed_this_cycle =
+                run_fixed_drive_mode(io, state, input.base_command, output);
+        }
+        else
+        {
+            failed_this_cycle = run_rl_mode(io, state, input.base_command, output);
+        }
     }
     else
     {
         failed_this_cycle = run_active_mode(io, state, output);
     }
 
-    if (!failed_this_cycle && output.submitted &&
+    if (mode_ != core::MotionMode::Passive && !failed_this_cycle && output.submitted &&
         output.submit_code == core::RobotIOCode::Ok)
     {
         status_.error_message.clear();
@@ -624,6 +1410,20 @@ MotionUpdateOutput MotionRuntime::update(core::RobotIO& io, const MotionUpdateIn
 
     status_.mode = mode_;
     output.status = status_;
+    const core::RobotIOStatus io_status = io.status();
+    output.diagnostics.startup_id = startup_id_;
+    output.diagnostics.session_id = session_id_;
+    output.diagnostics.command_sequence = command_sequence_;
+    output.diagnostics.dropped_state_frames = io_status.dropped_state_frames;
+    output.diagnostics.rejected_command_frames = io_status.rejected_command_frames;
+    output.diagnostics.inference_elapsed_ns = latest_inference_elapsed_ns_;
+    if (state.usable)
+    {
+        output.diagnostics.state_sequence = state.frame.header.sequence;
+        output.diagnostics.effective_command_sequence =
+            state.frame.effective_command_sequence;
+        output.diagnostics.state_age_ns = input.now_ns - state.frame.header.timestamp_ns;
+    }
     return output;
 }
 

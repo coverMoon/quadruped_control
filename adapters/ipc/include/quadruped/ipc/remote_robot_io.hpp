@@ -26,9 +26,15 @@ public:
     [[nodiscard]] bool backend_online() const noexcept;
 
 private:
+    [[nodiscard]] bool read_backend_heartbeat(WireHeartbeat& heartbeat) const noexcept;
+
     SharedMemory& memory_;
     core::RobotModel model_{};
     mutable core::RobotIOStatus cached_status_{};
+    mutable WireHeartbeat cached_backend_heartbeat_{};
+    mutable bool has_cached_backend_heartbeat_{false};
+    core::StateFrame cached_state_{};
+    bool has_cached_state_{false};
 };
 
 }  // 命名空间 quadruped::ipc

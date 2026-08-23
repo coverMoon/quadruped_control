@@ -18,3 +18,4 @@ string behavior_phase
 string policy_name
 string error_message
 bool policy_ready
+float64[3] command_limits

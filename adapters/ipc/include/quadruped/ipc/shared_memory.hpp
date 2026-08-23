@@ -73,9 +73,17 @@ void publish_latest(LatestSlot<T>& slot, const T& value) noexcept
 template<typename T>
 bool read_latest(const LatestSlot<T>& slot, T& value, std::uint64_t* version = nullptr) noexcept
 {
-    for (int attempt = 0; attempt < 4; ++attempt)
+    // 连续四次立即重试很容易全部落在 500 Hz/1 kHz 发布窗口内，进而把
+    // 正常锁竞争误报为“无数据”。仍保持有界非阻塞，并避免失败读者反复写锁缓存行。
+    constexpr int kReadAttempts = 64;
+    for (int attempt = 0; attempt < kReadAttempts; ++attempt)
     {
-        if (slot.lock.exchange(1, std::memory_order_acquire) != 0)
+        std::uint32_t expected = 0;
+        if (!slot.lock.compare_exchange_weak(
+                expected,
+                1,
+                std::memory_order_acquire,
+                std::memory_order_relaxed))
         {
             continue;
         }

@@ -1,0 +1,8 @@
+# 文件：policy_switch.yaml
+# 作用：冻结 blackW 已确认策略的切换顺序和姿态过渡周期。
+blackW:
+  posture_transition_cycles: 200
+  policy_config_cycle:
+    - flat
+    - obstacle
+    - stair

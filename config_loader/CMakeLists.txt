@@ -4,6 +4,7 @@
 find_package(yaml-cpp REQUIRED)
 
 add_library(quadruped_config
+    src/behavior_config_loader.cpp
     src/controller_config_loader.cpp
     src/policy_switch_loader.cpp
     src/rl_config_loader.cpp

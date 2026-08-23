@@ -3,9 +3,10 @@
  * @brief 运行独立 MotionRuntime，连接共享内存 RobotIO、速度命令和可靠请求队列。
  */
 
+#include "quadruped/config/behavior_config_loader.hpp"
+#include "quadruped/config/policy_switch_loader.hpp"
 #include "quadruped/config/rl_config_loader.hpp"
 #include "quadruped/config/robot_config.hpp"
-#include "quadruped/config/policy_switch_loader.hpp"
 #include "quadruped/ipc/conversions.hpp"
 #include "quadruped/ipc/remote_robot_io.hpp"
 #include "quadruped/ipc/shared_memory.hpp"
@@ -37,6 +38,7 @@ constexpr const char* kDefaultSharedMemoryName = "/quadruped_control_black";
 constexpr const char* kDefaultRobotConfigPath = QUADRUPED_DEFAULT_ROBOT_CONFIG_PATH;
 constexpr const char* kDefaultControllerConfigPath = QUADRUPED_DEFAULT_CONTROLLER_CONFIG_PATH;
 constexpr const char* kDefaultPolicySwitchConfigPath = QUADRUPED_DEFAULT_POLICY_SWITCH_CONFIG_PATH;
+constexpr const char* kDefaultRetryConfigPath = QUADRUPED_DEFAULT_RETRY_CONFIG_PATH;
 constexpr std::int64_t kOpenTimeoutNs = 10'000'000'000;
 constexpr auto kPollInterval = std::chrono::microseconds(250);
 
@@ -48,7 +50,11 @@ struct Options
     std::string robot_config_path{kDefaultRobotConfigPath};
     std::string controller_config_path{kDefaultControllerConfigPath};
     std::string policy_switch_config_path{kDefaultPolicySwitchConfigPath};
+    std::string retry_config_path{kDefaultRetryConfigPath};
+    std::string event_chain_config_path{};
+    std::string fixed_drive_config_dir{};
     std::string initial_policy{};
+    bool load_policy{true};
 };
 
 struct LoadedPolicy
@@ -77,8 +83,16 @@ bool parse_args(int argc, char** argv, Options& options)
             std::cout << "用法: " << argv[0]
                       << " [--shm <名称>] [--robot-config <路径>]"
                       << " [--controller-config <路径>] [--policy-switch-config <路径>]"
-                      << " [--initial-policy <策略名>]\n";
+                      << " [--retry-config <路径>] [--initial-policy <策略名>]"
+                      << " [--event-chain-config <路径>]"
+                      << " [--fixed-drive-config-dir <目录>]"
+                      << " [--no-policy]\n";
             std::exit(0);
+        }
+        if (arg == "--no-policy")
+        {
+            options.load_policy = false;
+            continue;
         }
         if (i + 1 >= argc)
         {
@@ -104,6 +118,18 @@ bool parse_args(int argc, char** argv, Options& options)
         else if (arg == "--initial-policy")
         {
             options.initial_policy = value;
+        }
+        else if (arg == "--retry-config")
+        {
+            options.retry_config_path = value;
+        }
+        else if (arg == "--event-chain-config")
+        {
+            options.event_chain_config_path = value;
+        }
+        else if (arg == "--fixed-drive-config-dir")
+        {
+            options.fixed_drive_config_dir = value;
         }
         else
         {
@@ -289,9 +315,58 @@ int run(const Options& options)
         std::cerr << "创建 MotionRuntime 失败: " << runtime.error_message << '\n';
         return 1;
     }
+    const auto retry = quadruped::config::load_retry_config(
+        options.retry_config_path, model.model);
+    if (!retry.ok())
+    {
+        std::cerr << "加载 Retry 配置失败: " << retry.error_message << '\n';
+        return 1;
+    }
+    std::string behavior_error;
+    if (!runtime.runtime->configure_retry(retry.config, behavior_error))
+    {
+        std::cerr << "配置 Retry 失败: " << behavior_error << '\n';
+        return 1;
+    }
+    if (!options.event_chain_config_path.empty())
+    {
+        const auto event_chain = quadruped::config::load_event_chain_config(
+            options.event_chain_config_path, model.model);
+        if (!event_chain.ok() ||
+            !runtime.runtime->configure_event_chain(event_chain.config, behavior_error))
+        {
+            const std::string reason = event_chain.ok()
+                ? behavior_error
+                : event_chain.error_message;
+            std::cerr << "配置 Event chain 失败: " << reason << '\n';
+            return 1;
+        }
+    }
+    if (!options.fixed_drive_config_dir.empty())
+    {
+        constexpr const char* kFixedDriveFiles[] = {
+            "bridge_drive.yaml", "low_bar_drive.yaml", "car_drive.yaml"};
+        for (const char* file : kFixedDriveFiles)
+        {
+            const std::filesystem::path path =
+                std::filesystem::path(options.fixed_drive_config_dir) / file;
+            const auto fixed = quadruped::config::load_fixed_drive_config(
+                path.string(), model.model);
+            if (!fixed.ok() ||
+                !runtime.runtime->configure_fixed_drive(fixed.config, behavior_error))
+            {
+                const std::string reason = fixed.ok()
+                    ? behavior_error
+                    : fixed.error_message;
+                std::cerr << "配置固定姿态轮驱失败: " << reason << '\n';
+                return 1;
+            }
+        }
+    }
     Policies policies;
     std::string policy_error;
-    if (!load_policies(options, model.model, *runtime.runtime, policies, policy_error))
+    if (options.load_policy &&
+        !load_policies(options, model.model, *runtime.runtime, policies, policy_error))
     {
         std::cerr << "加载策略失败: " << policy_error << '\n';
         return 1;

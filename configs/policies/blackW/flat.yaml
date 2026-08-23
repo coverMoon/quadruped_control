@@ -1,0 +1,53 @@
+# 文件：flat.yaml
+# 作用：记录 blackW 平地策略的已确认输入、输出和动作映射规格。
+name: flat
+robot_name: blackW
+model_path: assets/policies/blackW/flat/Flat_Jun26_20-12-37.pt
+
+observation_dimension: 57
+history_frames: [0, 1, 2, 3, 4, 5]
+inference_input_dimension: 342
+action_dimension: 16
+observation_order: [commands, angular_velocity, projected_gravity,
+                    joint_position_error, joint_velocity, previous_action]
+joint_names:
+  [FL_hip_joint, FL_thigh_joint, FL_calf_joint, FL_wheel_joint,
+   FR_hip_joint, FR_thigh_joint, FR_calf_joint, FR_wheel_joint,
+   RL_hip_joint, RL_thigh_joint, RL_calf_joint, RL_wheel_joint,
+   RR_hip_joint, RR_thigh_joint, RR_calf_joint, RR_wheel_joint]
+policy_dof_indices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+wheel_indices: [3, 7, 11, 15]
+
+command_scale: [2.0, 2.0, 0.25]
+command_limits: [2.0, 1.0, 3.0]
+angular_velocity_scale: 0.25
+joint_position_scale: 1.0
+joint_velocity_scale: 0.05
+observation_clip: 100.0
+
+default_joint_positions:
+  [0.05, 0.8014, -1.527, 0.0,
+   -0.05, -0.8014, 1.527, 0.0,
+   -0.05, 0.8014, -1.527, 0.0,
+   0.05, -0.8014, 1.527, 0.0]
+kp:
+  [50.0, 50.0, 50.0, 0.0,
+   50.0, 50.0, 50.0, 0.0,
+   50.0, 50.0, 50.0, 0.0,
+   50.0, 50.0, 50.0, 0.0]
+kd:
+  [1.2, 1.2, 1.2, 1.0,
+   1.2, 1.2, 1.2, 1.0,
+   1.2, 1.2, 1.2, 1.0,
+   1.2, 1.2, 1.2, 1.0]
+action_scale:
+  [0.25, 0.25, 0.25, 10.0,
+   0.25, 0.25, 0.25, -10.0,
+   0.25, 0.25, 0.25, 10.0,
+   0.25, 0.25, 0.25, -10.0]
+action_clip: 100.0
+max_position_jump: 1.0
+
+# 腿动作是相对默认姿态的位置残差；轮动作是目标速度，轮位置误差观测固定为 0。
+leg_action_mode: position_residual
+wheel_action_mode: target_velocity

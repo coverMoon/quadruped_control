@@ -1,6 +1,6 @@
 /**
  * @file rl_config_loader.hpp
- * @brief 声明精简的 black RL 策略配置加载接口。
+ * @brief 声明 black 与 blackW 共用的 RL 策略配置加载接口。
  */
 
 #pragma once

@@ -48,6 +48,26 @@ std::string SimController::reset_new_session()
     return {};
 }
 
+std::string SimController::reset_simulation_state(const int keyframe_id)
+{
+    const auto result = io_.reset_simulation_state(keyframe_id);
+    if (!result.ok())
+    {
+        return result.error_message;
+    }
+
+    core::StateFrame state;
+    if (io_.read_latest(state) != core::RobotIOCode::Ok)
+    {
+        return "simulation reset succeeded but state refresh failed";
+    }
+    latest_state_ns_ = state.header.timestamp_ns;
+    sim_time_ = static_cast<double>(latest_state_ns_) / 1.0e9;
+    // 复位后立即运行一次控制，避免短暂沿用复位前的执行目标。
+    next_control_ns_ = latest_state_ns_;
+    return {};
+}
+
 void SimController::apply_input(const SimInput& input)
 {
     base_command_.sequence = ++base_command_sequence_;
@@ -72,6 +92,18 @@ void SimController::apply_input(const SimInput& input)
     {
         type = qc::ModeRequestType::SwitchPolicy;
     }
+    else if (input.bridge_drive || input.low_bar_drive || input.car_drive)
+    {
+        type = qc::ModeRequestType::StartBehavior;
+    }
+    else if (input.retry)
+    {
+        type = qc::ModeRequestType::StartBehavior;
+    }
+    else if (input.event_chain)
+    {
+        type = qc::ModeRequestType::StartBehavior;
+    }
     else if (input.getdown)
     {
         type = qc::ModeRequestType::GetDown;
@@ -91,7 +123,30 @@ void SimController::apply_input(const SimInput& input)
     pending_request_.type = type;
     if (type == qc::ModeRequestType::StartBehavior)
     {
-        pending_request_.behavior_name = "rl_locomotion";
+        if (input.retry)
+        {
+            pending_request_.behavior_name = "retry";
+        }
+        else if (input.event_chain)
+        {
+            pending_request_.behavior_name = "event_chain";
+        }
+        else if (input.bridge_drive)
+        {
+            pending_request_.behavior_name = "bridge_drive";
+        }
+        else if (input.low_bar_drive)
+        {
+            pending_request_.behavior_name = "low_bar_drive";
+        }
+        else if (input.car_drive)
+        {
+            pending_request_.behavior_name = "car_drive";
+        }
+        else
+        {
+            pending_request_.behavior_name = "rl_locomotion";
+        }
     }
     else if (type == qc::ModeRequestType::SwitchPolicy)
     {

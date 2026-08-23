@@ -7,12 +7,13 @@ set -euo pipefail
 project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 robot_name="black"
 policy_name=""
+load_policy=true
 shm_name="${QUADRUPED_SHM_NAME:-}"
 positional_count=0
 
 usage() {
     cat <<USAGE
-用法: $0 [robot] [policy]
+用法: $0 [robot] [policy] [--no-policy]
 
 位置参数:
   robot                 机器人名称，默认 black
@@ -33,6 +34,10 @@ while (($# > 0)); do
             [[ $# -ge 2 ]] || { echo "--shm 缺少参数" >&2; exit 2; }
             shm_name="$2"
             shift 2
+            ;;
+        --no-policy)
+            load_policy=false
+            shift
             ;;
         --*)
             echo "未知选项: $1；配置路径由机器人和策略名称自动选择" >&2
@@ -61,9 +66,23 @@ fi
 robot_config="${project_dir}/configs/robots/${robot_name}.yaml"
 controller_config="${project_dir}/configs/controllers/${robot_name}.yaml"
 policy_switch_config="${project_dir}/configs/policies/${robot_name}/policy_switch.yaml"
+retry_config="${project_dir}/configs/behaviors/${robot_name}/retry.yaml"
+event_chain_config="${project_dir}/configs/behaviors/${robot_name}/event_chain.yaml"
+fixed_drive_config_dir="${project_dir}/configs/behaviors/${robot_name}"
 executable="${project_dir}/.build/rl/apps/runtime_daemons/quadruped_motiond"
-for required in "${executable}" "${robot_config}" "${controller_config}" \
-    "${policy_switch_config}"; do
+required_paths=("${executable}" "${robot_config}" "${controller_config}" "${retry_config}")
+if [[ "${load_policy}" == true ]]; then
+    required_paths+=("${policy_switch_config}")
+fi
+if [[ "${robot_name}" == "blackW" ]]; then
+    required_paths+=(
+        "${event_chain_config}"
+        "${fixed_drive_config_dir}/bridge_drive.yaml"
+        "${fixed_drive_config_dir}/low_bar_drive.yaml"
+        "${fixed_drive_config_dir}/car_drive.yaml"
+    )
+fi
+for required in "${required_paths[@]}"; do
     if [[ ! -e "${required}" ]]; then
         echo "缺少 motion 依赖或配置: ${required}" >&2
         echo "请先运行 ./scripts/build.sh --target motion" >&2
@@ -76,9 +95,18 @@ args=(
     "--shm" "${shm_name}"
     "--robot-config" "${robot_config}"
     "--controller-config" "${controller_config}"
-    "--policy-switch-config" "${policy_switch_config}"
+    "--retry-config" "${retry_config}"
 )
-if [[ -n "${policy_name}" ]]; then
+if [[ "${robot_name}" == "blackW" ]]; then
+    args+=("--event-chain-config" "${event_chain_config}")
+    args+=("--fixed-drive-config-dir" "${fixed_drive_config_dir}")
+fi
+if [[ "${load_policy}" == true ]]; then
+    args+=("--policy-switch-config" "${policy_switch_config}")
+else
+    args+=("--no-policy")
+fi
+if [[ "${load_policy}" == true && -n "${policy_name}" ]]; then
     args+=("--initial-policy" "${policy_name}")
 fi
 exec "${executable}" "${args[@]}"

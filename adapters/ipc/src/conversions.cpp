@@ -6,6 +6,7 @@
 #include "quadruped/ipc/conversions.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <limits>
 
@@ -335,6 +336,7 @@ WireMotionStatus to_wire(const core::MotionStatus& status)
     copy_string(status.policy_name, wire.policy_name);
     copy_string(status.error_message, wire.error_message);
     wire.policy_ready = status.policy_ready ? 1U : 0U;
+    wire.command_limits = status.command_limits;
     return wire;
 }
 
@@ -354,6 +356,15 @@ bool from_wire(const WireMotionStatus& wire, core::MotionStatus& status)
     status.policy_name = read_string(wire.policy_name);
     status.error_message = read_string(wire.error_message);
     status.policy_ready = wire.policy_ready != 0;
+    status.command_limits = wire.command_limits;
+    if (status.policy_ready &&
+        std::any_of(
+            status.command_limits.begin(),
+            status.command_limits.end(),
+            [](const double value) { return !std::isfinite(value) || value <= 0.0; }))
+    {
+        return false;
+    }
     return true;
 }
 

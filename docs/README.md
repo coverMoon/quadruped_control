@@ -11,6 +11,8 @@
 | [RL 与 MuJoCo 运行说明](rl_mujoco_runtime.md) | 操作与时序 | 构建、运行、按键控制、理解 200/50 Hz 时序 |
 | [系统架构](quadruped_control_architecture.md) | 长期约束 | 修改模块边界、RobotIO 或数据结构之前 |
 | [STM32H7 指导](STM32H7%20四足机器人下位机嵌入式开发指导.md) | 未来路线 | 开始下位机和实机通信开发时 |
+| [blackW 与共同行为开发指导](blackW_及共同行为开发指导.md) | 后续路线 | 开始 blackW、Retry 或 Event chain 开发前 |
+| [故障注入、诊断日志与回放](fault_logging_replay.md) | 当前能力 | 安全回归、问题复现或命令对比时 |
 
 根目录 [README](../README.md) 面向使用者说明环境搭建、构建、三进程启动、键盘和手柄操作；
 本目录保留更深入的设计与接口文档。

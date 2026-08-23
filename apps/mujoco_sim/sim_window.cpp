@@ -9,6 +9,7 @@
 #include "simulate.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <exception>
 #include <mutex>
@@ -51,6 +52,7 @@ public:
     std::unique_ptr<mujoco::Simulate> simulate{};
     mjModel* display_model{nullptr};
     mjData* display_data{nullptr};
+    std::atomic<bool> paused{false};
 };
 
 SimWindow::SimWindow(std::unique_ptr<Impl> impl) : impl_(std::move(impl)) {}
@@ -107,33 +109,57 @@ void SimWindow::load(
     focus_on_robot(impl_->display_model, impl_->display_data);
 }
 
-bool SimWindow::sync(const mjModel* const model, const mjData* const data)
+SimWindow::SimulationAction SimWindow::sync(
+    const mjModel* const model,
+    mjData* const data)
 {
     if (model == nullptr || data == nullptr || impl_->display_model == nullptr ||
         impl_->display_data == nullptr)
     {
-        return false;
+        return {};
     }
-    // pending_ 由渲染线程写入；持有官方互斥锁后取走 Reset，
-    // 防止 Simulate::Sync() 绕过上层会话状态单独执行 mj_resetData()。
-    mujoco::MutexLock lock(impl_->simulate->mtx);
-    const bool reset_requested = impl_->simulate->pending_.reset;
+    // pending_ 由渲染线程写入。先取走会改变 mjData 的动作，防止官方 Sync
+    // 只修改显示副本，随后又被物理数据覆盖而造成闪烁。
+    mujoco::MutexLock lock(impl_->simulate->mtx, std::try_to_lock);
+    if (!lock.owns_lock())
+    {
+        // 窗口线程持锁时跳过这一帧，不能让渲染事件阻塞物理步进和 heartbeat。
+        return {};
+    }
+    SimulationAction action;
+    if (impl_->simulate->pending_.load_key)
+    {
+        action.type = SimulationAction::Type::LoadKey;
+        action.keyframe_id = impl_->simulate->key;
+    }
+    else if (impl_->simulate->pending_.reset)
+    {
+        action.type = SimulationAction::Type::Reset;
+    }
     impl_->simulate->pending_.reset = false;
+    impl_->simulate->pending_.load_key = false;
     mj_copyData(impl_->display_data, impl_->display_model, data);
     impl_->simulate->Sync(true);
-    return reset_requested;
+    impl_->paused.store(impl_->simulate->run == 0, std::memory_order_release);
+    // 官方 passive viewer 把鼠标扰动力写入显示副本；显式复制回物理数据，
+    // 选择、拖拽和渲染仍留在 GUI 线程拥有的副本中。
+    mju_copy(
+        data->xfrc_applied,
+        impl_->display_data->xfrc_applied,
+        static_cast<int>(6 * model->nbody));
+    return action;
 }
 
 bool SimWindow::paused() const
 {
-    mujoco::MutexLock lock(impl_->simulate->mtx);
-    return impl_->simulate->run == 0;
+    return impl_->paused.load(std::memory_order_acquire);
 }
 
 void SimWindow::toggle_pause()
 {
     mujoco::MutexLock lock(impl_->simulate->mtx);
     impl_->simulate->run = impl_->simulate->run == 0 ? 1 : 0;
+    impl_->paused.store(impl_->simulate->run == 0, std::memory_order_release);
 }
 
 void SimWindow::focus_on_robot(const mjModel* const model, const mjData* const data)

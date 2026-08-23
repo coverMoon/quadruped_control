@@ -17,6 +17,19 @@ namespace quadruped::apps::mujoco_sim
 class SimWindow
 {
 public:
+    struct SimulationAction
+    {
+        enum class Type
+        {
+            None,
+            Reset,
+            LoadKey,
+        };
+
+        Type type{Type::None};
+        int keyframe_id{-1};
+    };
+
     struct CreateResult
     {
         std::unique_ptr<SimWindow> window{};
@@ -39,9 +52,9 @@ public:
     // 界面使用模型和数据的只读显示副本，不取得物理后端对象的所有权。
     void load(const mjModel* model, mjData* data, const std::string& displayed_filename);
 
-    // 同步官方界面输入；返回 true 表示用户点击了官方 Reset。
-    // 物理数据先复制到显示副本，界面 Reset 只返回请求，不直接修改物理后端。
-    [[nodiscard]] bool sync(const mjModel* model, const mjData* data);
+    // 非阻塞同步官方界面输入；窗口线程占锁时跳过当前显示帧，不阻塞物理循环。
+    // Reset 和 Load Key 只返回动作，由上层应用到物理后端。
+    [[nodiscard]] SimulationAction sync(const mjModel* model, mjData* data);
 
     // 返回官方界面的暂停状态；界面只提供暂停请求，物理步进由上层决定。
     [[nodiscard]] bool paused() const;

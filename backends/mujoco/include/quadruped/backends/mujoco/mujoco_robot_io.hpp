@@ -63,6 +63,11 @@ public:
     // session_id 必须非零；已建立会话后重复使用同一 session_id 会被拒绝。
     ResetResult reset(std::uint64_t session_id);
 
+    // 在当前会话内重置仿真物理状态，不改变 session_id、命令序号或上层运动模式。
+    // keyframe_id 为 -1 时恢复 MJCF 零位；否则加载指定 XML keyframe。
+    // 为保持帧时间单调，复位后继续使用复位前的仿真时间。
+    ResetResult reset_simulation_state(int keyframe_id = -1);
+
     // RobotIO 接口实现。
     core::RobotIOCode read_latest(core::StateFrame& frame) override;
     core::RobotIOCode submit(const core::CommandFrame& frame) override;

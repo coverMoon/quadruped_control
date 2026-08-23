@@ -1,0 +1,22 @@
+# 文件：blackW.yaml
+# 作用：定义 blackW 的统一关节顺序、功能角色和已确认的控制限值。
+name: blackW
+joints:
+  # 逻辑顺序固定为 FL、FR、RL、RR；每条腿固定 hip、thigh、calf、wheel。
+  # 腿部位置/速度/力矩限制来自 URDF，增益上限取当前参考控制配置的包络。
+  - {name: FL_hip_joint,   role: leg,   position_limited: true,  min_position: -0.5, max_position: 0.5,   max_velocity: 30.1,  max_effort: 23.7,  max_kp: 120.0, max_kd: 6.0}
+  - {name: FL_thigh_joint, role: leg,   position_limited: true,  min_position: -1.4, max_position: 3.0,   max_velocity: 30.1,  max_effort: 23.7,  max_kp: 120.0, max_kd: 6.0}
+  - {name: FL_calf_joint,  role: leg,   position_limited: true,  min_position: -2.5, max_position: -0.85, max_velocity: 12.04, max_effort: 59.25, max_kp: 120.0, max_kd: 6.0}
+  - {name: FL_wheel_joint, role: wheel, position_limited: false, min_position: 0.0,  max_position: 0.0,   max_velocity: 50.0,  max_effort: 20.0,  max_kp: 0.0,   max_kd: 6.0}
+  - {name: FR_hip_joint,   role: leg,   position_limited: true,  min_position: -0.5, max_position: 0.5,   max_velocity: 30.1,  max_effort: 23.7,  max_kp: 120.0, max_kd: 6.0}
+  - {name: FR_thigh_joint, role: leg,   position_limited: true,  min_position: -3.0, max_position: 1.4,   max_velocity: 30.1,  max_effort: 23.7,  max_kp: 120.0, max_kd: 6.0}
+  - {name: FR_calf_joint,  role: leg,   position_limited: true,  min_position: 0.85, max_position: 2.5,   max_velocity: 12.04, max_effort: 59.25, max_kp: 120.0, max_kd: 6.0}
+  - {name: FR_wheel_joint, role: wheel, position_limited: false, min_position: 0.0,  max_position: 0.0,   max_velocity: 50.0,  max_effort: 20.0,  max_kp: 0.0,   max_kd: 6.0}
+  - {name: RL_hip_joint,   role: leg,   position_limited: true,  min_position: -0.5, max_position: 0.5,   max_velocity: 30.1,  max_effort: 23.7,  max_kp: 120.0, max_kd: 6.0}
+  - {name: RL_thigh_joint, role: leg,   position_limited: true,  min_position: -1.4, max_position: 3.0,   max_velocity: 30.1,  max_effort: 23.7,  max_kp: 120.0, max_kd: 6.0}
+  - {name: RL_calf_joint,  role: leg,   position_limited: true,  min_position: -2.5, max_position: -0.85, max_velocity: 12.04, max_effort: 59.25, max_kp: 120.0, max_kd: 6.0}
+  - {name: RL_wheel_joint, role: wheel, position_limited: false, min_position: 0.0,  max_position: 0.0,   max_velocity: 50.0,  max_effort: 20.0,  max_kp: 0.0,   max_kd: 6.0}
+  - {name: RR_hip_joint,   role: leg,   position_limited: true,  min_position: -0.5, max_position: 0.5,   max_velocity: 30.1,  max_effort: 23.7,  max_kp: 120.0, max_kd: 6.0}
+  - {name: RR_thigh_joint, role: leg,   position_limited: true,  min_position: -3.0, max_position: 1.4,   max_velocity: 30.1,  max_effort: 23.7,  max_kp: 120.0, max_kd: 6.0}
+  - {name: RR_calf_joint,  role: leg,   position_limited: true,  min_position: 0.85, max_position: 2.5,   max_velocity: 12.04, max_effort: 59.25, max_kp: 120.0, max_kd: 6.0}
+  - {name: RR_wheel_joint, role: wheel, position_limited: false, min_position: 0.0,  max_position: 0.0,   max_velocity: 50.0,  max_effort: 20.0,  max_kp: 0.0,   max_kd: 6.0}

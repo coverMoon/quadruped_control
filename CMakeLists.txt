@@ -22,6 +22,7 @@ add_subdirectory(core)
 add_subdirectory(adapters/ipc)
 add_subdirectory(motion)
 add_subdirectory(config_loader)
+add_subdirectory(backends/replay)
 
 if(QUADRUPED_ENABLE_MUJOCO)
     add_subdirectory(backends/mujoco)

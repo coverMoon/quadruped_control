@@ -55,7 +55,8 @@ keyboard / joystick / ROS 2
            MuJoCo
 ```
 
-当前主要面向仿真验证，尚未提供真实硬件 `RobotIO`、电机标定和实机安全监督；blackW、机械臂和轮足行为也还没有接入当前运行链路。
+当前主要面向仿真验证，black 与 blackW 已共用基础动作、RL、Retry 和 Event chain 运行链路；
+尚未提供真实硬件 `RobotIO`、电机标定、实机安全监督和机械臂控制。
 
 ## 2. 仓库目录
 
@@ -344,11 +345,13 @@ backend.sh [robot] [scene]
 | 按键 | 功能 |
 |---|---|
 | `0` | 执行 GetUp，完成后进入 `Stand` |
-| `1` | 从 `Stand` 启动 `RL locomotion` |
-| `2` / `3` | 切换到 `policy_switch.yaml` 中的下一个策略 |
+| `1` | 从 `Stand` 启动 RL，或从 Event chain 平滑返回 RL |
+| `2` / `3` | black 切换策略；blackW 分别进入 Bridge/Low-bar drive |
+| `4` | blackW 进入 Car drive |
+| `6` | 启动已配置的 Event chain |
 | `9` | 执行 GetDown，完成后回到 `Passive` |
 | `P` | 立即请求进入 `Passive` |
-| `R` | reset MuJoCo backend，并建立新 session |
+| `R` | 加载 MuJoCo `default_pose`，保持当前 session 和运动行为 |
 | `Enter` | GUI 模式下暂停/继续物理仿真 |
 | `N` | 在终端手动指令和 ROS 2 `/cmd_vel` 导航指令之间切换 |
 | `H` | 在日志中重新输出按键帮助 |
@@ -374,8 +377,9 @@ backend.sh [robot] [scene]
 RL Controller policy=flat x:0.00 y:0.00 yaw:0.00
 ```
 
-MotionRuntime 会按当前策略 YAML 的 `command_limits` 做最终限幅。command gateway 还会先应用
-当前统一的 `[3.0, 1.0, 3.0]` 输入侧上限；black 的现有策略与该上限一致。
+MotionRuntime 会按当前策略 YAML 的 `command_limits` 做最终限幅，并通过 MotionStatus 把同一
+上限传给 command gateway。键盘、导航输入均按该值限幅；手柄的 `[-1, 1]` 归一化轴会自动
+缩放到当前策略的完整 `[-limit, limit]` 量程，策略切换后同步更新。
 
 ### 7.3 单进程调试程序的按键差异
 
@@ -444,8 +448,12 @@ configs/input/gamepads.yaml
 | `A` | 执行 GetUp，完成后进入 `Stand` |
 | `B` | 执行 GetDown |
 | `RB + DPadUp` | 进入 `RL locomotion` |
+| `RB + DPadRight` | blackW 进入 Bridge drive |
+| `RB + DPadDown` | blackW 进入 Low-bar drive |
+| `RB + DPadLeft` | blackW 进入 Car drive |
+| `LB + DPadUp` | 启动已配置的 Event chain |
 | `LB + X` | 进入 `Passive` |
-| `RB + Y` | reset MuJoCo backend |
+| `RB + Y` | 加载 MuJoCo `default_pose`，保持当前运动行为 |
 | `RB + X` | GUI 模式下暂停/继续 |
 | `Y` | 切换到策略循环中的下一项 |
 | `X` | 在手柄手动指令和 ROS 2 `/cmd_vel` 导航指令之间切换 |
@@ -456,7 +464,8 @@ configs/input/gamepads.yaml
 组合键以按下边沿触发。使用 `LB + X`、`RB + X` 或 `RB + Y` 时，单独的 `X`、`Y` 动作不会
 同时触发。
 
-当前 black 没有实现旧 blackW 的 D-pad 下、左、右专用行为，因此这些方向不会伪造为其他公共模式。
+black 保持 `2`/`3` 策略切换且不响应 blackW 专用 D-pad 组合；blackW 启动脚本会加载三份
+固定姿态轮驱配置并启用对应键位。`LB + DPadUp` 通过同一公共请求启动 Event chain。
 
 ### 8.3 手柄无响应时检查
 
@@ -710,19 +719,26 @@ configs/policies/<robot>/policy_switch.yaml
 
 并确认对应 YAML、模型路径和机器人名称均有效。
 
-## 13. 当前限制与待补充
+## 13. 只读日志回放
+
+默认构建会生成 `.build/default/apps/replay/quadruped_replay`。它读取带机器人名称和显式
+关节顺序的 StateFrame CSV，只读驱动 MotionRuntime，并输出实际状态、目标命令和帧统计
+对比；生成命令不会连接任何执行设备。格式和命令见
+[故障注入、诊断日志与回放](docs/fault_logging_replay.md)。
+
+## 14. 当前限制与待补充
 
 当前仍需后续完善：
 
-- blackW、轮关节、机械臂和其他行为；
+- blackW Car/Bridge/Low-bar 的专用障碍场景验收、完整墙体接触验收、机械臂和其他行为；
 - 真实硬件 backend、电机标定、IMU、通信看门狗和急停；
 - 不同实体手柄的长期 SDL/pygame 现场验证；
 - MuJoCo GUI 长时间运行和多显示环境验证；
-- 仿真故障注入、持久日志、回放和性能统计；
+- 面向长时间运行的自动日志采集、绘图和性能统计；
 - 将三进程 backend 的仿真参数进一步统一到 simulation YAML；
 - 更多机器人、场景和策略的回归测试。
 
-## 14. 进一步阅读
+## 15. 进一步阅读
 
 - [文档索引](docs/README.md)
 - [当前状态与参考工程差距](docs/current_status.md)
@@ -730,4 +746,5 @@ configs/policies/<robot>/policy_switch.yaml
 - [ROS 2 三进程运行架构](docs/ros2_three_process_runtime.md)
 - [ROS 2 接口契约](docs/ros2_interface_contract.md)
 - [系统架构](docs/quadruped_control_architecture.md)
+- [故障注入、诊断日志与回放](docs/fault_logging_replay.md)
 - [仿真部分后续指导](docs/仿真部分后续指导.md)

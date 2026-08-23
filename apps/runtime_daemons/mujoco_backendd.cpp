@@ -204,6 +204,27 @@ bool reset_session(
     return true;
 }
 
+bool reset_simulation_state(
+    qi::SharedLayout& layout,
+    qmj::MujocoRobotIO& io,
+    const std::uint64_t startup_id,
+    const std::uint64_t session_id,
+    const int keyframe_id,
+    std::string* const error_message = nullptr)
+{
+    const auto reset = io.reset_simulation_state(keyframe_id);
+    if (!reset.ok())
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = reset.error_message;
+        }
+        return false;
+    }
+    publish_backend_state(layout, io, startup_id, session_id);
+    return true;
+}
+
 void process_control_requests(
     qi::SharedLayout& layout,
     qmj::MujocoRobotIO& io,
@@ -225,9 +246,12 @@ void process_control_requests(
             request.type == static_cast<std::uint8_t>(qi::WireControlType::Reset);
         const bool is_pause_toggle =
             request.type == static_cast<std::uint8_t>(qi::WireControlType::PauseToggle);
+        const bool is_simulation_reset = request.type ==
+            static_cast<std::uint8_t>(qi::WireControlType::SimulationStateReset);
         const bool valid_request = request.schema_version == qc::kFrameSchemaVersion &&
             request.startup_id == startup_id && request.session_id == session_id &&
-            request.request_id != 0 && (is_reset || is_pause_toggle);
+            request.request_id != 0 &&
+            (is_reset || is_pause_toggle || is_simulation_reset);
         if (!valid_request)
         {
             result.success = 0;
@@ -250,6 +274,32 @@ void process_control_requests(
                     ? "simulation paused"
                     : "simulation resumed";
                 std::copy(message.begin(), message.end(), result.message.begin());
+            }
+        }
+        else if (is_simulation_reset)
+        {
+            const int default_pose_id =
+                mj_name2id(io.raw_model(), mjOBJ_KEY, "default_pose");
+            std::string error_message;
+            if (reset_simulation_state(
+                    layout,
+                    io,
+                    startup_id,
+                    session_id,
+                    default_pose_id,
+                    &error_message))
+            {
+                result.success = 1;
+                const std::string message = "simulation pose reset";
+                std::copy(message.begin(), message.end(), result.message.begin());
+            }
+            else
+            {
+                result.success = 0;
+                std::copy_n(
+                    error_message.begin(),
+                    std::min(error_message.size(), result.message.size() - 1),
+                    result.message.begin());
             }
         }
         else
@@ -324,14 +374,24 @@ int run_physics_loop(
         const auto now = clock::now();
         if (window != nullptr && now >= next_visual_sync)
         {
-            const bool gui_reset_requested = window->sync(io.raw_model(), io.raw_data());
-            if (gui_reset_requested)
+            const qsim::SimWindow::SimulationAction action =
+                window->sync(io.raw_model(), io.raw_data());
+            if (action.type != qsim::SimWindow::SimulationAction::Type::None)
             {
+                const int keyframe_id =
+                    action.type == qsim::SimWindow::SimulationAction::Type::LoadKey
+                    ? action.keyframe_id
+                    : -1;
                 std::string error_message;
-                if (!reset_session(
-                        layout, io, startup_id, session_id, command_version, &error_message))
+                if (!reset_simulation_state(
+                        layout,
+                        io,
+                        startup_id,
+                        session_id,
+                        keyframe_id,
+                        &error_message))
                 {
-                    std::cerr << "界面 reset 失败: " << error_message << '\n';
+                    std::cerr << "界面仿真状态复位失败: " << error_message << '\n';
                     window->request_exit();
                     return 1;
                 }

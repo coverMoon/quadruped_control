@@ -39,6 +39,7 @@ void check_policy(
         return;
     }
     quadruped::motion::RlInferenceInput input;
+    input.dimension = config.inference_input_dimension;
     const auto output = created.policy->forward(input);
     expect(output.ok, config.name + " 零输入推理应成功：" + output.error_message);
     for (std::size_t i = 0; output.ok && i < expected.size(); ++i)
@@ -62,6 +63,22 @@ void check_policy(
     const double maximum_ms = static_cast<double>(maximum_ns) / 1'000'000.0;
     std::cout << config.name << " CPU 推理：平均 "
               << average_ms << " ms，最大 " << maximum_ms << " ms\n";
+}
+
+void check_policy_shape(const quadruped::motion::RlConfig& config)
+{
+    auto created = quadruped::policy::TorchPolicy::create(config);
+    expect(created.ok(), config.name + " blackW 模型应加载：" + created.error_message);
+    if (!created.ok())
+    {
+        return;
+    }
+    quadruped::motion::RlInferenceInput input;
+    input.dimension = config.inference_input_dimension;
+    const auto output = created.policy->forward(input);
+    expect(output.ok, config.name + " blackW 零输入推理应成功：" + output.error_message);
+    expect(output.action_dimension == config.action_dimension,
+        config.name + " blackW 输出应为配置的 16 维动作");
 }
 
 }  // namespace
@@ -91,6 +108,24 @@ int main()
         check_policy(obstacle.config,
             {-0.006324F, -0.045350F, 0.053213F, 0.074816F, -0.080518F, -0.190362F,
              0.034378F, 0.035897F, 0.145156F, -0.029368F, -0.083529F, -0.299602F});
+    }
+    const auto blackw_model = quadruped::config::load_robot_model(
+        QUADRUPED_BLACKW_ROBOT_CONFIG_PATH);
+    expect(blackw_model.ok(), "blackW RobotModel 应加载成功");
+    if (blackw_model.ok())
+    {
+        for (const std::string path : {QUADRUPED_BLACKW_POLICY_FLAT_CONFIG_PATH,
+                 QUADRUPED_BLACKW_POLICY_OBSTACLE_CONFIG_PATH,
+                 QUADRUPED_BLACKW_POLICY_STAIR_CONFIG_PATH})
+        {
+            const auto config = quadruped::config::load_rl_config(
+                path, QUADRUPED_PROJECT_SOURCE_DIR, blackw_model.model);
+            expect(config.ok(), "blackW 策略配置应加载：" + config.error_message);
+            if (config.ok())
+            {
+                check_policy_shape(config.config);
+            }
+        }
     }
     if (failures != 0)
     {

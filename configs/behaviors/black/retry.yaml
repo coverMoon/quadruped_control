@@ -1,0 +1,18 @@
+# 文件：retry.yaml
+# 作用：定义 black 共用 Retry 行为的姿态、周期和关节增益。
+robot_name: black
+prepare_cycles: 100
+joint_names:
+  [FL_hip_joint, FL_thigh_joint, FL_calf_joint,
+   FR_hip_joint, FR_thigh_joint, FR_calf_joint,
+   RL_hip_joint, RL_thigh_joint, RL_calf_joint,
+   RR_hip_joint, RR_thigh_joint, RR_calf_joint]
+retry_default_joint_positions:
+  [0.0, 0.82, -1.5,
+   -0.0, -0.82, 1.5,
+   0.0, 0.82, -1.5,
+   -0.0, -0.82, 1.5]
+kp: [80.0, 80.0, 80.0, 80.0, 80.0, 80.0,
+     80.0, 80.0, 80.0, 80.0, 80.0, 80.0]
+kd: [3.0, 3.0, 3.0, 3.0, 3.0, 3.0,
+     3.0, 3.0, 3.0, 3.0, 3.0, 3.0]

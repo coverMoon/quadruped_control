@@ -133,6 +133,7 @@ struct WireMotionStatus
     std::array<char, kWireNameCapacity> policy_name{};
     std::array<char, kWireMessageCapacity> error_message{};
     std::uint8_t policy_ready{0};
+    std::array<double, 3> command_limits{};
 };
 
 struct WireRobotIOStatus
@@ -151,6 +152,7 @@ enum class WireControlType : std::uint8_t
 {
     Reset = 0,
     PauseToggle = 1,
+    SimulationStateReset = 2,
 };
 
 struct WireControlRequest

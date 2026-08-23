@@ -19,12 +19,14 @@ public:
         ++forward_count;
         last_input = input;
         qm::RlInferenceOutput output;
+        output.elapsed_ns = elapsed_ns;
         if (fail_forward)
         {
             output.error_message = "injected policy load failure";
             return output;
         }
         output.ok = true;
+        output.action_dimension = output_dimension;
         output.actions.fill(action);
         return output;
     }
@@ -32,6 +34,8 @@ public:
     int forward_count{0};
     bool fail_forward{false};
     float action{0.0F};
+    std::size_t output_dimension{qm::kRlActionDim};
+    qc::Nanoseconds elapsed_ns{0};
     qm::RlInferenceInput last_input{};
 };
 
@@ -50,20 +54,32 @@ qm::RlConfig make_rl_config(
     config.name = name;
     config.robot_name = "black";
     config.model_path = "/tmp/" + name + ".pt";
+    config.observation_dimension = qm::kRlObservationDim;
+    config.history_frame_count = qm::kRlHistoryFrames;
+    config.inference_input_dimension = qm::kRlInputDim;
+    config.action_dimension = qm::kRlActionDim;
+    config.joint_count = qm::kRlJointCount;
     config.command_scale = {1.0, 1.0, 1.0};
     config.command_limits = {2.0, 2.0, 2.0};
     config.angular_velocity_scale = 1.0;
     config.joint_position_scale = 1.0;
     config.joint_velocity_scale = 1.0;
     config.observation_clip = 100.0;
-    config.action_scale = 0.25;
     config.action_clip = 100.0;
     config.max_position_jump = 1.0;
+    for (std::size_t i = 0; i < qm::kRlHistoryFrames; ++i)
+    {
+        config.history_frames[i] = i;
+    }
+    const auto model = make_rl_model();
     for (std::size_t i = 0; i < qm::kRlJointCount; ++i)
     {
+        config.joint_names[i] = model.joints[i].name;
+        config.policy_dof_indices[i] = i;
         config.default_joint_positions[i] = default_positions[i];
         config.kp[i] = 40.0;
         config.kd[i] = 1.2;
+        config.action_scale[i] = 0.25;
     }
     return config;
 }
@@ -73,6 +89,80 @@ qm::MotionRuntime::CreateResult make_rl_runtime()
     auto created = qm::MotionRuntime::create(make_rl_model(), motion_test::make_test_config());
     expect(created.ok(), "black RL 测试运行时应创建成功：" + created.error_message);
     return created;
+}
+
+qm::RlConfig make_wheel_rl_config(const qc::RobotModel& model)
+{
+    qm::RlConfig config;
+    config.name = "flat";
+    config.robot_name = model.name;
+    config.model_path = "/tmp/blackw_flat.pt";
+    config.observation_dimension = 57;
+    config.history_frame_count = 6;
+    config.inference_input_dimension = 342;
+    config.action_dimension = model.joint_count;
+    config.joint_count = model.joint_count;
+    config.wheel_count = 4;
+    config.wheel_indices = {3, 7, 11, 15};
+    config.command_scale = {2.0, 2.0, 0.25};
+    config.command_limits = {2.0, 1.0, 3.0};
+    config.angular_velocity_scale = 0.25;
+    config.joint_position_scale = 1.0;
+    config.joint_velocity_scale = 0.05;
+    config.observation_clip = 100.0;
+    config.action_clip = 100.0;
+    config.max_position_jump = 1.0;
+    for (std::size_t i = 0; i < config.history_frame_count; ++i)
+    {
+        config.history_frames[i] = i;
+    }
+    for (std::size_t i = 0; i < model.joint_count; ++i)
+    {
+        const bool is_wheel = model.joints[i].role == qc::JointRole::Wheel;
+        config.joint_names[i] = model.joints[i].name;
+        config.policy_dof_indices[i] = i;
+        config.default_joint_positions[i] = is_wheel ? 0.0 : 0.4;
+        config.kp[i] = is_wheel ? 0.0 : 50.0;
+        config.kd[i] = is_wheel ? 1.0 : 1.2;
+        config.action_scale[i] = is_wheel
+            ? ((i == 7 || i == 15) ? -10.0 : 10.0)
+            : 0.25;
+    }
+    return config;
+}
+
+qm::FixedDriveConfig make_fixed_drive_config(
+    const qc::RobotModel& model,
+    const std::string& behavior_name,
+    const double target)
+{
+    qm::FixedDriveConfig config;
+    config.behavior_name = behavior_name;
+    config.robot_name = model.name;
+    config.joint_count = model.joint_count;
+    config.prepare_cycles = 2;
+    config.exit_to_rl_cycles = 2;
+    config.max_x = 2.0;
+    config.max_yaw = 3.0;
+    config.wheel_velocity_scale = 10.0;
+    config.yaw_to_wheel_velocity = 5.0;
+    config.wheel_count = 4;
+    config.wheel_velocity_sign = {1.0, -1.0, 1.0, -1.0};
+    config.wheel_sides = {
+        qm::WheelSide::Left,
+        qm::WheelSide::Right,
+        qm::WheelSide::Left,
+        qm::WheelSide::Right,
+    };
+    for (std::size_t i = 0; i < model.joint_count; ++i)
+    {
+        const bool is_wheel = model.joints[i].role == qc::JointRole::Wheel;
+        config.joint_names[i] = model.joints[i].name;
+        config.target_positions[i] = is_wheel ? 0.0 : target;
+        config.kp[i] = is_wheel ? 0.0 : 80.0;
+        config.kd[i] = is_wheel ? 2.0 : 3.0;
+    }
+    return config;
 }
 
 qc::BaseCommand make_base_command()
@@ -512,6 +602,130 @@ void test_fault_fails_active_request()
         "RobotIO fault 期间新的主动请求必须拒绝");
     expect(rejected.status.mode == qc::MotionMode::Passive,
         "RobotIO fault 期间拒绝请求不能离开 Passive");
+
+    io.read_code = qc::RobotIOCode::Ok;
+    const auto recovered_state = motion_test::update(*created.runtime, io);
+    expect(!recovered_state.status.error_message.empty(),
+        "进入 Passive 的故障原因必须锁存，不能被下一周期安全命令清除");
+}
+
+// 测试专用 RobotIO 注入统一验证故障终态、安全命令和显式恢复条件。
+void test_robot_io_fault_injection_matrix()
+{
+    struct FaultCase
+    {
+        motion_test::RobotIOFaultInjection injection;
+        qc::RobotIOCode read_code;
+        qc::RobotIOState io_state;
+        const char* name;
+    };
+    const std::array<FaultCase, 7> cases{{
+        {motion_test::RobotIOFaultInjection::NoData,
+            qc::RobotIOCode::NoData, qc::RobotIOState::Paused, "状态无数据"},
+        {motion_test::RobotIOFaultInjection::Disconnected,
+            qc::RobotIOCode::Disconnected, qc::RobotIOState::Disconnected, "IPC 断开"},
+        {motion_test::RobotIOFaultInjection::BackendFault,
+            qc::RobotIOCode::Fault, qc::RobotIOState::Fault, "backend fault"},
+        {motion_test::RobotIOFaultInjection::FutureTimestamp,
+            qc::RobotIOCode::Ok, qc::RobotIOState::Ready, "时间异常"},
+        {motion_test::RobotIOFaultInjection::NonFiniteJoint,
+            qc::RobotIOCode::Ok, qc::RobotIOState::Ready, "关节 NaN"},
+        {motion_test::RobotIOFaultInjection::InfiniteJoint,
+            qc::RobotIOCode::Ok, qc::RobotIOState::Ready, "关节 Inf"},
+        {motion_test::RobotIOFaultInjection::ExpiredCommand,
+            qc::RobotIOCode::Ok, qc::RobotIOState::Ready, "命令过期"},
+    }};
+
+    for (const auto& test : cases)
+    {
+        auto created = motion_test::make_runtime();
+        if (!created.ok())
+        {
+            continue;
+        }
+        motion_test::FakeRobotIO io;
+        io.state = motion_test::make_state(
+            motion_test::make_test_model(), motion_test::make_rest_positions());
+        motion_test::update(*created.runtime, io);
+        const auto getup = motion_test::make_request(1, qc::ModeRequestType::GetUp);
+        motion_test::update(*created.runtime, io, &getup);
+        const std::size_t command_count = io.submitted.size();
+
+        io.inject(test.injection);
+        const auto failed = motion_test::update(*created.runtime, io);
+        expect(failed.read_code == test.read_code,
+            std::string(test.name) + " 应报告预期 read_code");
+        expect(failed.status.mode == qc::MotionMode::Passive,
+            std::string(test.name) + " 应使主动动作回到 Passive");
+        expect(failed.result_event_count == 1 &&
+                failed.result_events[0].request_id == getup.request_id &&
+                failed.result_events[0].state == qc::ModeResultState::Failed,
+            std::string(test.name) + " 应交付活动请求 Failed");
+        expect(io.status().state == test.io_state,
+            std::string(test.name) + " 应保留明确 RobotIO 状态");
+        expect(io.submitted.size() == command_count,
+            std::string(test.name) + " 失败后不得留下新的主动命令");
+
+        const auto blocked = motion_test::make_request(2, qc::ModeRequestType::GetUp);
+        const auto rejected = motion_test::update(*created.runtime, io, &blocked);
+        expect(rejected.result.state == qc::ModeResultState::Rejected ||
+                created.runtime->query_result(blocked.request_id).state ==
+                    qc::ModeResultState::Failed,
+            std::string(test.name) + " 未清除时不得恢复主动控制");
+
+        io.clear_injection();
+        const auto recovery = motion_test::make_request(3, qc::ModeRequestType::GetUp);
+        const auto recovered = motion_test::update(*created.runtime, io, &recovery);
+        expect(recovered.result.state == qc::ModeResultState::Accepted,
+            std::string(test.name) + " 清除后应允许显式新请求恢复");
+    }
+}
+
+// IMU 无效、策略 forward 失败和推理超时只在依赖 IMU/策略的 RL 模式触发安全回退。
+void test_rl_fault_injection_and_diagnostics()
+{
+    const auto run_case = [](const motion_test::RobotIOFaultInjection io_fault,
+                              const bool fail_forward,
+                              const qc::Nanoseconds elapsed_ns,
+                              const char* name) {
+        auto created = make_rl_runtime();
+        if (!created.ok())
+        {
+            return;
+        }
+        const auto model = make_rl_model();
+        const auto stand_pose = config_stand_pose();
+        FakePolicy policy;
+        policy.fail_forward = fail_forward;
+        policy.elapsed_ns = elapsed_ns;
+        std::string error;
+        created.runtime->attach_policy(make_rl_config("flat", stand_pose), policy, error);
+        motion_test::FakeRobotIO io;
+        io.state = motion_test::make_state(model, motion_test::make_rest_positions());
+        motion_test::drive_getup(*created.runtime, io, 1);
+        io.state = motion_test::make_state(model, stand_pose);
+        io.inject(io_fault);
+        const auto command = make_base_command();
+        auto start = motion_test::make_request(2, qc::ModeRequestType::StartBehavior);
+        start.behavior_name = "rl_locomotion";
+        const auto failed = update_with_command(*created.runtime, io, command, &start);
+        expect(failed.status.mode == qc::MotionMode::Passive,
+            std::string(name) + " 应使 RL 回到 Passive");
+        expect(created.runtime->query_result(start.request_id).state ==
+                qc::ModeResultState::Failed,
+            std::string(name) + " 应使策略启动请求 Failed");
+        expect(!io.submitted.empty() &&
+                io.submitted.back().joints[0].mode == qc::ControlMode::Disabled,
+            std::string(name) + " 应提交 Disabled 最终命令");
+        expect(failed.diagnostics.inference_elapsed_ns == elapsed_ns,
+            std::string(name) + " 应记录最近推理耗时");
+    };
+
+    run_case(motion_test::RobotIOFaultInjection::InvalidImu, false, 0, "IMU 非法");
+    run_case(motion_test::RobotIOFaultInjection::None, true, 2'000'000,
+        "policy forward 失败");
+    run_case(motion_test::RobotIOFaultInjection::None, false,
+        qm::kRlInferenceDeadlineNs + 1, "policy inference 超时");
 }
 
 // GetDown 期间重新请求 GetUp：从当时姿态重新起立，但保留首次记录的 rest_pose。
@@ -684,8 +898,10 @@ void test_direct_policy_switches()
     const auto command = make_base_command();
     auto start = motion_test::make_request(2, qc::ModeRequestType::StartBehavior);
     start.behavior_name = "rl_locomotion";
-    update_with_command(*created.runtime, io, command, &start);
+    const auto started = update_with_command(*created.runtime, io, command, &start);
     expect(flat_policy.forward_count == 1, "启动 RL 时 flat 应完成首次推理");
+    expect(started.status.command_limits == std::array<double, 3>{2.0, 2.0, 2.0},
+        "MotionStatus 应公开当前策略的三轴 command_limits");
 
     auto obstacle = motion_test::make_request(3, qc::ModeRequestType::SwitchPolicy);
     obstacle.policy_name = "obstacle";
@@ -865,6 +1081,397 @@ void test_policy_transition_interrupted_by_passive()
     expect(far_policy.forward_count == 0, "被打断后目标策略不得推理");
 }
 
+// black 与 blackW 共用同一 Retry 生命周期；轮关节使用当前角度、零速和零 KP。
+void test_retry_and_mixed_wheel_commands()
+{
+    const auto leg_model = motion_test::make_test_model();
+    auto leg_runtime = motion_test::make_runtime();
+    if (leg_runtime.ok())
+    {
+        std::string leg_error;
+        expect(leg_runtime.runtime->configure_retry(
+                   motion_test::make_retry_config(leg_model), leg_error),
+            "black Retry 配置应接受：" + leg_error);
+        motion_test::FakeRobotIO leg_io;
+        leg_io.state = motion_test::make_state(
+            leg_model, motion_test::make_rest_positions());
+        auto leg_retry = motion_test::make_request(1, qc::ModeRequestType::StartBehavior);
+        leg_retry.behavior_name = "retry";
+        motion_test::update(*leg_runtime.runtime, leg_io, &leg_retry);
+        const auto leg_locked = motion_test::update(*leg_runtime.runtime, leg_io);
+        expect(leg_locked.status.behavior_name == "retry" &&
+                leg_locked.status.behavior_phase == "locked",
+            "black 应使用共用 Retry 生命周期进入 locked");
+    }
+
+    const auto model = motion_test::make_wheel_test_model();
+    auto created = qm::MotionRuntime::create(model, motion_test::make_wheel_test_config());
+    expect(created.ok(), "16 关节腿轮运行时应创建成功：" + created.error_message);
+    if (!created.ok())
+    {
+        return;
+    }
+    std::string error;
+    expect(created.runtime->configure_retry(
+               motion_test::make_retry_config(model), error),
+        "blackW Retry 配置应接受：" + error);
+
+    auto positions = motion_test::make_rest_positions();
+    positions[0] = 10.0;
+    positions[3] = 1.25;
+    positions[7] = -2.5;
+    positions[11] = 3.75;
+    positions[15] = -5.0;
+    motion_test::FakeRobotIO io;
+    io.state = motion_test::make_state(model, positions);
+
+    const auto getup = motion_test::make_request(1, qc::ModeRequestType::GetUp);
+    const auto first = motion_test::update(*created.runtime, io, &getup);
+    expect(first.result.state == qc::ModeResultState::Accepted,
+        "blackW GetUp 应被接受");
+    expect_close({io.submitted.back().joints[0].target_position, 3.0, 1e-12,
+        "越界腿姿态生成的命令应夹到显式位置上限"});
+    for (const std::size_t index : {3U, 7U, 11U, 15U})
+    {
+        const auto& wheel = io.submitted.back().joints[index];
+        expect_close({wheel.target_position, positions[index], 1e-12,
+            "基础动作轮关节应保持当前角度"});
+        expect(wheel.target_velocity == 0.0 && wheel.kp == 0.0 && wheel.kd == 0.5,
+            "基础动作轮关节应使用零速、零 KP 和配置 KD");
+    }
+
+    auto retry = motion_test::make_request(2, qc::ModeRequestType::StartBehavior);
+    retry.behavior_name = "retry";
+    const auto accepted = motion_test::update(*created.runtime, io, &retry);
+    expect(accepted.result.state == qc::ModeResultState::Accepted,
+        "Retry 应能中断当前基础动作");
+    expect(accepted.status.behavior_name == "retry" &&
+            accepted.status.behavior_phase == "preparing",
+        "Retry 应进入 preparing 阶段");
+    const auto locked = motion_test::update(*created.runtime, io);
+    expect(locked.status.mode == qc::MotionMode::Running &&
+            locked.status.behavior_phase == "locked",
+        "Retry 插值完成后应保持 Running/locked");
+    expect(created.runtime->query_result(retry.request_id).state ==
+            qc::ModeResultState::Completed,
+        "Retry 锁定后请求应 Completed");
+    for (const std::size_t index : {3U, 7U, 11U, 15U})
+    {
+        const auto& wheel = io.submitted.back().joints[index];
+        expect_close({wheel.target_position, positions[index], 1e-12,
+            "Retry 轮关节应保持当前角度"});
+        expect(wheel.target_velocity == 0.0 && wheel.kp == 0.0 && wheel.kd == 0.7,
+            "Retry 轮关节应使用行为配置 KD");
+    }
+
+    const auto switch_policy =
+        motion_test::make_request(3, qc::ModeRequestType::SwitchPolicy);
+    const auto rejected = motion_test::update(*created.runtime, io, &switch_policy);
+    expect(rejected.result.state == qc::ModeResultState::Rejected,
+        "Retry 锁定期间应拒绝策略切换");
+
+    const auto retry_getup = motion_test::make_request(4, qc::ModeRequestType::GetUp);
+    const auto interrupted = motion_test::update(*created.runtime, io, &retry_getup);
+    expect(interrupted.result.state == qc::ModeResultState::Accepted &&
+            interrupted.status.mode == qc::MotionMode::GetUp,
+        "Retry 应允许 GetUp 打断");
+
+    const auto passive = motion_test::make_request(5, qc::ModeRequestType::EnterPassive);
+    const auto stopped = motion_test::update(*created.runtime, io, &passive);
+    expect(stopped.result.state == qc::ModeResultState::Completed &&
+            stopped.status.mode == qc::MotionMode::Passive,
+        "Retry 后的动作应可由 EnterPassive 立即停止");
+}
+
+// Car、Bridge、Low-bar 共用固定姿态差速控制，并可在模式间切换和返回 RL。
+void test_fixed_drive_behaviors()
+{
+    const auto model = motion_test::make_wheel_test_model();
+    auto created = qm::MotionRuntime::create(
+        model, motion_test::make_wheel_test_config());
+    expect(created.ok(), "固定姿态轮驱测试运行时应创建成功");
+    if (!created.ok())
+    {
+        return;
+    }
+    std::string error;
+    auto car_config = make_fixed_drive_config(model, "car_drive", 0.6);
+    car_config.wheel_sides = {
+        qm::WheelSide::Right,
+        qm::WheelSide::Left,
+        qm::WheelSide::Right,
+        qm::WheelSide::Left,
+    };
+    expect(created.runtime->configure_fixed_drive(
+        car_config, error),
+        "Car drive 配置应接受：" + error);
+    expect(created.runtime->configure_fixed_drive(
+        make_fixed_drive_config(model, "bridge_drive", 0.5), error),
+        "Bridge drive 配置应接受：" + error);
+    expect(created.runtime->configure_fixed_drive(
+        make_fixed_drive_config(model, "low_bar_drive", 0.7), error),
+        "Low-bar drive 配置应接受：" + error);
+    auto duplicate = make_fixed_drive_config(model, "car_drive", 0.6);
+    expect(!created.runtime->configure_fixed_drive(duplicate, error),
+        "同名固定姿态轮驱配置必须拒绝重复注册");
+
+    FakePolicy policy;
+    policy.output_dimension = 16;
+    expect(created.runtime->attach_policy(
+        make_wheel_rl_config(model), policy, error),
+        "固定姿态轮驱返回测试策略应接入：" + error);
+    motion_test::FakeRobotIO io;
+    io.state = motion_test::make_state(model, motion_test::make_rest_positions());
+    motion_test::drive_getup(*created.runtime, io, 1);
+
+    auto car = motion_test::make_request(2, qc::ModeRequestType::StartBehavior);
+    car.behavior_name = "car_drive";
+    const auto no_command = motion_test::update(*created.runtime, io, &car);
+    expect(no_command.result.state == qc::ModeResultState::Rejected,
+        "固定姿态轮驱启动必须要求有效 BaseCommand");
+    car.request_id = 3;
+    auto command = make_base_command();
+    command.vx = 0.5;
+    command.wz = 0.2;
+    const auto accepted = update_with_command(*created.runtime, io, command, &car);
+    expect(accepted.result.state == qc::ModeResultState::Accepted &&
+            accepted.status.behavior_name == "car_drive" &&
+            accepted.status.behavior_phase == "preparing",
+        "Car drive 应从 Stand 进入姿态准备阶段");
+    expect_close({io.submitted.back().joints[0].target_position, 0.3, 1e-12,
+        "Car drive 第一周期应线性插值腿姿态"});
+    expect_close({io.submitted.back().joints[3].target_velocity, 6.0, 1e-12,
+        "轮侧映射必须来自显式配置而不是关节下标"});
+    expect_close({io.submitted.back().joints[7].target_velocity, -4.0, 1e-12,
+        "轮速应同时应用显式轮侧和独立方向符号"});
+    const auto ready = update_with_command(*created.runtime, io, command);
+    expect(ready.status.behavior_phase == "driving" &&
+            created.runtime->query_result(3).state == qc::ModeResultState::Completed,
+        "固定姿态准备完成后应完成启动请求并持续 Driving");
+
+    auto stale_command = command;
+    stale_command.expires_at_ns = -1;
+    update_with_command(*created.runtime, io, stale_command);
+    expect(io.submitted.back().joints[3].target_velocity == 0.0 &&
+            io.submitted.back().joints[7].target_velocity == 0.0,
+        "运行中 BaseCommand 过期必须将固定轮驱速度归零");
+
+    auto bridge = motion_test::make_request(4, qc::ModeRequestType::StartBehavior);
+    bridge.behavior_name = "bridge_drive";
+    const auto switched = update_with_command(*created.runtime, io, command, &bridge);
+    expect(switched.result.state == qc::ModeResultState::Accepted &&
+            switched.status.behavior_name == "bridge_drive",
+        "固定姿态轮驱之间应允许直接切换");
+    update_with_command(*created.runtime, io, command);
+
+    auto return_rl = motion_test::make_request(5, qc::ModeRequestType::StartBehavior);
+    return_rl.behavior_name = "rl_locomotion";
+    const auto transitioning = update_with_command(
+        *created.runtime, io, command, &return_rl);
+    expect(transitioning.result.state == qc::ModeResultState::Accepted &&
+            transitioning.status.behavior_phase == "policy_transition" &&
+            policy.forward_count == 0,
+        "Bridge drive 应以配置周期和固定增益进入返回 RL 过渡");
+    update_with_command(*created.runtime, io, command);
+    expect(created.runtime->query_result(5).state == qc::ModeResultState::Completed,
+        "固定姿态轮驱返回 RL 过渡完成后请求应 Completed");
+    update_with_command(*created.runtime, io, command);
+    expect(policy.forward_count == 1,
+        "返回固定姿态轮驱过渡后的下一周期应恢复 RL 推理");
+}
+
+// Event chain 对照 rl_sar 执行 pose、drive、pose_drive，并以编码器位移完成轮驱动。
+void test_event_chain_capability_and_request_interface()
+{
+    const auto model = motion_test::make_test_model();
+    auto created = motion_test::make_runtime();
+    if (!created.ok())
+    {
+        return;
+    }
+    qm::EventChainConfig config;
+    config.robot_name = model.name;
+    config.joint_count = model.joint_count;
+    config.exit_to_rl_cycles = 1;
+    config.interpolation = "linear";
+    config.event_count = 1;
+    config.events[0].name = "drive";
+    config.events[0].type = qm::EventType::Drive;
+    config.events[0].wheel_group = qm::WheelGroup::All;
+    config.events[0].distance_m = 0.1;
+    config.events[0].speed_mps = 0.1;
+    config.events[0].timeout_cycles = 10;
+    for (std::size_t i = 0; i < model.joint_count; ++i)
+    {
+        config.joint_names[i] = model.joints[i].name;
+        config.kp[i] = 10.0;
+        config.kd[i] = 1.0;
+    }
+    std::string error;
+    expect(!created.runtime->configure_event_chain(config, error),
+        "无 Wheel 角色的 black 模型必须拒绝 drive 事件");
+    expect(error.find("Wheel") != std::string::npos ||
+            error.find("wheel") != std::string::npos,
+        "能力拒绝应明确说明 Wheel 原因");
+
+    motion_test::FakeRobotIO io;
+    io.state = motion_test::make_state(model, motion_test::make_rest_positions());
+    auto request = motion_test::make_request(1, qc::ModeRequestType::StartBehavior);
+    request.behavior_name = "event_chain";
+    const auto result = motion_test::update(*created.runtime, io, &request);
+    expect(result.result.state == qc::ModeResultState::Rejected,
+        "未配置 Event chain 的请求应明确拒绝");
+    expect(result.status.mode == qc::MotionMode::Passive,
+        "Event chain 拒绝不得改变当前模式");
+
+    const auto wheel_model = motion_test::make_wheel_test_model();
+    auto wheel_runtime = qm::MotionRuntime::create(
+        wheel_model, motion_test::make_wheel_test_config());
+    expect(wheel_runtime.ok(), "Event chain 腿轮运行时应创建成功");
+    if (!wheel_runtime.ok())
+    {
+        return;
+    }
+    FakePolicy wheel_policy;
+    wheel_policy.output_dimension = 16;
+    expect(wheel_runtime.runtime->attach_policy(
+        make_wheel_rl_config(wheel_model), wheel_policy, error),
+        "blackW 测试策略应接入：" + error);
+    config.robot_name = wheel_model.name;
+    config.joint_count = wheel_model.joint_count;
+    config.wheel_count = 4;
+    config.wheel_radius = 0.1;
+    for (std::size_t i = 0; i < config.wheel_count; ++i)
+    {
+        config.wheel_velocity_sign[i] = 1.0;
+    }
+    for (std::size_t i = 0; i < wheel_model.joint_count; ++i)
+    {
+        config.joint_names[i] = wheel_model.joints[i].name;
+        if (wheel_model.joints[i].role == qc::JointRole::Wheel)
+        {
+            config.kp[i] = 0.0;
+        }
+    }
+    expect(wheel_runtime.runtime->configure_event_chain(config, error),
+        "显式 Wheel 角色模型应通过 drive 能力检查：" + error);
+    motion_test::FakeRobotIO wheel_io;
+    wheel_io.state = motion_test::make_state(
+        wheel_model, motion_test::make_rest_positions());
+    motion_test::drive_getup(*wheel_runtime.runtime, wheel_io, 1);
+
+    config.interpolation = "smoothstep";
+    config.exit_to_rl_cycles = 2;
+    config.event_count = 3;
+    config.events[0] = {};
+    config.events[0].name = "pose";
+    config.events[0].type = qm::EventType::Pose;
+    config.events[0].transition_cycles = 2;
+    config.events[1] = {};
+    config.events[1].name = "front_drive";
+    config.events[1].type = qm::EventType::Drive;
+    config.events[1].wheel_group = qm::WheelGroup::Front;
+    config.events[1].distance_m = 0.02;
+    config.events[1].speed_mps = 0.1;
+    config.events[1].timeout_cycles = 4;
+    config.events[2] = {};
+    config.events[2].name = "rear_pose_drive";
+    config.events[2].type = qm::EventType::PoseDrive;
+    config.events[2].transition_cycles = 2;
+    config.events[2].wheel_group = qm::WheelGroup::Rear;
+    config.events[2].distance_m = -0.02;
+    config.events[2].speed_mps = 0.1;
+    config.events[2].timeout_cycles = 4;
+    for (std::size_t i = 0; i < wheel_model.joint_count; ++i)
+    {
+        if (wheel_model.joints[i].role != qc::JointRole::Wheel)
+        {
+            config.events[0].dof_positions[i] = 0.6;
+            config.events[2].dof_positions[i] = 0.8;
+        }
+    }
+    config.wheel_velocity_sign = {1.0, -1.0, 1.0, -1.0};
+    expect(wheel_runtime.runtime->configure_event_chain(config, error),
+        "组合 Event chain 应通过配置检查：" + error);
+
+    request.request_id = 2;
+    const auto accepted = motion_test::update(*wheel_runtime.runtime, wheel_io, &request);
+    expect(accepted.result.state == qc::ModeResultState::Accepted &&
+            accepted.status.behavior_name == "event_chain",
+        "Stand 应接受 Event chain 请求");
+    expect_close({wheel_io.submitted.back().joints[0].target_position, 0.3, 1e-12,
+        "smoothstep 中点应按 rl_sar 插值"});
+    motion_test::update(*wheel_runtime.runtime, wheel_io);
+    motion_test::update(*wheel_runtime.runtime, wheel_io);
+    expect_close({wheel_io.submitted.back().joints[3].target_velocity, 1.0, 1e-12,
+        "前左轮应按正向符号驱动"});
+    expect_close({wheel_io.submitted.back().joints[7].target_velocity, -1.0, 1e-12,
+        "前右轮应按负向符号驱动"});
+    expect(wheel_io.submitted.back().joints[11].target_velocity == 0.0,
+        "front 轮组不得驱动后轮");
+    wheel_io.state.joints[3].position += 0.2;
+    wheel_io.state.joints[7].position -= 0.2;
+    motion_test::update(*wheel_runtime.runtime, wheel_io);
+    motion_test::update(*wheel_runtime.runtime, wheel_io);
+    expect_close({wheel_io.submitted.back().joints[11].target_velocity, -1.0, 1e-12,
+        "负距离 pose_drive 应反向驱动后左轮"});
+    expect_close({wheel_io.submitted.back().joints[15].target_velocity, 1.0, 1e-12,
+        "负距离 pose_drive 应反向驱动后右轮"});
+    wheel_io.state.joints[11].position -= 0.2;
+    wheel_io.state.joints[15].position += 0.2;
+    const auto completed = motion_test::update(*wheel_runtime.runtime, wheel_io);
+    expect(completed.status.behavior_phase == "completed" &&
+            wheel_runtime.runtime->query_result(2).state ==
+                qc::ModeResultState::Completed,
+        "姿态和位移均完成后 Event chain 应进入最终保持并完成请求");
+
+    auto return_rl = motion_test::make_request(3, qc::ModeRequestType::StartBehavior);
+    return_rl.behavior_name = "rl_locomotion";
+    const auto base_command = make_base_command();
+    const auto returning = update_with_command(
+        *wheel_runtime.runtime, wheel_io, base_command, &return_rl);
+    expect(returning.result.state == qc::ModeResultState::Accepted &&
+            returning.status.behavior_phase == "policy_transition",
+        "Event chain 应通过显式过渡返回当前 RL 策略");
+    expect(wheel_policy.forward_count == 0,
+        "返回 RL 的姿态过渡周期不得提前执行策略推理");
+    const auto returned = update_with_command(
+        *wheel_runtime.runtime, wheel_io, base_command);
+    expect(returned.status.policy_name == "flat" &&
+            wheel_runtime.runtime->query_result(3).state ==
+                qc::ModeResultState::Completed,
+        "exit_to_rl_cycles 完成后应激活原策略并完成返回请求");
+    update_with_command(*wheel_runtime.runtime, wheel_io, base_command);
+    expect(wheel_policy.forward_count == 1,
+        "返回过渡后的下一周期应恢复 RL 推理");
+
+    auto timeout_runtime = qm::MotionRuntime::create(
+        wheel_model, motion_test::make_wheel_test_config());
+    expect(timeout_runtime.ok(), "Event chain 超时测试运行时应创建成功");
+    if (!timeout_runtime.ok())
+    {
+        return;
+    }
+    config.event_count = 1;
+    config.events[0] = config.events[1];
+    config.events[0].timeout_cycles = 1;
+    expect(timeout_runtime.runtime->configure_event_chain(config, error),
+        "Event chain 超时配置应通过：" + error);
+    motion_test::FakeRobotIO timeout_io;
+    timeout_io.state = motion_test::make_state(
+        wheel_model, motion_test::make_rest_positions());
+    motion_test::drive_getup(*timeout_runtime.runtime, timeout_io, 1);
+    request.request_id = 2;
+    motion_test::update(*timeout_runtime.runtime, timeout_io, &request);
+    const auto timed_out = motion_test::update(*timeout_runtime.runtime, timeout_io);
+    expect(timed_out.status.mode == qc::MotionMode::Passive &&
+            timeout_runtime.runtime->query_result(2).state ==
+                qc::ModeResultState::Failed,
+        "轮编码器无进展达到 timeout 后应失败并回到 Passive");
+    expect(timeout_io.submitted.back().joints[0].mode == qc::ControlMode::Disabled,
+        "Event chain 超时周期应提交显式 Disabled");
+}
+
 }  // namespace
 
 int main()
@@ -879,9 +1486,14 @@ int main()
     test_rl_behavior_requires_base_command();
     test_request_interruptions_and_explicit_rejections();
     test_fault_fails_active_request();
+    test_robot_io_fault_injection_matrix();
+    test_rl_fault_injection_and_diagnostics();
     test_direct_policy_switches();
     test_policy_transition_and_failure();
     test_policy_transition_interrupted_by_passive();
+    test_retry_and_mixed_wheel_commands();
+    test_fixed_drive_behaviors();
+    test_event_chain_capability_and_request_interface();
 
     if (motion_test::failures > 0)
     {

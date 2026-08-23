@@ -100,6 +100,79 @@ MujocoRobotIO::ResetResult MujocoRobotIO::reset(const std::uint64_t session_id)
     return result;
 }
 
+MujocoRobotIO::ResetResult MujocoRobotIO::reset_simulation_state(const int keyframe_id)
+{
+    ResetResult result;
+    if (session_id_ == 0)
+    {
+        result.code = core::RobotIOCode::Rejected;
+        result.error_message = "no established session";
+        return result;
+    }
+    if (status_.state == core::RobotIOState::Fault)
+    {
+        result.code = core::RobotIOCode::Fault;
+        result.error_message = "RobotIO is in fault state";
+        return result;
+    }
+
+    const mjModel* const model = model_.raw_model();
+    mjData* const data = model_.raw_data();
+    if (keyframe_id < -1 || keyframe_id >= model->nkey)
+    {
+        result.code = core::RobotIOCode::Rejected;
+        result.error_message = "keyframe_id is out of range";
+        return result;
+    }
+
+    // 用户侧仿真复位只搬动物理状态。时间和会话连续，运动状态机可像旧 runner
+    // 一样继续运行，同时仍满足 StateFrame 时间戳单调约束。
+    const mjtNum continued_time = data->time + model->opt.timestep;
+    if (keyframe_id >= 0)
+    {
+        mj_resetDataKeyframe(model, data, keyframe_id);
+    }
+    else
+    {
+        mj_resetData(model, data);
+    }
+    data->time = continued_time;
+
+    core::Nanoseconds now_ns{0};
+    if (const SimTimeError error = seconds_to_nanoseconds(data->time, now_ns);
+        error != SimTimeError::None)
+    {
+        status_.state = core::RobotIOState::Fault;
+        result.code = core::RobotIOCode::Fault;
+        result.error_message = sim_time_error_message(error);
+        return result;
+    }
+    const bool active = command_is_active(latest_command_, has_command_, now_ns);
+    if (const std::string error = apply_joint_commands(
+            *data, model_, robot_model_, latest_command_, active);
+        !error.empty())
+    {
+        status_.state = core::RobotIOState::Fault;
+        result.code = core::RobotIOCode::Fault;
+        result.error_message = error;
+        return result;
+    }
+    mj_forward(model, data);
+
+    if (const std::string error = refresh_latest_state(session_id_); !error.empty())
+    {
+        result.code = core::RobotIOCode::Fault;
+        result.error_message = error;
+        return result;
+    }
+    latest_state_.last_accepted_command_sequence = status_.latest_command_sequence;
+    latest_state_.effective_command_sequence = active ? latest_command_.header.sequence : 0;
+    latest_state_.safety_state = core::SafetyState::ControlEnabled;
+    status_.state = core::RobotIOState::Ready;
+    result.code = core::RobotIOCode::Ok;
+    return result;
+}
+
 core::RobotIOCode MujocoRobotIO::read_latest(core::StateFrame& frame)
 {
     if (!has_state_)

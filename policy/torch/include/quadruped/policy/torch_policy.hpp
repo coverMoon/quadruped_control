@@ -1,6 +1,6 @@
 /**
  * @file torch_policy.hpp
- * @brief 定义单个 TorchScript black 策略的轻量推理适配器。
+ * @brief 定义 black 与 blackW 共用的 TorchScript 策略推理适配器。
  */
 
 #pragma once

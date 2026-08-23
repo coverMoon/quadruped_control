@@ -30,6 +30,10 @@ public:
     // 建立新会话（会话号递增）并清除未完成请求；失败时返回可读原因，空串表示成功。
     std::string reset_new_session();
 
+    // 在当前会话内重置物理姿态，并保持 MotionRuntime 当前行为和策略。
+    // keyframe_id 为 -1 时恢复模型零位，否则加载指定 keyframe。
+    std::string reset_simulation_state(int keyframe_id);
+
     // 把终端输入转换为速度命令和一次性运动请求。
     void apply_input(const SimInput& input);
 

@@ -1,0 +1,5 @@
+# 文件：blackW_mujoco.yaml
+# 作用：配置 blackW MuJoCo 仿真的实时调度和画面同步参数。
+real_time_factor: 1.0
+visual_sync_hz: 60.0
+vsync: true

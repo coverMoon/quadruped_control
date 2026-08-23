@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -20,6 +21,19 @@ namespace qm = quadruped::motion;
 
 namespace motion_test
 {
+
+enum class RobotIOFaultInjection : std::uint8_t
+{
+    None = 0,
+    NoData,
+    Disconnected,
+    BackendFault,
+    FutureTimestamp,
+    InvalidImu,
+    NonFiniteJoint,
+    InfiniteJoint,
+    ExpiredCommand,
+};
 
 // 简单测试程序累计失败断言，全部用例运行后统一返回非零退出码。
 inline int failures = 0;
@@ -61,29 +75,93 @@ public:
     qc::RobotIOCode submit_code{qc::RobotIOCode::Ok};
     qc::StateFrame state{};
     std::vector<qc::CommandFrame> submitted{};
+    RobotIOFaultInjection injection{RobotIOFaultInjection::None};
+    qc::RobotIOStatus status_snapshot{qc::RobotIOState::Ready};
+
+    void inject(const RobotIOFaultInjection fault)
+    {
+        injection = fault;
+        status_snapshot.state = fault == RobotIOFaultInjection::Disconnected
+            ? qc::RobotIOState::Disconnected
+            : (fault == RobotIOFaultInjection::BackendFault
+                      ? qc::RobotIOState::Fault
+                      : qc::RobotIOState::Ready);
+    }
+
+    void clear_injection()
+    {
+        injection = RobotIOFaultInjection::None;
+        status_snapshot.state = qc::RobotIOState::Ready;
+    }
 
     qc::RobotIOCode read_latest(qc::StateFrame& frame) override
     {
+        if (injection == RobotIOFaultInjection::NoData)
+        {
+            status_snapshot.state = qc::RobotIOState::Paused;
+            return qc::RobotIOCode::NoData;
+        }
+        if (injection == RobotIOFaultInjection::Disconnected)
+        {
+            return qc::RobotIOCode::Disconnected;
+        }
+        if (injection == RobotIOFaultInjection::BackendFault)
+        {
+            return qc::RobotIOCode::Fault;
+        }
         if (read_code != qc::RobotIOCode::Ok)
         {
             return read_code;
         }
         frame = state;
+        if (injection == RobotIOFaultInjection::FutureTimestamp)
+        {
+            frame.header.timestamp_ns += 1;
+        }
+        else if (injection == RobotIOFaultInjection::InvalidImu)
+        {
+            frame.imu.valid = false;
+        }
+        else if (injection == RobotIOFaultInjection::NonFiniteJoint)
+        {
+            frame.joints[0].position = std::numeric_limits<double>::quiet_NaN();
+        }
+        else if (injection == RobotIOFaultInjection::InfiniteJoint)
+        {
+            frame.joints[0].velocity = std::numeric_limits<double>::infinity();
+        }
+        status_snapshot.latest_state_sequence = frame.header.sequence;
         return qc::RobotIOCode::Ok;
     }
 
     qc::RobotIOCode submit(const qc::CommandFrame& frame) override
     {
+        if (injection == RobotIOFaultInjection::Disconnected)
+        {
+            ++status_snapshot.rejected_command_frames;
+            return qc::RobotIOCode::Disconnected;
+        }
+        if (injection == RobotIOFaultInjection::BackendFault)
+        {
+            ++status_snapshot.rejected_command_frames;
+            return qc::RobotIOCode::Fault;
+        }
+        if (injection == RobotIOFaultInjection::ExpiredCommand)
+        {
+            ++status_snapshot.rejected_command_frames;
+            return qc::RobotIOCode::InvalidFrame;
+        }
         if (submit_code == qc::RobotIOCode::Ok)
         {
             submitted.push_back(frame);
+            status_snapshot.latest_command_sequence = frame.header.sequence;
         }
         return submit_code;
     }
 
     qc::RobotIOStatus status() const noexcept override
     {
-        return {};
+        return status_snapshot;
     }
 };
 
@@ -107,6 +185,29 @@ inline qc::RobotModel make_test_model()
     return model;
 }
 
+inline qc::RobotModel make_wheel_test_model()
+{
+    qc::RobotModel model;
+    model.name = "test_wheel_quadruped";
+    model.joint_count = 16;
+    constexpr const char* names[16] = {
+        "FL_hip_joint", "FL_thigh_joint", "FL_calf_joint", "FL_wheel_joint",
+        "FR_hip_joint", "FR_thigh_joint", "FR_calf_joint", "FR_wheel_joint",
+        "RL_hip_joint", "RL_thigh_joint", "RL_calf_joint", "RL_wheel_joint",
+        "RR_hip_joint", "RR_thigh_joint", "RR_calf_joint", "RR_wheel_joint",
+    };
+    for (std::size_t i = 0; i < model.joint_count; ++i)
+    {
+        const bool is_wheel = i % 4 == 3;
+        model.joints[i].name = names[i];
+        model.joints[i].role = is_wheel ? qc::JointRole::Wheel : qc::JointRole::Leg;
+        model.joints[i].limits = is_wheel
+            ? qc::JointLimits{false, 0.0, 0.0, 50.0, 20.0, 0.0, 10.0}
+            : qc::JointLimits{true, -3.0, 3.0, 20.0, 40.0, 100.0, 10.0};
+    }
+    return model;
+}
+
 // 测试用小幅周期数的控制器配置，姿态和增益与 black 真实配置一致。
 inline qc::ControllerConfig make_test_config()
 {
@@ -126,6 +227,42 @@ inline qc::ControllerConfig make_test_config()
         config.stand_position[i] = stand[i];
         config.fixed_kp[i] = 80.0;
         config.fixed_kd[i] = 3.0;
+    }
+    return config;
+}
+
+inline qc::ControllerConfig make_wheel_test_config()
+{
+    qc::ControllerConfig config;
+    config.control_period_ns = 5'000'000;
+    config.command_validity_ns = 10'000'000;
+    config.getup_pre_cycles = 2;
+    config.getup_cycles = 1;
+    config.getdown_cycles = 2;
+    for (std::size_t i = 0; i < 16; ++i)
+    {
+        const bool is_wheel = i % 4 == 3;
+        config.pre_getup_position[i] = is_wheel ? 0.0 : 0.2;
+        config.stand_position[i] = is_wheel ? 0.0 : 0.4;
+        config.fixed_kp[i] = is_wheel ? 0.0 : 80.0;
+        config.fixed_kd[i] = is_wheel ? 0.5 : 3.0;
+    }
+    return config;
+}
+
+inline qm::RetryConfig make_retry_config(const qc::RobotModel& model)
+{
+    qm::RetryConfig config;
+    config.robot_name = model.name;
+    config.joint_count = model.joint_count;
+    config.prepare_cycles = 2;
+    for (std::size_t i = 0; i < model.joint_count; ++i)
+    {
+        const bool is_wheel = model.joints[i].role == qc::JointRole::Wheel;
+        config.joint_names[i] = model.joints[i].name;
+        config.target_positions[i] = is_wheel ? 0.0 : 0.3;
+        config.kp[i] = is_wheel ? 0.0 : 70.0;
+        config.kd[i] = is_wheel ? 0.7 : 2.5;
     }
     return config;
 }

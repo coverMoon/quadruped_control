@@ -19,8 +19,10 @@ inline constexpr double kCommandIncrement = 0.1;
 
 }  // 匿名命名空间
 
-TerminalInput::TerminalInput(std::array<double, 3> command_limits)
-    : command_limits_(command_limits)
+TerminalInput::TerminalInput(
+    std::array<double, 3> command_limits,
+    const bool fixed_drive_enabled)
+    : command_limits_(command_limits), fixed_drive_enabled_(fixed_drive_enabled)
 {
     if (isatty(STDIN_FILENO) == 0 || tcgetattr(STDIN_FILENO, &original_termios_) != 0)
     {
@@ -40,6 +42,21 @@ TerminalInput::~TerminalInput()
     {
         tcsetattr(STDIN_FILENO, TCSANOW, &original_termios_);
     }
+}
+
+void TerminalInput::set_command_limits(const std::array<double, 3>& command_limits)
+{
+    for (const double limit : command_limits)
+    {
+        if (!std::isfinite(limit) || limit <= 0.0)
+        {
+            return;
+        }
+    }
+    command_limits_ = command_limits;
+    vx_ = std::clamp(vx_, -command_limits_[0], command_limits_[0]);
+    vy_ = std::clamp(vy_, -command_limits_[1], command_limits_[1]);
+    wz_ = std::clamp(wz_, -command_limits_[2], command_limits_[2]);
 }
 
 void TerminalInput::adjust(
@@ -89,11 +106,37 @@ void TerminalInput::handle_character(
     case '1':
         input.start_rl = true;
         break;
+    case '5':
+        input.retry = true;
+        break;
+    case '6':
+        input.event_chain = true;
+        break;
     case '2':
-        input.switch_policy = true;
+        if (fixed_drive_enabled_)
+        {
+            input.bridge_drive = true;
+        }
+        else
+        {
+            input.switch_policy = true;
+        }
         break;
     case '3':
-        input.switch_policy = true;
+        if (fixed_drive_enabled_)
+        {
+            input.low_bar_drive = true;
+        }
+        else
+        {
+            input.switch_policy = true;
+        }
+        break;
+    case '4':
+        if (fixed_drive_enabled_)
+        {
+            input.car_drive = true;
+        }
         break;
     case '9':
         input.getdown = true;

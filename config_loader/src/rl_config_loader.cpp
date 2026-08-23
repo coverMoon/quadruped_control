@@ -1,6 +1,6 @@
 /**
  * @file rl_config_loader.cpp
- * @brief 实现 black RL 策略所需最小 YAML 配置加载。
+ * @brief 实现 black/blackW RL 固定容量配置加载和显式关节映射校验。
  */
 
 #include "quadruped/config/rl_config_loader.hpp"
@@ -9,6 +9,7 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <cstdint>
 #include <filesystem>
 #include <string>
 
@@ -17,22 +18,193 @@ namespace quadruped::config
 namespace
 {
 
-bool read_config(detail::FieldReader& reader, motion::RlConfig& config)
+bool read_size(
+    detail::FieldReader& reader,
+    const char* key,
+    std::size_t& output,
+    const std::size_t maximum)
 {
-    return reader.required("name", config.name) &&
-        reader.required("robot_name", config.robot_name) &&
-        reader.required("model_path", config.model_path) &&
-        reader.double_array("command_scale", config.command_scale.data(), 3) &&
+    std::int64_t value = 0;
+    if (!reader.required(key, value))
+    {
+        return false;
+    }
+    if (value <= 0 || static_cast<std::uint64_t>(value) > maximum)
+    {
+        return reader.fail(std::string("key \"") + key + "\" is out of range");
+    }
+    output = static_cast<std::size_t>(value);
+    return true;
+}
+
+bool read_index_sequence(
+    const YAML::Node& root,
+    const char* key,
+    std::size_t* output,
+    const std::size_t expected_size,
+    std::string& error)
+{
+    const YAML::Node values = root[key];
+    if (!values || !values.IsSequence() || values.size() != expected_size)
+    {
+        error = std::string("key \"") + key + "\" must contain " +
+            std::to_string(expected_size) + " indices";
+        return false;
+    }
+    try
+    {
+        for (std::size_t i = 0; i < expected_size; ++i)
+        {
+            const std::int64_t value = values[i].as<std::int64_t>();
+            if (value < 0)
+            {
+                error = std::string("key \"") + key + "\" contains a negative index";
+                return false;
+            }
+            output[i] = static_cast<std::size_t>(value);
+        }
+    }
+    catch (const YAML::Exception& exception)
+    {
+        error = std::string("invalid index in key \"") + key + "\": " + exception.what();
+        return false;
+    }
+    return true;
+}
+
+bool read_joint_names(
+    const YAML::Node& root,
+    const core::RobotModel& model,
+    motion::RlConfig& config,
+    std::string& error)
+{
+    const YAML::Node values = root["joint_names"];
+    if (!values || !values.IsSequence() || values.size() != model.joint_count)
+    {
+        error = "joint_names must match the RobotModel joint count";
+        return false;
+    }
+    try
+    {
+        for (std::size_t i = 0; i < model.joint_count; ++i)
+        {
+            config.joint_names[i] = values[i].as<std::string>();
+        }
+    }
+    catch (const YAML::Exception& exception)
+    {
+        error = "invalid joint_names: " + std::string(exception.what());
+        return false;
+    }
+    return true;
+}
+
+bool read_observation_order(const YAML::Node& root, std::string& error)
+{
+    constexpr const char* expected[6] = {
+        "commands", "angular_velocity", "projected_gravity",
+        "joint_position_error", "joint_velocity", "previous_action"};
+    const YAML::Node values = root["observation_order"];
+    if (!values || !values.IsSequence() || values.size() != 6)
+    {
+        error = "observation_order must contain the six supported fields";
+        return false;
+    }
+    try
+    {
+        for (std::size_t i = 0; i < 6; ++i)
+        {
+            if (values[i].as<std::string>() != expected[i])
+            {
+                error = "observation_order does not match the supported RL layout";
+                return false;
+            }
+        }
+    }
+    catch (const YAML::Exception& exception)
+    {
+        error = "invalid observation_order: " + std::string(exception.what());
+        return false;
+    }
+    return true;
+}
+
+bool read_action_modes(detail::FieldReader& reader, motion::RlConfig& config)
+{
+    std::string leg_mode;
+    std::string wheel_mode;
+    if (!reader.required("leg_action_mode", leg_mode) ||
+        !reader.required("wheel_action_mode", wheel_mode))
+    {
+        return false;
+    }
+    if (leg_mode != "position_residual" || wheel_mode != "target_velocity")
+    {
+        return reader.fail("unsupported leg_action_mode or wheel_action_mode");
+    }
+    config.leg_action_mode = motion::RlJointActionMode::PositionResidual;
+    config.wheel_action_mode = motion::RlJointActionMode::TargetVelocity;
+    return true;
+}
+
+bool read_config(
+    detail::FieldReader& reader,
+    const core::RobotModel& model,
+    motion::RlConfig& config)
+{
+    config.joint_count = model.joint_count;
+    if (!reader.required("name", config.name) ||
+        !reader.required("robot_name", config.robot_name) ||
+        !reader.required("model_path", config.model_path))
+    {
+        return false;
+    }
+    if (!read_size(reader, "observation_dimension", config.observation_dimension,
+            motion::kMaxRlObservationDim) ||
+        !read_size(reader, "inference_input_dimension", config.inference_input_dimension,
+            motion::kMaxRlInputDim) ||
+        !read_size(reader, "action_dimension", config.action_dimension,
+            motion::kMaxRlActionDim))
+    {
+        return false;
+    }
+    const YAML::Node root = reader.node();
+    const YAML::Node history = root["history_frames"];
+    if (!history || !history.IsSequence() || history.size() == 0 ||
+        history.size() > motion::kMaxRlHistoryFrames)
+    {
+        return reader.fail("history_frames must be a nonempty bounded sequence");
+    }
+    config.history_frame_count = history.size();
+    std::size_t model_wheel_count = 0;
+    for (std::size_t i = 0; i < model.joint_count; ++i)
+    {
+        model_wheel_count += model.joints[i].role == core::JointRole::Wheel ? 1U : 0U;
+    }
+    config.wheel_count = model_wheel_count;
+    if (!read_index_sequence(root, "history_frames", config.history_frames.data(),
+            config.history_frame_count, reader.error_message()) ||
+        !read_joint_names(root, model, config, reader.error_message()) ||
+        !read_index_sequence(root, "policy_dof_indices", config.policy_dof_indices.data(),
+            config.action_dimension, reader.error_message()) ||
+        !read_index_sequence(root, "wheel_indices", config.wheel_indices.data(),
+            config.wheel_count, reader.error_message()) ||
+        !read_observation_order(root, reader.error_message()) ||
+        !read_action_modes(reader, config))
+    {
+        return false;
+    }
+    return reader.double_array("command_scale", config.command_scale.data(), 3) &&
         reader.double_array("command_limits", config.command_limits.data(), 3) &&
         reader.required("angular_velocity_scale", config.angular_velocity_scale) &&
         reader.required("joint_position_scale", config.joint_position_scale) &&
         reader.required("joint_velocity_scale", config.joint_velocity_scale) &&
         reader.required("observation_clip", config.observation_clip) &&
         reader.double_array("default_joint_positions",
-            config.default_joint_positions.data(), motion::kRlJointCount) &&
-        reader.double_array("kp", config.kp.data(), motion::kRlJointCount) &&
-        reader.double_array("kd", config.kd.data(), motion::kRlJointCount) &&
-        reader.required("action_scale", config.action_scale) &&
+            config.default_joint_positions.data(), config.action_dimension) &&
+        reader.double_array("kp", config.kp.data(), config.action_dimension) &&
+        reader.double_array("kd", config.kd.data(), config.action_dimension) &&
+        reader.double_array("action_scale", config.action_scale.data(), config.action_dimension) &&
         reader.required("action_clip", config.action_clip) &&
         reader.required("max_position_jump", config.max_position_jump);
 }
@@ -69,7 +241,7 @@ RlConfigLoadResult load_rl_config(
     }
 
     detail::FieldReader reader(root, result.error_message);
-    if (!read_config(reader, result.config))
+    if (!read_config(reader, model, result.config))
     {
         return result;
     }

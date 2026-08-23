@@ -14,6 +14,11 @@ struct SimInput
     bool getup{false};          // 0：请求起立
     bool start_rl{false};       // 1：从 Stand 启动 RL 行走
     bool switch_policy{false};  // 2/3：Running 中切换到策略循环的下一项
+    bool bridge_drive{false};   // 2：blackW Bridge drive
+    bool low_bar_drive{false};  // 3：blackW Low-bar drive
+    bool car_drive{false};      // 4：blackW Car drive
+    bool retry{false};          // 5：进入共用 Retry 恢复锁定
+    bool event_chain{false};    // 6：进入 Event chain
     bool getdown{false};        // 9：请求趴下
     bool enter_passive{false};  // P：请求进入被动
     bool reset{false};          // R：reset 并建立新会话

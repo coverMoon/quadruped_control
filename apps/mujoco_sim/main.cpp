@@ -9,6 +9,7 @@
 #include "terminal_input.hpp"
 
 #include "quadruped/backends/mujoco/mujoco_robot_io.hpp"
+#include "quadruped/config/behavior_config_loader.hpp"
 #include "quadruped/config/robot_config.hpp"
 #include "quadruped/config/simulation_config.hpp"
 #include "quadruped/motion/motion_runtime.hpp"
@@ -45,6 +46,7 @@ constexpr const char* kDefaultScenePath = QUADRUPED_DEFAULT_SCENE_PATH;
 constexpr const char* kDefaultRobotConfigPath = QUADRUPED_DEFAULT_ROBOT_CONFIG_PATH;
 constexpr const char* kDefaultControllerConfigPath = QUADRUPED_DEFAULT_CONTROLLER_CONFIG_PATH;
 constexpr const char* kDefaultSimulationConfigPath = QUADRUPED_DEFAULT_SIMULATION_CONFIG_PATH;
+constexpr const char* kDefaultRetryConfigPath = QUADRUPED_DEFAULT_RETRY_CONFIG_PATH;
 #if defined(QUADRUPED_WITH_TORCH)
 constexpr const char* kDefaultPolicySwitchConfigPath =
     QUADRUPED_DEFAULT_POLICY_SWITCH_CONFIG_PATH;
@@ -56,8 +58,19 @@ constexpr std::uint64_t kStartupId = 1;
 struct Options
 {
     std::string scene_path = kDefaultScenePath;
+    std::string robot_config_path = kDefaultRobotConfigPath;
+    std::string controller_config_path = kDefaultControllerConfigPath;
+    std::string simulation_config_path = kDefaultSimulationConfigPath;
+    std::string retry_config_path = kDefaultRetryConfigPath;
+    std::string event_chain_config_path{};
+    std::string fixed_drive_config_dir{};
+#if defined(QUADRUPED_WITH_TORCH)
+    std::string policy_switch_config_path = kDefaultPolicySwitchConfigPath;
+    bool load_policy{true};
+#endif
 };
 
+#if defined(QUADRUPED_WITH_TORCH)
 struct LoadedPolicy
 {
     quadruped::motion::RlConfig config{};
@@ -65,15 +78,16 @@ struct LoadedPolicy
 };
 
 bool load_policies(
+    const std::string& policy_switch_config_path,
     const qc::RobotModel& model,
     qm::MotionRuntime& runtime,
     std::vector<LoadedPolicy>& policies,
     std::array<double, 3>& command_limits,
     std::string& error_message)
 {
-    const std::filesystem::path switch_path(kDefaultPolicySwitchConfigPath);
+    const std::filesystem::path switch_path(policy_switch_config_path);
     const auto switch_config = quadruped::config::load_policy_switch_config(
-        kDefaultPolicySwitchConfigPath, model.name, switch_path.parent_path().string());
+        policy_switch_config_path, model.name, switch_path.parent_path().string());
     for (const std::string& warning : switch_config.warnings)
     {
         std::cerr << "策略配置警告: " << warning << '\n';
@@ -135,12 +149,23 @@ bool load_policies(
     }
     return true;
 }
+#endif
 
 void print_usage(const char* program)
 {
     std::cout << "用法: " << program << " [选项]\n"
               << "\n选项:\n"
-              << "  --scene <路径>  MuJoCo 场景 XML（默认 black 平地）\n"
+              << "  --scene <路径>  MuJoCo 场景 XML（默认 black 地形）\n"
+              << "  --robot-config <路径>      RobotModel YAML\n"
+              << "  --controller-config <路径> 基础动作 YAML\n"
+              << "  --simulation-config <路径> 仿真调度 YAML\n"
+              << "  --retry-config <路径>      Retry 行为 YAML\n"
+              << "  --event-chain-config <路径> Event chain 行为 YAML\n"
+              << "  --fixed-drive-config-dir <目录> Car/Bridge/Low-bar YAML 目录\n"
+#if defined(QUADRUPED_WITH_TORCH)
+              << "  --policy-switch-config <路径> RL 策略循环 YAML\n"
+              << "  --no-policy                不加载 Torch 策略\n"
+#endif
               << "  -h, --help      显示本帮助\n"
               << "\n机器人按键在启动程序的终端中输入，MuJoCo 窗口保留官方快捷键。\n"
               << "W/S、A/D、Q/E 每次调整 0.1，Space 速度归零，H 显示完整帮助。\n";
@@ -156,15 +181,53 @@ bool parse_args(int argc, char** argv, Options& options)
             print_usage(argv[0]);
             std::exit(0);
         }
+#if defined(QUADRUPED_WITH_TORCH)
+        if (arg == "--no-policy")
+        {
+            options.load_policy = false;
+            continue;
+        }
+#endif
+        if (i + 1 >= argc)
+        {
+            std::cerr << arg << " 需要路径参数\n";
+            return false;
+        }
+        const std::string value = argv[++i];
         if (arg == "--scene")
         {
-            if (i + 1 >= argc)
-            {
-                std::cerr << "--scene 需要路径参数\n";
-                return false;
-            }
-            options.scene_path = argv[++i];
+            options.scene_path = value;
         }
+        else if (arg == "--robot-config")
+        {
+            options.robot_config_path = value;
+        }
+        else if (arg == "--controller-config")
+        {
+            options.controller_config_path = value;
+        }
+        else if (arg == "--simulation-config")
+        {
+            options.simulation_config_path = value;
+        }
+        else if (arg == "--retry-config")
+        {
+            options.retry_config_path = value;
+        }
+        else if (arg == "--event-chain-config")
+        {
+            options.event_chain_config_path = value;
+        }
+        else if (arg == "--fixed-drive-config-dir")
+        {
+            options.fixed_drive_config_dir = value;
+        }
+#if defined(QUADRUPED_WITH_TORCH)
+        else if (arg == "--policy-switch-config")
+        {
+            options.policy_switch_config_path = value;
+        }
+#endif
         else
         {
             std::cerr << "未知选项: " << arg << '\n';
@@ -217,7 +280,14 @@ int run_physics_loop(
         }
         const bool velocity_enabled =
             controller.last_output().status.mode == qc::MotionMode::Running &&
-            controller.last_output().status.behavior_name == "rl_locomotion";
+            (controller.last_output().status.behavior_name == "rl_locomotion" ||
+                controller.last_output().status.behavior_name == "bridge_drive" ||
+                controller.last_output().status.behavior_name == "low_bar_drive" ||
+                controller.last_output().status.behavior_name == "car_drive");
+        if (controller.last_output().status.policy_ready)
+        {
+            terminal.set_command_limits(controller.last_output().status.command_limits);
+        }
         const auto input = terminal.poll(velocity_enabled);
         if (input.quit)
         {
@@ -243,14 +313,16 @@ int run_physics_loop(
         }
         if (input.reset)
         {
-            if (const std::string error = controller.reset_new_session(); !error.empty())
+            const int default_pose_id =
+                mj_name2id(io.raw_model(), mjOBJ_KEY, "default_pose");
+            if (const std::string error =
+                    controller.reset_simulation_state(default_pose_id);
+                !error.empty())
             {
                 std::cerr << "reset 失败: " << error << '\n';
                 window.request_exit();
                 return 1;
             }
-            status_printer.reset();
-            printed_update_sequence = 0;
             window.focus_on_robot(io.raw_model(), io.raw_data());
         }
         controller.apply_input(input);
@@ -264,17 +336,22 @@ int run_physics_loop(
         const auto now = clock::now();
         if (now >= next_visual_sync)
         {
-            const bool gui_reset_requested = window.sync(io.raw_model(), io.raw_data());
-            if (gui_reset_requested)
+            const qsim::SimWindow::SimulationAction action =
+                window.sync(io.raw_model(), io.raw_data());
+            if (action.type != qsim::SimWindow::SimulationAction::Type::None)
             {
-                if (const std::string error = controller.reset_new_session(); !error.empty())
+                const int keyframe_id =
+                    action.type == qsim::SimWindow::SimulationAction::Type::LoadKey
+                    ? action.keyframe_id
+                    : -1;
+                if (const std::string error =
+                        controller.reset_simulation_state(keyframe_id);
+                    !error.empty())
                 {
-                    std::cerr << "界面 reset 后重建会话失败: " << error << '\n';
+                    std::cerr << "界面仿真状态复位失败: " << error << '\n';
                     window.request_exit();
                     return 1;
                 }
-                status_printer.reset();
-                printed_update_sequence = 0;
                 window.focus_on_robot(io.raw_model(), io.raw_data());
                 next_tick = now;
             }
@@ -298,21 +375,21 @@ int run(const Options& options)
     // basic 构建不会使用速度命令；RL 构建会用策略 YAML 覆盖这份保守默认值。
     std::array<double, 3> command_limits{3.0, 1.0, 3.0};
     bool policy_ready = false;
-    const auto model = quadruped::config::load_robot_model(kDefaultRobotConfigPath);
+    const auto model = quadruped::config::load_robot_model(options.robot_config_path);
     if (!model.ok())
     {
         std::cerr << "加载机器人配置失败: " << model.error_message << '\n';
         return 1;
     }
     const auto controller =
-        quadruped::config::load_controller_config(kDefaultControllerConfigPath, model.model);
+        quadruped::config::load_controller_config(options.controller_config_path, model.model);
     if (!controller.ok())
     {
         std::cerr << "加载控制器配置失败: " << controller.error_message << '\n';
         return 1;
     }
     const auto simulation_config =
-        quadruped::config::load_simulation_config(kDefaultSimulationConfigPath);
+        quadruped::config::load_simulation_config(options.simulation_config_path);
     if (!simulation_config.ok())
     {
         std::cerr << "加载仿真配置失败: " << simulation_config.error_message << '\n';
@@ -331,17 +408,72 @@ int run(const Options& options)
         std::cerr << "创建 MotionRuntime 失败: " << runtime.error_message << '\n';
         return 1;
     }
+    const auto retry = quadruped::config::load_retry_config(
+        options.retry_config_path, model.model);
+    if (!retry.ok())
+    {
+        std::cerr << "加载 Retry 配置失败: " << retry.error_message << '\n';
+        return 1;
+    }
+    std::string behavior_error;
+    if (!runtime.runtime->configure_retry(retry.config, behavior_error))
+    {
+        std::cerr << "配置 Retry 失败: " << behavior_error << '\n';
+        return 1;
+    }
+    if (!options.event_chain_config_path.empty())
+    {
+        const auto event_chain = quadruped::config::load_event_chain_config(
+            options.event_chain_config_path, model.model);
+        if (!event_chain.ok() ||
+            !runtime.runtime->configure_event_chain(event_chain.config, behavior_error))
+        {
+            const std::string reason = event_chain.ok()
+                ? behavior_error
+                : event_chain.error_message;
+            std::cerr << "配置 Event chain 失败: " << reason << '\n';
+            return 1;
+        }
+    }
+    if (!options.fixed_drive_config_dir.empty())
+    {
+        constexpr const char* kFixedDriveFiles[] = {
+            "bridge_drive.yaml", "low_bar_drive.yaml", "car_drive.yaml"};
+        for (const char* file : kFixedDriveFiles)
+        {
+            const std::filesystem::path path =
+                std::filesystem::path(options.fixed_drive_config_dir) / file;
+            const auto fixed = quadruped::config::load_fixed_drive_config(
+                path.string(), model.model);
+            if (!fixed.ok() ||
+                !runtime.runtime->configure_fixed_drive(fixed.config, behavior_error))
+            {
+                const std::string reason = fixed.ok()
+                    ? behavior_error
+                    : fixed.error_message;
+                std::cerr << "配置固定姿态轮驱失败: " << reason << '\n';
+                return 1;
+            }
+        }
+    }
 #if defined(QUADRUPED_WITH_TORCH)
     std::vector<LoadedPolicy> policies;
     std::string policy_error;
-    if (!load_policies(model.model, *runtime.runtime, policies, command_limits, policy_error))
+    if (options.load_policy &&
+        !load_policies(options.policy_switch_config_path,
+            model.model,
+            *runtime.runtime,
+            policies,
+            command_limits,
+            policy_error))
     {
         std::cerr << "加载 RL 策略失败: " << policy_error << '\n';
         return 1;
     }
-    policy_ready = true;
+    policy_ready = options.load_policy;
 #endif
-    qsim::TerminalInput terminal(command_limits);
+    qsim::TerminalInput terminal(
+        command_limits, !options.fixed_drive_config_dir.empty());
     if (!terminal.interactive())
     {
         std::cerr << "标准输入不是交互式终端，终端键盘控制已禁用。\n";

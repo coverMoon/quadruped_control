@@ -60,6 +60,7 @@ target_compile_definitions(quadruped_mujoco_sim
         QUADRUPED_DEFAULT_ROBOT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/robots/black.yaml"
         QUADRUPED_DEFAULT_CONTROLLER_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/controllers/black.yaml"
         QUADRUPED_DEFAULT_SIMULATION_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/simulation/black_mujoco.yaml"
+        QUADRUPED_DEFAULT_RETRY_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/behaviors/black/retry.yaml"
 )
 
 if(QUADRUPED_ENABLE_TORCH)

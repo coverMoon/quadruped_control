@@ -22,10 +22,26 @@ RemoteRobotIO::RemoteRobotIO(SharedMemory& memory, core::RobotModel model)
 {
 }
 
+bool RemoteRobotIO::read_backend_heartbeat(WireHeartbeat& heartbeat) const noexcept
+{
+    WireHeartbeat latest;
+    if (ipc::read_latest(memory_.layout().backend_heartbeat, latest))
+    {
+        cached_backend_heartbeat_ = latest;
+        has_cached_backend_heartbeat_ = true;
+    }
+    if (!has_cached_backend_heartbeat_)
+    {
+        return false;
+    }
+    heartbeat = cached_backend_heartbeat_;
+    return true;
+}
+
 bool RemoteRobotIO::backend_online() const noexcept
 {
     WireHeartbeat heartbeat;
-    if (!ipc::read_latest(memory_.layout().backend_heartbeat, heartbeat) || heartbeat.online == 0)
+    if (!read_backend_heartbeat(heartbeat) || heartbeat.online == 0)
     {
         return false;
     }
@@ -36,17 +52,34 @@ bool RemoteRobotIO::backend_online() const noexcept
 
 core::RobotIOCode RemoteRobotIO::read_latest(core::StateFrame& frame)
 {
-    if (!backend_online())
+    WireHeartbeat heartbeat;
+    if (!read_backend_heartbeat(heartbeat) || heartbeat.online == 0)
+    {
+        cached_status_.state = core::RobotIOState::Disconnected;
+        return core::RobotIOCode::Disconnected;
+    }
+    const std::int64_t now = monotonic_now_ns();
+    if (heartbeat.monotonic_ns <= 0 || now < heartbeat.monotonic_ns ||
+        now - heartbeat.monotonic_ns > kHeartbeatTimeoutNs)
     {
         cached_status_.state = core::RobotIOState::Disconnected;
         return core::RobotIOCode::Disconnected;
     }
 
-    WireHeartbeat heartbeat;
     WireStateFrame wire;
-    if (!ipc::read_latest(memory_.layout().backend_heartbeat, heartbeat) ||
-        !ipc::read_latest(memory_.layout().state, wire))
+    if (!ipc::read_latest(memory_.layout().state, wire))
     {
+        // 发布者短暂占用状态槽时复用同一 backend 会话内最后一帧。
+        // heartbeat 的 500 ms 时限仍会让真正断线进入安全退路。
+        if (has_cached_state_ &&
+            cached_state_.header.startup_id == heartbeat.startup_id &&
+            cached_state_.header.session_id == heartbeat.session_id)
+        {
+            frame = cached_state_;
+            cached_status_.state = core::RobotIOState::Ready;
+            cached_status_.latest_state_sequence = frame.header.sequence;
+            return core::RobotIOCode::Ok;
+        }
         cached_status_.state = core::RobotIOState::Paused;
         return core::RobotIOCode::NoData;
     }
@@ -57,6 +90,8 @@ core::RobotIOCode RemoteRobotIO::read_latest(core::StateFrame& frame)
         cached_status_.state = core::RobotIOState::Fault;
         return core::RobotIOCode::InvalidFrame;
     }
+    cached_state_ = frame;
+    has_cached_state_ = true;
     cached_status_.state = core::RobotIOState::Ready;
     cached_status_.latest_state_sequence = frame.header.sequence;
     return core::RobotIOCode::Ok;
@@ -64,14 +99,20 @@ core::RobotIOCode RemoteRobotIO::read_latest(core::StateFrame& frame)
 
 core::RobotIOCode RemoteRobotIO::submit(const core::CommandFrame& frame)
 {
-    if (!backend_online())
+    WireHeartbeat heartbeat;
+    if (!read_backend_heartbeat(heartbeat) || heartbeat.online == 0)
     {
         cached_status_.state = core::RobotIOState::Disconnected;
         return core::RobotIOCode::Disconnected;
     }
-    WireHeartbeat heartbeat;
-    if (!ipc::read_latest(memory_.layout().backend_heartbeat, heartbeat) ||
-        frame.header.startup_id != heartbeat.startup_id ||
+    const std::int64_t now = monotonic_now_ns();
+    if (heartbeat.monotonic_ns <= 0 || now < heartbeat.monotonic_ns ||
+        now - heartbeat.monotonic_ns > kHeartbeatTimeoutNs)
+    {
+        cached_status_.state = core::RobotIOState::Disconnected;
+        return core::RobotIOCode::Disconnected;
+    }
+    if (frame.header.startup_id != heartbeat.startup_id ||
         frame.header.session_id != heartbeat.session_id ||
         !core::validate(frame, model_, frame.header.timestamp_ns).ok())
     {

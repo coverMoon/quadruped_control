@@ -9,6 +9,7 @@
 #include "quadruped/core/robot_io.hpp"
 #include "quadruped/core/robot_model.hpp"
 #include "quadruped/core/types.hpp"
+#include "quadruped/motion/behavior_config.hpp"
 #include "quadruped/motion/rl_controller.hpp"
 
 #include <array>
@@ -34,6 +35,20 @@ struct MotionUpdateInput
     const core::ModeRequest* request{nullptr};
 };
 
+// 单周期诊断快照只包含标量和枚举，可由低频日志线程按需抽样；MotionRuntime 本身不写文件。
+struct MotionDiagnostics
+{
+    std::uint64_t startup_id{0};
+    std::uint64_t session_id{0};
+    std::uint64_t state_sequence{0};
+    std::uint64_t command_sequence{0};
+    std::uint64_t effective_command_sequence{0};
+    core::Nanoseconds state_age_ns{0};
+    std::uint64_t dropped_state_frames{0};
+    std::uint64_t rejected_command_frames{0};
+    core::Nanoseconds inference_elapsed_ns{0};
+};
+
 // MotionRuntime 一次周期更新的输出，全部按值返回，不持有内部指针。
 struct MotionUpdateOutput
 {
@@ -46,6 +61,9 @@ struct MotionUpdateOutput
 
     // 当前低频状态快照。
     core::MotionStatus status{};
+
+    // 供日志、回放对比和状态界面抽样的诊断字段。
+    MotionDiagnostics diagnostics{};
 
     // 输入中存在请求时对应的处理结果；has_result 为 false 时 result 无意义。
     bool has_result{false};
@@ -86,6 +104,15 @@ public:
     // 构造前校验 RobotModel 和 ControllerConfig；不合法的配置拒绝创建，
     // 不允许运行时使用部分默认值继续主动控制。
     static CreateResult create(core::RobotModel model, core::ControllerConfig config);
+
+    // 配置共用 Retry；数组必须与 RobotModel 的名称、顺序和限制一致。
+    bool configure_retry(RetryConfig config, std::string& error_message);
+
+    // 注册 Car、Bridge 或 Low-bar 配置；同名配置只能注册一次。
+    bool configure_fixed_drive(FixedDriveConfig config, std::string& error_message);
+
+    // 配置 Event chain 并检查姿态、轮组、行程和关节限制。
+    bool configure_event_chain(EventChainConfig config, std::string& error_message);
 
     // 注册一个由调用方持有的同步策略。策略对象必须比 MotionRuntime 生命周期长。
     // 注册不会改变当前策略；策略名称在同一运行时内必须唯一。
@@ -193,6 +220,25 @@ private:
         const core::BaseCommand* base_command,
         MotionUpdateOutput& output);
 
+    // Retry 插值完成后继续锁定恢复姿态，不自动退出 Running。
+    bool run_retry_mode(
+        core::RobotIO& io,
+        const StateRead& state,
+        MotionUpdateOutput& output);
+
+    // 以固定腿姿态和显式左右轮映射执行 Car、Bridge、Low-bar 差速轮控制。
+    bool run_fixed_drive_mode(
+        core::RobotIO& io,
+        const StateRead& state,
+        const core::BaseCommand* base_command,
+        MotionUpdateOutput& output);
+
+    // 按 rl_sar 的 pose、drive、pose_drive 语义推进 Event chain。
+    bool run_event_chain_mode(
+        core::RobotIO& io,
+        const StateRead& state,
+        MotionUpdateOutput& output);
+
     // 策略切换期间只输出固定位置阻抗，不调用旧策略推理。
     bool run_policy_transition(
         core::RobotIO& io,
@@ -203,6 +249,8 @@ private:
     void activate_policy(std::size_t policy_index);
 
     [[nodiscard]] std::size_t find_policy(const std::string& name) const;
+
+    [[nodiscard]] std::size_t find_fixed_drive(const std::string& name) const;
 
     [[nodiscard]] bool pose_close_to_policy(
         const RlConfig& config, const std::array<double, core::kMaxJoints>& positions) const;
@@ -271,11 +319,34 @@ private:
     std::size_t current_policy_index_{kInvalidPolicyIndex};
     std::size_t pending_policy_index_{kInvalidPolicyIndex};
     bool policy_transition_active_{false};
+    bool event_to_rl_transition_{false};
+    bool fixed_drive_to_rl_transition_{false};
     RlController* rl_controller_{nullptr};
     Policy* policy_{nullptr};
     std::string policy_name_{};
     std::uint32_t rl_control_cycle_{0};
     RlController::CommandResult rl_command_{};
+    core::Nanoseconds latest_inference_elapsed_ns_{0};
+
+    RetryConfig retry_config_{};
+    static constexpr std::size_t kMaxFixedDriveConfigs = 3;
+    static constexpr std::size_t kInvalidFixedDriveIndex = kMaxFixedDriveConfigs;
+    std::array<FixedDriveConfig, kMaxFixedDriveConfigs> fixed_drive_configs_{};
+    std::array<bool, kMaxFixedDriveConfigs> fixed_drive_configured_{};
+    std::size_t active_fixed_drive_index_{kInvalidFixedDriveIndex};
+    EventChainConfig event_chain_config_{};
+    bool retry_configured_{false};
+    bool event_chain_configured_{false};
+    bool retry_locked_{false};
+    std::size_t event_index_{0};
+    std::uint32_t event_cycle_{0};
+    std::uint32_t event_hold_cycle_{0};
+    bool event_initialized_{false};
+    bool event_motion_complete_{false};
+    bool event_chain_complete_{false};
+    std::array<double, core::kMaxJoints> event_active_pose_{};
+    std::array<double, core::kMaxJoints> event_segment_start_{};
+    std::array<double, core::kMaxJoints> event_drive_start_{};
 
     core::MotionMode mode_{core::MotionMode::Passive};
 

@@ -98,18 +98,29 @@ latest slot 使用共享 spin lock 保护普通 payload，避免用非法的无�
 BaseCommand 和 CommandFrame 的有效期相互独立。ROS 速度命令不能复用 10 ms 的关节命令
 有效期。
 
+latest slot 的短暂锁竞争不表示进程断开。读取端采用有界 CAS 重试；`RemoteRobotIO` 在同一
+backend startup/session 内保留最后一次有效 heartbeat 和 StateFrame，只在槽正被发布者占用
+时复用。heartbeat 超过 500 ms 或明确发布 offline 后仍会按真实断线处理。MuJoCo GUI 的显示
+同步同样使用非阻塞取锁；渲染线程繁忙时只丢弃一帧画面同步，不得阻塞物理步进和 heartbeat。
+
 ## 5. reset 和会话
 
-backend 首次启动建立 `session_id == 1`。执行：
+backend 首次启动建立 `session_id == 1`。用户通过键盘 `R` 或手柄 `RB + Y` 复位时，
+backend 在当前 session 内加载 `default_pose`，保持单调仿真时间以及 motiond 当前行为。
+MuJoCo GUI 的 Reset 加载模型零位，Load Key 加载当前选中的 XML keyframe；两者同样不建立
+新 session。
+
+管理和测试需要完整重建会话时执行：
 
 ```bash
 ros2 run quadruped_gateway quadruped_ipc_control \
     /quadruped_control_black reset
 ```
 
-后端成功 reset 后 session 加一，并记录 reset 时的 CommandFrame slot version。reset 前留下的
-旧命令不会在新 session 再提交。motiond 发现 startup/session 改变后清除旧 BaseCommand、
-活动请求跟踪和控制调度基准；gateway 只接收当前 motion startup 和 backend session 的结果。
+后端成功执行管理级 reset 后 session 加一，并记录 reset 时的 CommandFrame slot version。
+reset 前留下的旧命令不会在新 session 再提交。motiond 发现 startup/session 改变后清除旧
+BaseCommand、活动请求跟踪和控制调度基准；gateway 只接收当前 motion startup 和 backend
+session 的结果。
 
 ## 6. 故障退路
 

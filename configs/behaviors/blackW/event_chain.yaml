@@ -1,0 +1,117 @@
+# 文件：event_chain.yaml
+# 作用：配置直接对照 rl_sar 的 blackW 越墙事件链。
+robot_name: blackW
+joint_names:
+  [FL_hip_joint, FL_thigh_joint, FL_calf_joint, FL_wheel_joint,
+   FR_hip_joint, FR_thigh_joint, FR_calf_joint, FR_wheel_joint,
+   RL_hip_joint, RL_thigh_joint, RL_calf_joint, RL_wheel_joint,
+   RR_hip_joint, RR_thigh_joint, RR_calf_joint, RR_wheel_joint]
+exit_to_rl_cycles: 300
+interpolation: smoothstep
+wheel_radius: 0.103
+wheel_velocity_sign: [1.0, -1.0, 1.0, -1.0]
+kp:
+  [80.0, 80.0, 80.0, 0.0,
+   80.0, 80.0, 80.0, 0.0,
+   80.0, 80.0, 80.0, 0.0,
+   80.0, 80.0, 80.0, 0.0]
+kd:
+  [3.0, 3.0, 3.0, 2.0,
+   3.0, 3.0, 3.0, 2.0,
+   3.0, 3.0, 3.0, 2.0,
+   3.0, 3.0, 3.0, 2.0]
+
+# 原实现的前腿折叠目标为 ±3.14 rad；本仓库按显式 URDF 限位收敛到 ±3.0 rad。
+events:
+  - name: settle_at_wall
+    type: pose
+    transition_cycles: 200
+    hold_cycles: 100
+    dof_pos: [0.0, 0.8014, -1.527, 0.0,
+              0.0, -0.8014, 1.527, 0.0,
+              0.0, 0.8014, -1.527, 0.0,
+              0.0, -0.8014, 1.527, 0.0]
+
+  - name: tuck_front_above_wall
+    type: pose
+    transition_cycles: 400
+    hold_cycles: 100
+    dof_pos: [0.0, 3.0, -2.5, 0.0,
+              0.0, -3.0, 2.5, 0.0,
+              0.0, 0.8014, -1.527, 0.0,
+              0.0, -0.8014, 1.527, 0.0]
+
+  - name: level_body_on_wall
+    type: pose
+    transition_cycles: 160
+    hold_cycles: 50
+    dof_pos: [0.0, 3.0, -2.5, 0.0,
+              0.0, -3.0, 2.5, 0.0,
+              0.0, 1.55, -1.4, 0.0,
+              0.0, -1.55, 1.4, 0.0]
+
+  - name: rear_wheels_push_body_over_wall
+    type: drive
+    wheel_group: rear
+    distance_m: 0.4
+    speed_mps: 0.8
+    timeout_cycles: 600
+
+  - name: lower_front_early
+    type: pose
+    transition_cycles: 120
+    hold_cycles: 50
+    dof_pos: [0.0, 1.0, -1.85, 0.0,
+              0.0, -1.0, 1.85, 0.0,
+              0.0, 1.0, -1.85, 0.0,
+              0.0, -1.0, 1.85, 0.0]
+
+  - name: lean_forward_for_rear_lift
+    type: pose
+    transition_cycles: 120
+    hold_cycles: 50
+    dof_pos: [0.0, 1.2, -2.0, 0.0,
+              0.0, -1.2, 2.0, 0.0,
+              0.0, 1.0, -1.85, 0.0,
+              0.0, -1.0, 1.85, 0.0]
+
+  - name: rear_wheels_climb_onto_wall
+    type: pose_drive
+    transition_cycles: 200
+    wheel_group: rear
+    distance_m: 0.75
+    speed_mps: 0.8
+    timeout_cycles: 500
+    hold_cycles: 100
+    dof_pos: [0.0, 1.2, -2.4, 0.0,
+              0.0, -1.2, 2.4, 0.0,
+              -0.5, -0.15, -2.5, 0.0,
+              0.5, 0.15, 2.5, 0.0]
+
+  - name: rear_kick_backward
+    type: pose_drive
+    transition_cycles: 120
+    wheel_group: front
+    distance_m: 0.12
+    speed_mps: 0.2
+    timeout_cycles: 300
+    dof_pos: [0.0, 1.2, -2.4, 0.0,
+              0.0, -1.2, 2.4, 0.0,
+              0.0, 0.4, -2.5, 0.0,
+              0.0, -0.4, 2.5, 0.0]
+
+  - name: front_wheels_pull_after_rear_kick
+    type: drive
+    wheel_group: front
+    distance_m: 0.32
+    speed_mps: 0.8
+    timeout_cycles: 600
+    hold_cycles: 100
+
+  - name: restore_default_stand
+    type: pose
+    transition_cycles: 500
+    dof_pos: [0.0, 0.8014, -1.527, 0.0,
+              0.0, -0.8014, 1.527, 0.0,
+              0.0, 0.8014, -1.527, 0.0,
+              0.0, -0.8014, 1.527, 0.0]

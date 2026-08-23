@@ -195,6 +195,21 @@ void test_shared_memory_and_remote_io(const qc::RobotModel& model)
     const auto command = make_command(model, startup_id, session_id, state_time);
     expect(io.submit(command) == qc::RobotIOCode::Ok, "RemoteRobotIO publishes matching command");
 
+    // latest slot 的读锁竞争只是瞬态，不得把已建立的连接误判为断开或无状态。
+    owner.memory->layout().backend_heartbeat.lock.store(1, std::memory_order_release);
+    expect(io.backend_online(), "busy heartbeat slot preserves cached online state");
+    expect(io.submit(command) == qc::RobotIOCode::Ok,
+        "busy heartbeat slot does not reject a valid command");
+    owner.memory->layout().backend_heartbeat.lock.store(0, std::memory_order_release);
+
+    owner.memory->layout().state.lock.store(1, std::memory_order_release);
+    qc::StateFrame cached_state;
+    expect(io.read_latest(cached_state) == qc::RobotIOCode::Ok,
+        "busy state slot reuses the matching cached state");
+    expect(cached_state.header.sequence == state.header.sequence,
+        "cached state preserves the last valid sequence");
+    owner.memory->layout().state.lock.store(0, std::memory_order_release);
+
     auto old_session_command = command;
     old_session_command.header.sequence += 1;
     old_session_command.header.session_id = session_id - 1;

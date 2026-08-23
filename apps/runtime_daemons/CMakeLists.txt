@@ -33,6 +33,7 @@ if(QUADRUPED_ENABLE_TORCH)
         QUADRUPED_DEFAULT_ROBOT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/robots/black.yaml"
         QUADRUPED_DEFAULT_CONTROLLER_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/controllers/black.yaml"
         QUADRUPED_DEFAULT_POLICY_SWITCH_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/black/policy_switch.yaml"
+        QUADRUPED_DEFAULT_RETRY_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/behaviors/black/retry.yaml"
     )
 endif()
 

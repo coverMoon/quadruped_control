@@ -165,10 +165,18 @@ core::ModeResult MotionRuntime::dispatch_enter_passive(const core::ModeRequest& 
     status_.active_source = core::CommandSource::None;
     status_.behavior_name.clear();
     status_.behavior_phase.clear();
+    status_.error_message.clear();
     rl_control_cycle_ = 0;
     rl_command_ = {};
     pending_policy_index_ = kInvalidPolicyIndex;
     policy_transition_active_ = false;
+    event_to_rl_transition_ = false;
+    fixed_drive_to_rl_transition_ = false;
+    active_fixed_drive_index_ = kInvalidFixedDriveIndex;
+    retry_locked_ = false;
+    event_initialized_ = false;
+    event_motion_complete_ = false;
+    event_chain_complete_ = false;
     if (rl_controller_ != nullptr)
     {
         rl_controller_->reset();
@@ -193,8 +201,13 @@ core::ModeResult MotionRuntime::dispatch_getup(
     }
     if (mode_ == core::MotionMode::Running)
     {
-        return make_result(request.request_id, core::ModeResultState::Rejected,
-            "getup is not valid while a behavior is running");
+        if (status_.behavior_name != "retry" &&
+            status_.behavior_name != "event_chain" &&
+            find_fixed_drive(status_.behavior_name) == kInvalidFixedDriveIndex)
+        {
+            return make_result(request.request_id, core::ModeResultState::Rejected,
+                "getup is not valid while a behavior is running");
+        }
     }
     if (!state_usable)
     {
@@ -230,6 +243,11 @@ core::ModeResult MotionRuntime::dispatch_getdown(
     const core::ModeRequest& request,
     const bool state_usable)
 {
+    if (mode_ == core::MotionMode::Running && status_.behavior_name == "retry")
+    {
+        return make_result(request.request_id, core::ModeResultState::Rejected,
+            "getdown is not valid while Retry is locked");
+    }
     if (mode_ == core::MotionMode::GetDown)
     {
         return make_result(request.request_id, core::ModeResultState::Rejected,
@@ -258,6 +276,176 @@ core::ModeResult MotionRuntime::dispatch_start_behavior(
     const bool state_usable,
     const bool base_command_usable)
 {
+    if (request.behavior_name == "retry")
+    {
+        if (!retry_configured_)
+        {
+            return make_result(request.request_id, core::ModeResultState::Rejected,
+                "Retry is not configured");
+        }
+        if (!state_usable)
+        {
+            return make_result(request.request_id, core::ModeResultState::Rejected,
+                "no valid state");
+        }
+        if (std::string reason; !check_active_preconditions(reason))
+        {
+            return make_result(request.request_id, core::ModeResultState::Rejected,
+                reason.c_str());
+        }
+        if (has_active_request_)
+        {
+            abort_active_request("interrupted by retry");
+        }
+        rl_control_cycle_ = 0;
+        rl_command_ = {};
+        pending_policy_index_ = kInvalidPolicyIndex;
+        policy_transition_active_ = false;
+        event_to_rl_transition_ = false;
+        fixed_drive_to_rl_transition_ = false;
+        active_fixed_drive_index_ = kInvalidFixedDriveIndex;
+        if (rl_controller_ != nullptr)
+        {
+            rl_controller_->reset();
+        }
+        interp_start_ = current_positions_;
+        interp_total_cycles_ = retry_config_.prepare_cycles;
+        interp_elapsed_cycles_ = 0;
+        retry_locked_ = false;
+        mode_ = core::MotionMode::Running;
+        status_.active_source = core::CommandSource::None;
+        status_.behavior_name = "retry";
+        status_.behavior_phase = "preparing";
+        return make_result(request.request_id, core::ModeResultState::Accepted,
+            "Retry accepted");
+    }
+    if (request.behavior_name == "event_chain")
+    {
+        if (!event_chain_configured_)
+        {
+            return make_result(request.request_id, core::ModeResultState::Rejected,
+                "Event chain is not configured");
+        }
+        const bool valid_source = mode_ == core::MotionMode::Stand ||
+            (mode_ == core::MotionMode::Running &&
+                (status_.behavior_name == "rl_locomotion" ||
+                    find_fixed_drive(status_.behavior_name) !=
+                        kInvalidFixedDriveIndex));
+        if (!valid_source)
+        {
+            return make_result(request.request_id, core::ModeResultState::Rejected,
+                "Event chain requires Stand or running rl_locomotion");
+        }
+        if (!state_usable)
+        {
+            return make_result(request.request_id, core::ModeResultState::Rejected,
+                "no valid state");
+        }
+        if (std::string reason; !check_active_preconditions(reason))
+        {
+            return make_result(request.request_id, core::ModeResultState::Rejected,
+                reason.c_str());
+        }
+        if (has_active_request_)
+        {
+            abort_active_request("interrupted by Event chain");
+        }
+        rl_control_cycle_ = 0;
+        rl_command_ = {};
+        pending_policy_index_ = kInvalidPolicyIndex;
+        policy_transition_active_ = false;
+        event_to_rl_transition_ = false;
+        fixed_drive_to_rl_transition_ = false;
+        active_fixed_drive_index_ = kInvalidFixedDriveIndex;
+        if (rl_controller_ != nullptr)
+        {
+            rl_controller_->reset();
+        }
+        event_index_ = 0;
+        event_cycle_ = 0;
+        event_hold_cycle_ = 0;
+        event_initialized_ = false;
+        event_motion_complete_ = false;
+        event_chain_complete_ = false;
+        event_active_pose_ = current_positions_;
+        event_segment_start_ = current_positions_;
+        event_drive_start_ = {};
+        mode_ = core::MotionMode::Running;
+        status_.active_source = core::CommandSource::None;
+        status_.behavior_name = "event_chain";
+        status_.behavior_phase = event_chain_config_.events[0].name;
+        return make_result(request.request_id, core::ModeResultState::Accepted,
+            "Event chain accepted");
+    }
+    const std::size_t fixed_drive_index = find_fixed_drive(request.behavior_name);
+    const bool fixed_drive_name = request.behavior_name == "car_drive" ||
+        request.behavior_name == "bridge_drive" ||
+        request.behavior_name == "low_bar_drive";
+    if (fixed_drive_name && fixed_drive_index == kInvalidFixedDriveIndex)
+    {
+        return make_result(request.request_id, core::ModeResultState::Rejected,
+            "fixed drive is not configured");
+    }
+    if (fixed_drive_index != kInvalidFixedDriveIndex)
+    {
+        if (mode_ == core::MotionMode::Running &&
+            status_.behavior_name == request.behavior_name)
+        {
+            return make_result(request.request_id, core::ModeResultState::Rejected,
+                "fixed drive is already running");
+        }
+        const bool valid_source = mode_ == core::MotionMode::Stand ||
+            (mode_ == core::MotionMode::Running &&
+                (status_.behavior_name == "rl_locomotion" ||
+                    status_.behavior_name == "event_chain" ||
+                    find_fixed_drive(status_.behavior_name) !=
+                        kInvalidFixedDriveIndex));
+        if (!valid_source)
+        {
+            return make_result(request.request_id, core::ModeResultState::Rejected,
+                "fixed drive requires Stand or another running behavior");
+        }
+        if (!state_usable)
+        {
+            return make_result(request.request_id, core::ModeResultState::Rejected,
+                "no valid state");
+        }
+        if (!base_command_usable)
+        {
+            return make_result(request.request_id, core::ModeResultState::Rejected,
+                "fixed drive requires a valid BaseCommand");
+        }
+        if (std::string reason; !check_active_preconditions(reason))
+        {
+            return make_result(request.request_id, core::ModeResultState::Rejected,
+                reason.c_str());
+        }
+        if (has_active_request_)
+        {
+            abort_active_request("interrupted by fixed drive");
+        }
+        rl_control_cycle_ = 0;
+        rl_command_ = {};
+        pending_policy_index_ = kInvalidPolicyIndex;
+        policy_transition_active_ = false;
+        event_to_rl_transition_ = false;
+        fixed_drive_to_rl_transition_ = false;
+        if (rl_controller_ != nullptr)
+        {
+            rl_controller_->reset();
+        }
+        active_fixed_drive_index_ = fixed_drive_index;
+        interp_start_ = current_positions_;
+        interp_total_cycles_ =
+            fixed_drive_configs_[fixed_drive_index].prepare_cycles;
+        interp_elapsed_cycles_ = 0;
+        mode_ = core::MotionMode::Running;
+        status_.active_source = core::CommandSource::None;
+        status_.behavior_name = request.behavior_name;
+        status_.behavior_phase = "preparing";
+        return make_result(request.request_id, core::ModeResultState::Accepted,
+            "fixed drive accepted");
+    }
     if (request.behavior_name != "rl_locomotion")
     {
         return make_result(request.request_id, core::ModeResultState::Rejected,
@@ -268,7 +456,15 @@ core::ModeResult MotionRuntime::dispatch_start_behavior(
         return make_result(request.request_id, core::ModeResultState::Rejected,
             "RL policy is not attached");
     }
-    if (mode_ != core::MotionMode::Stand)
+    const bool returning_from_event_chain = mode_ == core::MotionMode::Running &&
+        status_.behavior_name == "event_chain";
+    const std::size_t returning_fixed_index = mode_ == core::MotionMode::Running
+        ? find_fixed_drive(status_.behavior_name)
+        : kInvalidFixedDriveIndex;
+    const bool returning_from_fixed_drive =
+        returning_fixed_index != kInvalidFixedDriveIndex;
+    if (mode_ != core::MotionMode::Stand && !returning_from_event_chain &&
+        !returning_from_fixed_drive)
     {
         return make_result(request.request_id, core::ModeResultState::Rejected,
             "RL behavior requires Stand mode");
@@ -289,12 +485,54 @@ core::ModeResult MotionRuntime::dispatch_start_behavior(
             reason.c_str());
     }
 
+    if (returning_from_event_chain || returning_from_fixed_drive)
+    {
+        if (has_active_request_)
+        {
+            abort_active_request("interrupted by RL locomotion");
+        }
+        pending_policy_index_ = current_policy_index_;
+        policy_transition_active_ = true;
+        event_to_rl_transition_ = returning_from_event_chain;
+        fixed_drive_to_rl_transition_ = returning_from_fixed_drive;
+        if (returning_from_fixed_drive)
+        {
+            active_fixed_drive_index_ = returning_fixed_index;
+        }
+        interp_start_ = current_positions_;
+        interp_target_ = current_positions_;
+        const auto& policy_config = policies_[current_policy_index_].config;
+        for (std::size_t action_index = 0;
+             action_index < policy_config.action_dimension;
+             ++action_index)
+        {
+            const std::size_t joint_index =
+                policy_config.policy_dof_indices[action_index];
+            if (model_.joints[joint_index].role != core::JointRole::Wheel)
+            {
+                interp_target_[joint_index] =
+                    policy_config.default_joint_positions[action_index];
+            }
+        }
+        interp_total_cycles_ = returning_from_event_chain
+            ? event_chain_config_.exit_to_rl_cycles
+            : fixed_drive_configs_[returning_fixed_index].exit_to_rl_cycles;
+        interp_elapsed_cycles_ = 0;
+    }
+    else
+    {
+        event_to_rl_transition_ = false;
+        fixed_drive_to_rl_transition_ = false;
+        active_fixed_drive_index_ = kInvalidFixedDriveIndex;
+    }
     rl_controller_->reset();
     rl_control_cycle_ = 0;
     rl_command_ = {};
     mode_ = core::MotionMode::Running;
     status_.behavior_name = request.behavior_name;
-    status_.behavior_phase = "starting";
+    status_.behavior_phase = returning_from_event_chain || returning_from_fixed_drive
+        ? "policy_transition"
+        : "starting";
     status_.policy_name = policy_name_;
     status_.policy_ready = true;
     return make_result(request.request_id, core::ModeResultState::Accepted,
@@ -367,11 +605,21 @@ core::ModeResult MotionRuntime::dispatch_switch_policy(
 
     pending_policy_index_ = target_index;
     policy_transition_active_ = true;
+    event_to_rl_transition_ = false;
+    fixed_drive_to_rl_transition_ = false;
+    active_fixed_drive_index_ = kInvalidFixedDriveIndex;
     interp_start_ = current_positions_;
     interp_target_ = current_positions_;
-    for (std::size_t i = 0; i < kRlJointCount; ++i)
+    for (std::size_t action_index = 0;
+         action_index < target.config.action_dimension;
+         ++action_index)
     {
-        interp_target_[i] = target.config.default_joint_positions[i];
+        const std::size_t joint_index = target.config.policy_dof_indices[action_index];
+        if (model_.joints[joint_index].role != core::JointRole::Wheel)
+        {
+            interp_target_[joint_index] =
+                target.config.default_joint_positions[action_index];
+        }
     }
     interp_total_cycles_ = policy_transition_cycles_;
     interp_elapsed_cycles_ = 0;

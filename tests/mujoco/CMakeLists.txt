@@ -19,6 +19,15 @@ target_compile_features(quadruped_mujoco_tests PRIVATE cxx_std_17)
 target_compile_definitions(quadruped_mujoco_tests PRIVATE
     QUADRUPED_BLACK_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/black/mujoco/scene.xml"
     QUADRUPED_BLACK_TERRAIN_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/black/mujoco/scene_terrain.xml"
+    QUADRUPED_BLACKW_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/blackW/mujoco/scene.xml"
+    QUADRUPED_BLACKW_TERRAIN_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/blackW/mujoco/scene_terrain.xml"
+    QUADRUPED_BLACKW_ROBOT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/robots/blackW.yaml"
+    QUADRUPED_BLACKW_CONTROLLER_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/controllers/blackW.yaml"
+    QUADRUPED_BLACKW_RETRY_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/behaviors/blackW/retry.yaml"
+    QUADRUPED_BLACKW_EVENT_CHAIN_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/behaviors/blackW/event_chain.yaml"
+    QUADRUPED_BLACKW_BRIDGE_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/behaviors/blackW/bridge_drive.yaml"
+    QUADRUPED_BLACKW_LOW_BAR_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/behaviors/blackW/low_bar_drive.yaml"
+    QUADRUPED_BLACKW_CAR_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/behaviors/blackW/car_drive.yaml"
     QUADRUPED_ROBOT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/robots/black.yaml"
     QUADRUPED_CONTROLLER_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/controllers/black.yaml"
 )
@@ -36,5 +45,8 @@ if(QUADRUPED_ENABLE_TORCH)
         QUADRUPED_PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
         QUADRUPED_POLICY_FLAT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/black/flat.yaml"
         QUADRUPED_POLICY_OBSTACLE_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/black/obstacle.yaml"
+        QUADRUPED_BLACKW_POLICY_FLAT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/blackW/flat.yaml"
+        QUADRUPED_BLACKW_POLICY_OBSTACLE_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/blackW/obstacle.yaml"
+        QUADRUPED_BLACKW_POLICY_STAIR_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/blackW/stair.yaml"
     )
 endif()
