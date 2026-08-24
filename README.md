@@ -1,4 +1,4 @@
-# quadruped_control
+# QUAC: Quadruped Control
 
 `quadruped_control` 是一个面向四足与轮足机器人的运动控制工程，包含 MuJoCo 仿真、TorchScript 强化学习策略、ROS 2 指令接口和运行时运动控制。
 
