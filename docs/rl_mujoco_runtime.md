@@ -1,66 +1,82 @@
-# RL 与 MuJoCo 运行说明
+# RL 与 MuJoCo
 
-## 1. 构建和启动
+## 1. 启动
+
+准备依赖并构建：
 
 ```bash
 ./scripts/setup/mujoco.sh
 ./scripts/setup/libtorch.sh
-./scripts/build.sh --rl
+./scripts/build.sh --target motion
+```
+
+单进程调试：
+
+```bash
 ./scripts/debug/mujoco_sim.sh
 ```
 
-界面使用 MuJoCo 3.9.0 官方 Simulate UI，具备 File、Option、Simulation、Physics、
-Rendering、Joint、Control、Sensor 和 Profiler 等原生面板。为避免与官方快捷键冲突，机器人
-控制键只在启动程序的终端中读取，MuJoCo 窗口不拦截这些按键：
+MuJoCo 使用官方 Simulate UI。机器人控制按键由启动程序的终端读取，避免与 MuJoCo 自身快捷键冲突。
 
-| 按键 | 行为 |
-|---|---|
-| `0` | 起立到 Stand |
-| `1` | 从 Stand 启动 `rl_locomotion` |
-| `W/S` | `vx` 每次增加/减少 `0.1 m/s` |
-| `A/D` | `vy` 每次增加/减少 `0.1 m/s` |
-| `Q/E` | `wz` 每次增加/减少 `0.1 rad/s` |
-| `2` 或 `3` | black 切换策略；blackW 进入 Bridge/Low-bar drive |
-| `4` | blackW 进入 Car drive |
-| `5` | 进入 Retry |
-| `6` | 启动 Event chain |
+## 2. 单进程调试按键
+
+| 按键 | 功能 |
+| --- | --- |
+| `0` | 起立并进入 Stand |
+| `1` | 启动 `rl_locomotion` |
+| `W/S` | 调整 `vx` |
+| `A/D` | 调整 `vy` |
+| `Q/E` | 调整 `wz` |
+| `2` / `3` | black 切换策略；blackW Bridge / Low-bar |
+| `4` | blackW Car drive |
+| `5` | Retry |
+| `6` | Event chain |
 | `9` | 趴下 |
-| `P` | 进入 Passive |
-| `R` | 加载 `default_pose`，保持当前会话和行为 |
-| `Space` | 三轴速度立即归零 |
-| `K` | 暂停/继续物理线程 |
-| `H` | 重新显示帮助 |
-| `X` 或 `Esc` | 退出 |
+| `P` | Passive |
+| `R` | 加载 `default_pose` |
+| `Space` | 速度归零 |
+| `K` | 暂停 / 继续物理线程 |
+| `H` | 显示帮助 |
+| `X` / `Esc` | 退出 |
 
-速度目标会在松开按键后保持，不会自动归零。长按按键时，终端的键盘自动重复会连续产生
-字符，因此看起来会逐级“加速”，但每一级改变的是目标速度，不是直接控制物理加速度。
-最终限幅来自当前策略 YAML 的 `command_limits`，单位依次为 m/s、m/s、rad/s；达到上限后
-继续输入不会再增加。手柄归一化轴也会按这三个值缩放到完整量程。
+速度每次调整 `0.1 m/s` 或 `0.1 rad/s`，最终范围由策略 YAML 的 `command_limits` 限制。离开 `rl_locomotion` 后速度目标会清零。
 
-速度键只在 `MotionMode::Running` 且行为名为 `rl_locomotion` 时生效。在 Passive、GetUp、
-Stand 和 GetDown 中输入速度键只提示一次，不会提前缓存命令；离开 RL 模式会自动把三轴
-目标清零。命令显示使用终端单行原地刷新，不为每次增量新增日志行。
+正式三进程的键盘和手柄操作见根目录 [README](../README.md)。
 
-## 2. 控制和策略频率
+## 3. 控制频率
 
 | 环节 | black | blackW |
 | --- | ---: | ---: |
-| MuJoCo physics | 2 ms / 500 Hz | 2 ms / 500 Hz |
-| MotionRuntime | 5 ms / 200 Hz | 5 ms / 200 Hz |
+| MuJoCo physics | 500 Hz | 500 Hz |
+| MotionRuntime | 200 Hz | 200 Hz |
 | RL decimation | 4 | 4 |
-| TorchScript policy | 20 ms / 50 Hz | 20 ms / 50 Hz |
+| TorchScript policy | 50 Hz | 50 Hz |
 
-策略输出只在每第 4 个控制周期更新，其余 3 个周期保持最近一次关节目标。因此“50 Hz 策略”
-不等于“50 Hz 物理”，关节阻抗命令仍以 200 Hz 提交。
+策略每 4 个 MotionRuntime 周期更新一次，其余周期复用最近的动作目标。CommandFrame 仍以 200 Hz 生成和提交。
 
-策略创建时通过正式输入路径预热三次，把 Torch JIT 首次执行和图优化成本留在启动阶段。
-运行时以 `20 ms` 为单次推理期限；超过期限会结束活动请求并进入 Passive，不会自动降低
-策略频率。具体耗时取决于处理器、Torch 版本和系统负载，应通过运行时诊断字段测量。
+TorchScript 策略在启动阶段完成预热。当前推理超时阈值为 20 ms，实际耗时可从运行时诊断中查看。
 
-## 3. 模型选择
+## 4. 策略选择
 
-- 策略循环由 `configs/policies/<robot>/policy_switch.yaml` 的 `policy_config_cycle` 定义；
-- 列表项对应同目录下的 `<name>.yaml`，只列入循环的策略才会在启动时加载和允许 toggle/Y 切换；
-- 默认启动使用列表中的第一个策略，也可以通过 `motion.sh [robot] [policy]` 指定循环内的初始策略；
-- `posture_transition_cycles` 控制策略默认姿态不同于当前姿态时的位置阻抗过渡周期；
-- 策略文件来源记录在 `assets/policies/<robot>/SOURCE.md`。
+策略列表由：
+
+```text
+configs/policies/<robot>/policy_switch.yaml
+```
+
+定义。
+
+`policy_config_cycle` 同时决定启动加载的策略和运行时切换顺序。默认使用列表第一项，也可以在启动 `motion.sh` 时指定初始策略：
+
+```bash
+./scripts/run/motion.sh black flat
+./scripts/run/motion.sh black obstacle
+```
+
+单个策略的模型、观测、动作、增益和速度限制位于同目录的 `<policy>.yaml`。模型文件位于：
+
+```text
+assets/policies/<robot>/<policy>/
+```
+
+策略默认姿态不同时，MotionRuntime 按 `posture_transition_cycles` 完成姿态过渡后再切换。

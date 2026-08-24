@@ -138,6 +138,18 @@ Torch policy adapter, configuration loaders, and runnable simulation application
 - Tests in M0 must not require network access or a third-party test framework.
 - Do not commit `build/`, generated binaries, or `compile_commands.json`.
 
+## Documentation style
+
+- Keep `README.md` focused on project overview, setup, basic usage, and links to deeper documentation.
+- Give each technical topic one authoritative document. Summarize and link elsewhere instead of repeating the same details.
+- Describe the normal usage path first. Add failure cases only when they are useful for operation, debugging, or interface correctness.
+- Reserve strong requirement words such as “必须”“不得” for real interface, data-integrity, concurrency, or safety invariants.
+- Prefer concise factual descriptions over meta statements such as “本文只描述……”“当前范围不包括……”.
+- Do not turn README sections into exhaustive configuration or API specifications; keep detailed field rules under `docs/`.
+- Avoid documenting hypothetical edge cases that are neither implemented nor likely to help users.
+- Keep status and validation notes short. Do not repeat architecture or usage instructions in status documents.
+- When a code or configuration change affects existing documentation, update the authoritative document rather than adding another overlapping explanation.
+
 ## Change discipline
 
 - Keep generated files and unrelated historical code out of this repository.

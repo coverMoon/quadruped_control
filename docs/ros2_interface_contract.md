@@ -1,202 +1,131 @@
-# ROS 2 顶层接口契约
+# ROS 2 接口
 
-本文件记录当前 ROS 2 消息、动作、服务、命名和请求语义。顶层 gateway 位于
-`adapters/ros2/quadruped_gateway/`，通过本机 IPC 连接独立的 motiond 和 mujoco_backendd。
+ROS 2 gateway 位于 `adapters/ros2/quadruped_gateway/`，通过本机 IPC 与 `motiond` 和 `mujoco_backendd` 通信。
 
-## 1. 包和主题命名
+## 1. Topic
 
-接口包名称为 `quadruped_interfaces`。`ros2_gateway` 使用以下名称：
-
-| 类型 | 名称 | ROS 类型 | 语义 |
-| --- | --- | --- | --- |
-| 连续命令 | `/cmd_vel` | `geometry_msgs/msg/Twist` | 最新机体速度目标 |
-| 运动状态 | `/motion/status` | `quadruped_interfaces/msg/MotionStatus` | MotionRuntime 低频状态 |
-| RobotIO 状态 | `/robot_io/status` | `quadruped_interfaces/msg/RobotIOStatus` | 后端连接和帧统计 |
-| 状态诊断 | `/state/diagnostic` | `quadruped_interfaces/msg/StateDiagnostic` | StateFrame 低频诊断子集 |
-| 终态事件 | `/motion/result` | `quadruped_interfaces/msg/ModeResult` | 一次性请求终态事件 |
-
-一次性控制入口使用以下接口：
-
-| 入口 | ROS 类型 | 目标 |
+| 名称 | 类型 | 用途 |
 | --- | --- | --- |
-| `/motion/get_up` | `quadruped_interfaces/action/GetUp` | 执行起立流程 |
-| `/motion/get_down` | `quadruped_interfaces/action/GetDown` | 执行趴下流程 |
-| `/motion/start_behavior` | `quadruped_interfaces/action/StartBehavior` | 启动指定行为 |
-| `/motion/switch_policy` | `quadruped_interfaces/action/SwitchPolicy` | 切换指定策略 |
-| `/motion/enter_passive` | `quadruped_interfaces/srv/EnterPassive` | 立即进入 Passive |
-| `/motion/reset_fault` | `quadruped_interfaces/srv/ResetFault` | 请求复位可软件复位的故障 |
+| `/cmd_vel` | `geometry_msgs/msg/Twist` | 机体速度目标 |
+| `/motion/status` | `quadruped_interfaces/msg/MotionStatus` | MotionRuntime 状态 |
+| `/robot_io/status` | `quadruped_interfaces/msg/RobotIOStatus` | 后端状态和帧统计 |
+| `/state/diagnostic` | `quadruped_interfaces/msg/StateDiagnostic` | StateFrame 低频诊断 |
+| `/motion/result` | `quadruped_interfaces/msg/ModeResult` | 一次性请求结果 |
 
-主题和服务名属于顶层约定；接口包本身不创建节点，也不注册 executor 或 callback。
+### `/cmd_vel`
 
-## 2. ROS 字段到 core 字段的映射
+使用三个字段：
 
-### 2.1 `/cmd_vel`
-
-`geometry_msgs/msg/Twist` 只使用以下三个字段：
-
-| ROS 字段 | `core::BaseCommand` 字段 | 单位 |
+| ROS 字段 | BaseCommand | 单位 |
 | --- | --- | --- |
-| `twist.linear.x` | `vx` | m/s |
-| `twist.linear.y` | `vy` | m/s |
-| `twist.angular.z` | `wz` | rad/s |
+| `linear.x` | `vx` | m/s |
+| `linear.y` | `vy` | m/s |
+| `angular.z` | `wz` | rad/s |
 
-`linear.z`、`angular.x` 和 `angular.y` 不进入当前控制语义，gateway 不得把它们映射到未知
-core 字段。
+gateway 将其转换为 `CommandSource::Navigation`，时间戳使用本机 monotonic clock。默认有效期为 200 ms，可通过 `cmd_vel_timeout_ns` 调整。
 
-adapter 必须：
+BaseCommand 与关节级 CommandFrame 使用独立的有效期。`/cmd_vel` 停止更新后，导航速度按 BaseCommand 超时规则归零。
 
-- 将 `source` 固定为 `core::CommandSource::Navigation`；
-- 为每个来源维护严格递增且非零的 `sequence`；
-- 使用本机 monotonic clock 生成 `timestamp_ns`；
-- gateway 使用独立的 `cmd_vel_timeout_ns` ROS 参数生成 `expires_at_ns`，默认
-  200,000,000 ns（200 ms）；
-- 该超时只约束 `BaseCommand`，不得复用 10 ms 级的 `CommandFrame` 有效期；
-- 不把 ROS wall time 或 `builtin_interfaces/msg/Time` 直接写入 core 时间戳；
-- 只保留同一来源的最新命令，旧消息允许丢弃；
-- 只通过 motiond 提交 `BaseCommand`，ROS callback 不直接调用
-  `MotionRuntime::update()` 或 `RobotIO::submit()`。
+## 2. Action 与 Service
 
-当前 black 和 blackW 配置的控制周期均为 5 ms、命令有效期均为 10 ms。这些数值来自各自的
-`configs/controllers/<robot>.yaml`，不是 ROS 接口的固定默认值；运行时必须使用当前
-`ControllerConfig` 的有效期。
+| 接口 | 类型 | 功能 |
+| --- | --- | --- |
+| `/motion/get_up` | `GetUp` action | 起立 |
+| `/motion/get_down` | `GetDown` action | 趴下 |
+| `/motion/start_behavior` | `StartBehavior` action | 启动行为 |
+| `/motion/switch_policy` | `SwitchPolicy` action | 切换策略 |
+| `/motion/enter_passive` | `EnterPassive` service | 进入 Passive |
+| `/motion/reset_fault` | `ResetFault` service | 请求软件故障复位 |
 
-命令在 `now_ns > expires_at_ns` 时过期。过期后 adapter 必须提供零速语义：清除当前有效
-速度或生成同一 `Navigation` 来源的零速最新值，但不能继续沿用过期速度。ROS 进程断开不应
-阻塞 motion 控制周期，motion 层仍按过期规则运行。
+一次性请求携带非零 `request_id`，在一个 session 中用于去重和结果关联。
 
-### 2.2 `MotionStatus`
+结果状态：
 
-`quadruped_interfaces/msg/MotionStatus` 的字段按下表直接对应：
+```text
+Accepted → Running → Completed
+                   ↘ Failed
+
+Rejected
+```
+
+- `Rejected`：请求没有开始执行；
+- `Failed`：请求已经开始，但运行期间失败或被打断。
+
+相同 `request_id` 的重试返回已有状态，不重复执行动作。
+
+## 3. MotionStatus
+
+主要字段：
+
+| 字段 | 含义 |
+| --- | --- |
+| `mode` | Passive / GetUp / Stand / Running / GetDown |
+| `active_source` | 当前速度命令来源 |
+| `behavior_name` | 当前行为 |
+| `behavior_phase` | 行为内部阶段 |
+| `policy_name` | 当前策略 |
+| `policy_ready` | 策略可用状态 |
+| `command_limits[3]` | `vx`、`vy`、`wz` 限制 |
+| `error_message` | 最近错误信息 |
+
+`behavior_phase` 和 `error_message` 用于诊断；控制流程以请求结果和稳定状态为主要依据。
+
+## 4. RobotIOStatus
 
 | ROS 字段 | core 字段 |
 | --- | --- |
-| `mode` | `core::MotionStatus::mode`，数值对应 `MotionMode` |
-| `active_source` | `core::MotionStatus::active_source`，数值对应 `CommandSource` |
-| `behavior_name` | `behavior_name` |
-| `behavior_phase` | `behavior_phase` |
-| `policy_name` | `policy_name` |
-| `error_message` | `error_message` |
-| `policy_ready` | `policy_ready` |
-| `command_limits[3]` | `command_limits`，顺序为 vx、vy、wz |
-
-消息中的常量冻结当前 core 枚举值。`behavior_phase` 只用于诊断，不得被 ROS 节点用作
-控制分支；行为仍由 `behavior_name` 和 core 的请求语义选择。
-
-### 2.3 `RobotIOStatus`
-
-| ROS 字段 | core 字段 |
-| --- | --- |
-| `state` | `core::RobotIOStatus::state`，数值对应 `RobotIOState` |
+| `state` | `RobotIOStatus::state` |
 | `latest_state_sequence` | 同名字段 |
 | `latest_command_sequence` | 同名字段 |
 | `dropped_state_frames` | 同名字段 |
 | `rejected_command_frames` | 同名字段 |
 
-### 2.4 `StateDiagnostic`
+## 5. StateDiagnostic
 
-该消息只发布 `StateFrame` 的低频诊断字段，不承载高频关节数组，也不作为控制输入：
+StateDiagnostic 发布 StateFrame 的低频摘要：
 
-| ROS 字段 | `core::StateFrame` 字段 |
+- schema / startup / session / sequence；
+- timestamp；
+- joint count；
+- safety state；
+- accepted / effective command sequence；
+- IMU 有效状态、四元数、角速度和线加速度。
+
+高频关节数组保留在内部 StateFrame 中。
+
+## 6. 请求语义
+
+### GetUp / GetDown
+
+GetUp 成功后进入 Stand，GetDown 成功后进入 Passive。
+
+### StartBehavior
+
+`behavior_name` 直接映射到 MotionRuntime 的行为名称，例如 `rl_locomotion`、`retry`、`event_chain`。
+
+### SwitchPolicy
+
+`policy_name` 指定目标策略。需要姿态过渡时，MotionRuntime 先完成过渡，再初始化目标策略并恢复 `rl_locomotion`。
+
+### EnterPassive
+
+EnterPassive 可中断正在运行的主动请求。被中断请求以 Failed 结束。
+
+### ResetFault
+
+接口已经保留；是否支持具体故障复位由 RobotIO 能力决定。
+
+## 7. QoS
+
+| 数据 | QoS |
 | --- | --- |
-| `schema_version` | `header.schema_version` |
-| `startup_id` | `header.startup_id` |
-| `session_id` | `header.session_id` |
-| `sequence` | `header.sequence` |
-| `timestamp_ns` | `header.timestamp_ns`，单调 ns |
-| `joint_count` | `joint_count` |
-| `safety_state` | `safety_state`，数值对应 `SafetyState` |
-| `last_accepted_command_sequence` | 同名字段 |
-| `effective_command_sequence` | 同名字段 |
-| `imu_valid` | `imu.valid` |
-| `imu_orientation_{w,x,y,z}` | `imu.orientation[0..3]`，顺序 w、x、y、z |
-| `imu_angular_velocity_{x,y,z}` | `imu.angular_velocity[0..2]`，rad/s |
-| `imu_linear_acceleration_{x,y,z}` | `imu.linear_acceleration[0..2]`，m/s² |
+| `/cmd_vel` | reliable, depth 1, volatile |
+| action / service | reliable |
+| `/motion/status` | reliable, depth 1, transient local |
+| `/robot_io/status` | reliable, depth 1, transient local |
+| `/state/diagnostic` | best effort, depth 1, volatile |
+| `/motion/result` | reliable, depth 16, volatile |
 
-## 3. 一次性请求和 ModeResult
+ROS callback 负责消息转换与 IPC 写入，MotionRuntime 由 `motiond` 的独立控制周期驱动。
 
-### 3.1 request_id
-
-每个 action goal 或 service request 必须携带非零 `request_id`。请求方在一个控制会话内
-保证编号唯一并递增；adapter 不得因为 ROS goal 重试而生成另一个 core 请求编号。
-
-`request_id` 只用于去重和结果关联，不代表时间戳，也不代表 action goal handle。请求的
-core `timestamp_ns` 由 adapter 使用本机 monotonic clock 生成。控制会话由
-`StateDiagnostic.session_id` 识别；session 变化后，旧请求不得在新会话自动重放，未完成的
-ROS goal 应被标记为失败或取消并重新建立请求。
-
-MotionRuntime 的既有去重语义通过 ROS 统一保留：
-
-- 相同 `request_id` 重试：返回当前活动状态或历史终态，不重复执行；
-- 活动请求重试：返回 `Accepted` 或 `Running` 的当前快照；
-- 已终态请求重试：返回原 `Completed`、`Rejected` 或 `Failed`；
-- 乱序的旧编号不能覆盖更新请求；
-- session 变化后的旧 request 不能继续执行。
-
-### 3.2 状态值
-
-`ModeResult.msg` 的 `state` 常量与 `core::ModeResultState` 一一对应：
-
-| ROS 状态 | core 状态 | 语义 |
-| --- | --- | --- |
-| `ACCEPTED` | `Accepted` | 前置检查通过，等待控制周期开始执行 |
-| `RUNNING` | `Running` | 请求对应的动作正在执行 |
-| `COMPLETED` | `Completed` | 请求成功完成 |
-| `REJECTED` | `Rejected` | 参数、当前模式、session 或能力检查失败，未执行 |
-| `FAILED` | `Failed` | 已接受但运行期间失败或被安全打断 |
-
-`message` 只用于日志、界面和诊断，不得作为程序分支条件。每个 action 的 feedback
-使用 `ModeResult status`，result 使用 `ModeResult result`；`request_id` 必须与 goal
-一致。终态产生时只交付一次 `/motion/result` 事件，但 action server 可以把相同终态返回
-给对应 goal，二者必须使用同一个 `ModeResult` 内容。
-
-### 3.3 action 语义
-
-- `GetUp`：请求 `ModeRequestType::GetUp`，成功后进入 `Stand`；非法状态、无状态、fault
-  或 session 不匹配返回 `Rejected`，运行中安全错误返回 `Failed`。
-- `GetDown`：请求 `ModeRequestType::GetDown`，完成后进入 `Passive`；允许
-  `EnterPassive` 打断。
-- `StartBehavior`：`behavior_name` 原样映射到
-  `ModeRequest::behavior_name`。未注册或不适用于当前机器人的行为直接 `Rejected`。
-- `SwitchPolicy`：`policy_name` 原样映射到 `ModeRequest::policy_name`。可以在 Running
-  状态接收；切换期间旧策略暂停，feedback 保持 `Running`，完成后才报告 `Completed`。
-
-`SwitchPolicy` 的成功路径由 MotionRuntime 决定：当前姿态接近目标默认姿态时直接 reload；
-不接近时先输出固定位置阻抗过渡，再初始化目标策略、清空旧历史和动作目标，随后恢复
-`rl_locomotion`。未知策略、策略未加载或配置不合法返回 `Rejected`；已经接受后发生
-推理、过渡或后端错误返回 `Failed`，不得继续使用旧策略的旧动作。
-
-### 3.4 service 语义
-
-`EnterPassive` 使用 `ModeRequestType::EnterPassive`，拥有最高打断优先级，可以立即打断
-所有主动 action。service response 的 `result` 是 EnterPassive 请求自身的终态；若确实打断
-了活动请求，`has_interrupted_request` 为 true，`interrupted_result` 携带被打断请求的
-`Failed` 终态，并且该终态也必须通过 `/motion/result` 发布。没有活动请求时该字段为 false。
-
-`ResetFault` 使用 `ModeRequestType::ResetFault`。当前 RobotIO 没有可由该接口复位的锁存
-故障，因此 MotionRuntime 返回 `Rejected`，并保留
-`fault reset is not supported by RobotIO` 语义。ROS service 不得伪造复位成功。
-
-## 4. QoS 和线程边界
-
-| 数据 | QoS | 约束 |
-| --- | --- | --- |
-| `/cmd_vel` | reliable、depth 1、volatile | 只保留最新值，允许覆盖旧消息 |
-| action/service | reliable 请求应答 | 不丢弃请求，不在 callback 内执行控制周期 |
-| `/motion/status`、`/robot_io/status` | reliable、depth 1、transient local | 低频最新状态，新订阅者可取得最近快照 |
-| `/state/diagnostic` | best effort、depth 1、volatile | 允许丢帧，不阻塞控制线程 |
-| `/motion/result` | reliable、depth 16、volatile | 终态事件可靠发布，订阅端仍以 request_id 去重 |
-
-QoS 是顶层 adapter 的约定，不改变 core 的固定容量数据结构。ROS callback 只负责解析、
-校验、写入最新值通道或固定容量请求通道；独立 motiond 在自己的周期读取这些输入，再创建
-`BaseCommand` / `ModeRequest` 并调用 `MotionRuntime::update()`。ROS 接口不能绕过
-`RobotIO` 提交 `CommandFrame`，也不能把 ROS 消息类型放入 core。
-
-## 5. 接口边界
-
-- ROS 2 只传递 BaseCommand、ModeRequest 和低频状态，不提交关节 CommandFrame；
-- black 与 blackW 复用同一接口，机器人差异由配置和行为能力检查处理；
-- `behavior_phase` 和错误文本只供诊断，调用方不能据此代替 ModeResult 做控制判断；
-- launch 和人工三终端启动使用相同 topic/action/service 契约。
-
-三进程运行、构建和故障规则见
-[`ros2_three_process_runtime.md`](ros2_three_process_runtime.md)。
+三进程拓扑和 IPC 规则见 [ROS 2 三进程运行架构](ros2_three_process_runtime.md)。

@@ -1,22 +1,10 @@
-# blackW 模型、策略与行为
+# blackW 模型与行为
 
-本文记录 blackW 在当前仓库中的有效技术契约。配置文件和代码是运行时事实来源；本文用于
-解释关节顺序、策略张量、腿轮混合命令以及各行为的共同语义，不再记录已经完成的实施阶段。
+blackW 是 16 关节轮足机器人，在公共 MotionRuntime 上增加轮关节、轮足 RL 策略、Event chain 和固定姿态轮驱行为。
 
-## 1. 事实来源
+## 1. 关节顺序
 
-- `rl_sar@4abccaa60d4c2242466f82c8ac8ff83f4cefe9b3`：策略观测、历史、动作顺序和
-  轮足行为参考，Apache-2.0；
-- `real_robot@4662151ab5c72e7fa28d4af2c66b5d6b0d7018d0`：MuJoCo 对象和历史运行参数参考；
-- `URDF@22c120bad450a81af2c4d6fcbf221262e2884928`：关节位置、速度和力矩限制参考；
-- `configs/`、`assets/robots/blackW/` 和当前测试：本仓库实际执行契约。
-
-冲突字段按职责选取：策略语义以 `rl_sar` 为参考，MuJoCo 名称以当前 MJCF 为准，命令限制
-以 `configs/robots/blackW.yaml` 为准。参考工程中的数组下标不能直接替代本仓库的显式名称映射。
-
-## 2. RobotModel 与关节顺序
-
-blackW 有 16 个逻辑关节，每条腿依次为 hip、thigh、calf、wheel：
+每条腿依次为 hip、thigh、calf、wheel：
 
 ```text
 FL_hip_joint, FL_thigh_joint, FL_calf_joint, FL_wheel_joint,
@@ -25,151 +13,151 @@ RL_hip_joint, RL_thigh_joint, RL_calf_joint, RL_wheel_joint,
 RR_hip_joint, RR_thigh_joint, RR_calf_joint, RR_wheel_joint
 ```
 
-这个顺序由 RobotModel、ControllerConfig、行为配置和策略 YAML 共同显式声明。MJCF 的物理
-书写顺序不是逻辑顺序，后端按关节名和 actuator 传动建立映射。
+逻辑顺序由 RobotModel 和各配置文件中的 `joint_names` 统一描述。MuJoCo backend 按关节名和 actuator transmission 建立映射。
 
-轮关节固定使用：
+轮关节配置：
 
 ```yaml
 role: wheel
 position_limited: false
 ```
 
-不能根据关节名称、MJCF joint 类型或很大的位置范围推断轮子。腿关节有位置限制，轮关节
-连续旋转。当前软件命令包络位于 `configs/robots/blackW.yaml`；其中 KP/KD 是本控制系统允许
-接收的范围，不表示电机物理极限。
+腿关节带位置限制，轮关节连续旋转。软件命令范围位于 `configs/robots/blackW.yaml`。
 
-## 3. MuJoCo 映射
+## 2. MuJoCo 模型
 
-模型入口：
+入口：
 
 ```text
 assets/robots/blackW/mujoco/scene.xml
 assets/robots/blackW/mujoco/scene_terrain.xml
 ```
 
-两者包含 `black_description.xml`。模型具有 16 个单自由度关节和 16 个直接关节传动 motor，
-物理步长为 `2 ms`。motor 没有独立名称，`MujocoRobotIO` 通过 `joint` 传动反查执行器，不能
-使用 actuator 数组下标推断逻辑顺序。
+模型包含 16 个单自由度关节和对应执行器，physics timestep 为 2 ms。
 
-IMU 固定在 site `imu`：
+IMU：
 
-| 传感器 | MuJoCo 类型 | 内部语义 |
+| 传感器 | MuJoCo 类型 | 内部格式 |
 | --- | --- | --- |
-| `imu_quat` | `framequat` | 四元数 `w,x,y,z` |
-| `imu_gyro` | `gyro` | 角速度，rad/s |
-| `imu_acc` | `accelerometer` | 线加速度，m/s² |
+| `imu_quat` | `framequat` | `w,x,y,z` |
+| `imu_gyro` | `gyro` | rad/s |
+| `imu_acc` | `accelerometer` | m/s² |
 
-MJCF 为仿真兼容保留了较宽的腿关节 range；运行时仍按 RobotModel 限制校验命令。
+## 3. 基础控制
 
-## 4. 基础控制
-
-| 项目 | 当前值 |
+| 项目 | 值 |
 | --- | ---: |
-| MotionRuntime 周期 | 5 ms / 200 Hz |
+| MotionRuntime | 200 Hz |
 | CommandFrame 有效期 | 10 ms |
-| MuJoCo 物理步长 | 2 ms / 500 Hz |
+| MuJoCo physics | 500 Hz |
 | RL decimation | 4 |
-| RL 推理周期 | 20 ms / 50 Hz |
-| GetUp | 200 个控制周期，随后 1 周期确认 |
-| GetDown | 500 个控制周期 |
+| RL policy | 50 Hz |
+| GetUp | 200 cycles |
+| GetDown | 500 cycles |
 
-腿和轮都显式使用 `JointImpedance`：
+腿和轮都使用 `JointImpedance`：
 
-- 腿：位置目标、`target_velocity=0`，使用非零 KP/KD；
-- 轮：保持当前轮角、`target_velocity=目标轮速`、`KP=0`，使用 KD；
-- 控制模式由 `ControlMode` 明确给出，不能根据 KP 是否为零推断。
+- 腿：位置目标 + KP/KD；
+- 轮：当前轮角 + 目标轮速，`KP=0`，使用 KD。
 
-## 5. RL 策略契约
+`ControlMode` 表示控制模式，KP/KD 只表示该模式下的增益。
 
-blackW 当前注册 `flat`、`obstacle`、`stair` 三份 TorchScript 策略，切换顺序由
-`configs/policies/blackW/policy_switch.yaml` 决定。
+## 4. RL 策略
 
-三份策略使用相同张量契约：
+blackW 提供：
 
-- 单帧观测：57 维；
-- 历史帧：`[0,1,2,3,4,5]`；
-- 推理输入：`57 × 6 = 342` 维；
-- 动作：16 维，与 RobotModel 逻辑顺序一致；
-- 观测顺序：`commands(3) + angular_velocity(3) + projected_gravity(3) +
-  joint_position_error(16) + joint_velocity(16) + previous_action(16)`；
-- 轮位置误差槽位保留但置零；
-- 腿动作是默认姿态的位置残差，缩放为 `0.25`；
-- 轮动作是目标角速度，FL/FR/RL/RR 缩放为 `+10/-10/+10/-10`；
-- 腿使用 `KP=50`、`KD=1.2`，轮使用 `KP=0`、`KD=1.0`。
+- `flat`
+- `obstacle`
+- `stair`
 
-策略 YAML 的 `command_limits` 同时约束 MotionRuntime、键盘、导航和手柄。手柄归一化轴
-`[-1,1]` 会按当前策略的限制缩放到完整速度量程，策略切换后同步更新。
+切换顺序由 `configs/policies/blackW/policy_switch.yaml` 定义。
 
-策略切换时，如果目标默认姿态与当前姿态差异较大，MotionRuntime 先执行固定周期的姿态
-过渡，再清空目标策略的观测历史和旧动作。过渡或首次推理失败会终止活动请求并进入 Passive。
+三份策略共享相同张量结构：
 
-## 6. 行为分类
-
-行为通过 `ModeRequest.behavior_name` 选择，运行时统一归入 `MotionMode::Running`：
-
-| 行为 | black | blackW | 含义 |
-| --- | --- | --- | --- |
-| `rl_locomotion` | 支持 | 支持 | RL 策略行走 |
-| `retry` | 支持 | 支持 | 公共恢复姿态 |
-| `event_chain` | 空配置 | 支持 | 顺序执行姿态和轮驱事件 |
-| `bridge_drive` | 不支持 | 支持 | 桥面固定姿态差速轮驱动 |
-| `low_bar_drive` | 不支持 | 支持 | 低矮通道固定姿态差速轮驱动 |
-| `car_drive` | 不支持 | 支持 | 低姿态车辆式差速轮驱动 |
-
-具体状态由以下字段表达，不为单个行为增加新的 `MotionMode`：
-
-```text
-MotionStatus.behavior_name
-MotionStatus.behavior_phase
-MotionStatus.policy_name
-```
-
-`policy_switch.yaml` 只包含 RL 策略，不放入 Retry、Event chain 或固定姿态轮驱行为。
-
-## 7. Retry
-
-Retry 从当前姿态平滑插值到配置的恢复姿态并持续保持：
-
-```text
-当前行为 → prepare → locked
-```
-
-执行规则：
-
-- 清除 RL 输出、速度命令和待处理的策略切换；
-- 腿关节插值到 `retry_default_joint_positions`；
-- 轮关节保持当前轮角、目标速度归零、`KP=0`；
-- 不自动退出；
-- GetUp 和 EnterPassive 可以打断；
-- 状态或命令提交失败时产生明确的 Failed 结果并进入 Passive。
-
-black 与 blackW 使用相同实现和 YAML 字段，差异来自显式关节顺序及 `JointRole`。
-
-## 8. Event chain
-
-Event chain 配置支持三种事件：
-
-| 类型 | 必需内容 |
+| 项目 | 规格 |
 | --- | --- |
-| `pose` | `transition_cycles`、`dof_pos`，可选 `hold_cycles` |
-| `drive` | `wheel_group`、距离、速度、超时，可选保持周期 |
-| `pose_drive` | 同时具有姿态过渡和轮驱字段 |
+| 单帧观测 | 57 |
+| 历史帧 | 6 |
+| 输入 | 342 |
+| 动作 | 16 |
 
-姿态插值使用 smoothstep。轮驱事件根据显式 wheel group 和方向符号计算轮速，用参与轮组的
-平均编码器位移判断距离，超时则 Failed。当前事件名直接作为 `behavior_phase`；退出阶段为
-`policy_transition`，完成后返回当前 RL 策略。
+观测：
 
-black 的 `event_chain.yaml` 使用空事件列表，因此不会伪造轮组能力。blackW 配置包含 10 个
-直接对照 `rl_sar` 的事件，轮半径为 `0.103 m`，轮方向为 `[+,-,+,-]`。参考姿态中超过
-RobotModel 限位的目标已经收敛到允许范围。
+```text
+commands(3)
++ angular_velocity(3)
++ projected_gravity(3)
++ joint_position_error(16)
++ joint_velocity(16)
++ previous_action(16)
+```
 
-事件调度、编码器距离、超时和返回 RL 已由测试覆盖；完整 0.30 m 墙体接触链仍需要在专用
-MuJoCo 场景中做整体通过性验证。
+动作顺序与 RobotModel 一致：
 
-## 9. 固定姿态差速轮行为
+- 腿：默认姿态位置残差，scale `0.25`；
+- 轮：目标角速度，FL/FR/RL/RR scale 为 `+10/-10/+10/-10`；
+- 腿：`KP=50, KD=1.2`；
+- 轮：`KP=0, KD=1.0`。
 
-Car、Bridge 和 Low-bar 共用一个实现，配置分别位于：
+策略 YAML 中的 `command_limits` 同时用于 MotionRuntime、键盘、导航和手柄输入。
+
+## 5. 行为
+
+| 行为 | black | blackW |
+| --- | --- | --- |
+| `rl_locomotion` | ✓ | ✓ |
+| `retry` | ✓ | ✓ |
+| `event_chain` | 空配置 | ✓ |
+| `bridge_drive` | — | ✓ |
+| `low_bar_drive` | — | ✓ |
+| `car_drive` | — | ✓ |
+
+这些行为都运行在 `MotionMode::Running` 下，通过：
+
+```text
+behavior_name
+behavior_phase
+policy_name
+```
+
+描述具体状态。
+
+## 6. Retry
+
+Retry 从当前姿态插值到恢复姿态：
+
+```text
+prepare → locked
+```
+
+进入 Retry 后：
+
+- RL 输出和速度目标清零；
+- 腿移动到 `retry_default_joint_positions`；
+- 轮速归零；
+- 保持恢复姿态，直到收到新的模式请求。
+
+black 和 blackW 共用同一实现。
+
+## 7. Event chain
+
+Event chain 支持：
+
+| 类型 | 内容 |
+| --- | --- |
+| `pose` | 姿态过渡与保持 |
+| `drive` | 指定轮组按距离驱动 |
+| `pose_drive` | 姿态与轮驱组合 |
+
+blackW 配置包含 10 个事件，轮半径为 `0.103 m`，轮方向为 `[+,-,+,-]`。
+
+轮驱事件根据参与轮组的编码器位移计算行驶距离。事件完成后通过 `policy_transition` 返回当前 RL 策略。
+
+完整墙体接触与整体通过性仍建议在专用场景中继续验证。
+
+## 8. 固定姿态轮驱
+
+配置：
 
 ```text
 configs/behaviors/blackW/car_drive.yaml
@@ -177,39 +165,28 @@ configs/behaviors/blackW/bridge_drive.yaml
 configs/behaviors/blackW/low_bar_drive.yaml
 ```
 
-共同生命周期：
+三种行为共享流程：
 
 ```text
-当前姿态 → 150 周期进入目标姿态 → 差速轮驱动
-差速轮驱动 → 轮速归零 → 150 周期返回当前 RL 默认姿态
+当前姿态
+  → 进入目标姿态
+  → 差速轮驱
+  → 轮速归零
+  → 返回 RL 默认姿态
 ```
 
-轮速换算使用 `10 × x ± 5 × yaw`，并按 `max_x=2.0`、`max_yaw=3.0` 限幅。左右轮和方向
-均由配置显式给出，不依赖关节下标。
+轮速使用：
 
-## 10. 输入映射
+```text
+10 × x ± 5 × yaw
+```
 
-| 键盘 | 手柄 | 行为 |
-| --- | --- | --- |
-| `0` | `A` | GetUp |
-| `1` | `RB + DPadUp` | RL locomotion / 返回 RL |
-| `2` | `RB + DPadRight` | Bridge drive |
-| `3` | `RB + DPadDown` | Low-bar drive |
-| `4` | `RB + DPadLeft` | Car drive |
-| `5` | — | Retry（仅单进程调试入口） |
-| `6` | `LB + DPadUp` | Event chain |
-| `9` | `B` | GetDown |
-| `P` | `LB + X` | EnterPassive |
+并按 `max_x=2.0`、`max_yaw=3.0` 限幅。左右轮分组和方向由配置给出。
 
-正式三进程 command 与单进程调试入口存在少量按键差异，以根目录 README 的运行说明为准。
+## 9. 参考来源
 
-## 11. 测试关注点
+- `rl_sar`：策略观测、动作和轮足行为；
+- `real_robot`：MuJoCo 场景与历史参数；
+- `URDF`：几何和关节限制。
 
-- 12/16 关节名称、顺序、角色和位置限制校验；
-- 腿轮混合 CommandFrame 的位置、速度、KP 和 KD；
-- 三份策略的 342 维输入、16 维输出和切换历史清零；
-- black/blackW 共用 Retry 生命周期；
-- black 对轮驱 Event chain 的明确拒绝；
-- Event chain 距离、正负方向、超时、中断和返回 RL；
-- 三种固定姿态轮驱行为的进入、限幅、差速和退出；
-- black 的 RL、基础动作和三进程链路保持回归通过。
+本仓库运行时参数以 `configs/`、模型文件和代码为准。
