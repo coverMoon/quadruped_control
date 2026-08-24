@@ -15,6 +15,7 @@ from geometry_msgs.msg import Twist
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+from sensor_msgs.msg import Joy
 
 from quadruped_interfaces.action import GetDown, GetUp, StartBehavior, SwitchPolicy
 from quadruped_interfaces.msg import MotionStatus, StateDiagnostic
@@ -28,6 +29,7 @@ MODE_PASSIVE = 0
 MODE_STAND = 2
 MODE_RUNNING = 3
 SOURCE_NONE = 0
+SOURCE_GAMEPAD = 1
 SOURCE_NAVIGATION = 2
 
 
@@ -160,6 +162,9 @@ class TestNode(Node):
             diagnostic_qos,
         )
         self.cmd_vel = self.create_publisher(Twist, "/cmd_vel", 1)
+        joy_qos = QoSProfile(depth=1)
+        joy_qos.reliability = ReliabilityPolicy.BEST_EFFORT
+        self.joy = self.create_publisher(Joy, "/joy", joy_qos)
         self.get_up = ActionClient(self, GetUp, "/motion/get_up")
         self.get_down = ActionClient(self, GetDown, "/motion/get_down")
         self.start_behavior = ActionClient(
@@ -230,6 +235,13 @@ class TestNode(Node):
         message.angular.z = wz
         self.cmd_vel.publish(message)
 
+    def publish_joy(self, axes=None, buttons=None, frame_id="joy_connected:test"):
+        message = Joy()
+        message.header.frame_id = frame_id
+        message.axes = list(axes) if axes is not None else [0.0] * 8
+        message.buttons = list(buttons) if buttons is not None else [0] * 6
+        self.joy.publish(message)
+
     def assert_rl_stable(self, group, duration):
         deadline = time.monotonic() + duration
         while time.monotonic() < deadline:
@@ -280,7 +292,7 @@ class TestNode(Node):
             )
         return result
 
-    def call_enter_passive(self, request_id, group):
+    def call_enter_passive(self, group):
         self.spin_until(
             lambda: self.enter_passive.wait_for_service(timeout_sec=0.0),
             5.0,
@@ -288,7 +300,6 @@ class TestNode(Node):
             group.assert_running,
         )
         request = EnterPassive.Request()
-        request.request_id = request_id
         future = self.enter_passive.call_async(request)
         response = self.wait_future(
             future, 10.0, "EnterPassive 结果超时", group.assert_running
@@ -300,28 +311,22 @@ class TestNode(Node):
         return response
 
 
-def get_up_goal(request_id):
-    goal = GetUp.Goal()
-    goal.request_id = request_id
-    return goal
+def get_up_goal():
+    return GetUp.Goal()
 
 
-def get_down_goal(request_id):
-    goal = GetDown.Goal()
-    goal.request_id = request_id
-    return goal
+def get_down_goal():
+    return GetDown.Goal()
 
 
-def start_behavior_goal(request_id):
+def start_behavior_goal():
     goal = StartBehavior.Goal()
-    goal.request_id = request_id
     goal.behavior_name = "rl_locomotion"
     return goal
 
 
-def switch_policy_goal(request_id, policy_name):
+def switch_policy_goal(policy_name):
     goal = SwitchPolicy.Goal()
-    goal.request_id = request_id
     goal.policy_name = policy_name
     return goal
 
@@ -342,7 +347,7 @@ def functional_and_gateway_timeout(args):
         node.wait_ready(group)
         initial_session = node.diagnostic.session_id
 
-        node.finish_action(node.get_up, get_up_goal(1), group, COMPLETED)
+        node.finish_action(node.get_up, get_up_goal(), group, COMPLETED)
         node.spin_until(
             lambda: node.motion_status.mode == MODE_STAND,
             3.0,
@@ -350,10 +355,18 @@ def functional_and_gateway_timeout(args):
             group.assert_running,
         )
 
+        # 与旧 rl_sar 一致，启动时为 manual，手柄 X 显式进入 navigation。
+        node.publish_joy()
+        time.sleep(0.05)
+        navigation_buttons = [0] * 6
+        navigation_buttons[2] = 1
+        node.publish_joy(buttons=navigation_buttons)
+        time.sleep(0.05)
+        node.publish_joy()
         node.publish_velocity(0.2, 0.0, 0.0)
         node.finish_action(
             node.start_behavior,
-            start_behavior_goal(2),
+            start_behavior_goal(),
             group,
             COMPLETED,
             on_spin=lambda: node.publish_velocity(0.2, 0.0, 0.0),
@@ -367,30 +380,72 @@ def functional_and_gateway_timeout(args):
         )
         node.finish_action(
             node.switch_policy,
-            switch_policy_goal(3, "obstacle"),
+            switch_policy_goal("obstacle"),
             group,
             COMPLETED,
             on_spin=lambda: node.publish_velocity(0.2, 0.0, 0.0),
         )
         node.finish_action(
             node.switch_policy,
-            switch_policy_goal(4, "flat"),
+            switch_policy_goal("flat"),
             group,
             COMPLETED,
             on_spin=lambda: node.publish_velocity(0.2, 0.0, 0.0),
         )
         node.assert_rl_stable(group, 2.0)
 
-        node.call_enter_passive(5, group)
+        # 导航模式只由 X 显式切换；手柄离散按键仍可操作，重连不能抢占导航。
+        node.publish_joy()
+        y_buttons = [0] * 6
+        y_buttons[3] = 1
+        node.publish_joy(buttons=y_buttons)
+        time.sleep(0.05)
+        node.publish_joy()
+        node.spin_until(
+            lambda: node.motion_status.policy_name == "obstacle"
+            and node.motion_status.active_source == SOURCE_NAVIGATION,
+            5.0,
+            "导航模式下手柄策略键未生效或速度源被抢占",
+            lambda: node.publish_velocity(0.2, 0.0, 0.0),
+        )
+
+        x_buttons = [0] * 6
+        x_buttons[2] = 1
+        node.publish_joy(buttons=x_buttons)
+        node.spin_until(
+            lambda: node.motion_status.active_source == SOURCE_GAMEPAD,
+            3.0,
+            "手柄 X 未切换到 manual",
+            group.assert_running,
+        )
+        node.publish_joy()
+        time.sleep(0.05)
+        node.publish_joy(buttons=x_buttons)
+        node.spin_until(
+            lambda: node.motion_status.active_source == SOURCE_NAVIGATION,
+            3.0,
+            "手柄 X 未切回 navigation",
+            lambda: node.publish_velocity(0.2, 0.0, 0.0),
+        )
+        node.publish_joy(frame_id="joy_disconnected")
+        node.publish_joy()
+        node.spin_until(
+            lambda: node.motion_status.active_source == SOURCE_NAVIGATION,
+            3.0,
+            "手柄重连后退出了 navigation",
+            lambda: node.publish_velocity(0.2, 0.0, 0.0),
+        )
+
+        node.call_enter_passive(group)
         node.spin_until(
             lambda: node.motion_status.mode == MODE_PASSIVE,
             3.0,
             "EnterPassive 后未进入 Passive",
             group.assert_running,
         )
-        node.finish_action(node.get_down, get_down_goal(6), group, COMPLETED)
-        node.finish_action(node.get_up, get_up_goal(7), group, COMPLETED)
-        node.finish_action(node.get_down, get_down_goal(8), group, COMPLETED)
+        node.finish_action(node.get_down, get_down_goal(), group, COMPLETED)
+        node.finish_action(node.get_up, get_up_goal(), group, COMPLETED)
+        node.finish_action(node.get_down, get_down_goal(), group, COMPLETED)
         node.spin_until(
             lambda: node.motion_status.mode == MODE_PASSIVE,
             3.0,
@@ -406,11 +461,11 @@ def functional_and_gateway_timeout(args):
             group.assert_running,
         )
 
-        node.finish_action(node.get_up, get_up_goal(9), group, COMPLETED)
+        node.finish_action(node.get_up, get_up_goal(), group, COMPLETED)
         node.publish_velocity(0.25, 0.0, 0.0)
         node.finish_action(
             node.start_behavior,
-            start_behavior_goal(10),
+            start_behavior_goal(),
             group,
             COMPLETED,
             on_spin=lambda: node.publish_velocity(0.25, 0.0, 0.0),
@@ -443,7 +498,7 @@ def motion_failure(args):
     try:
         start_group(group)
         node.wait_ready(group)
-        node.finish_action(node.get_up, get_up_goal(101), group, COMPLETED)
+        node.finish_action(node.get_up, get_up_goal(), group, COMPLETED)
         node.spin_until(
             lambda: node.diagnostic.effective_command_sequence != 0,
             3.0,
@@ -470,7 +525,7 @@ def backend_failure(args):
         start_group(group)
         node.wait_ready(group)
         _, result_future = node.begin_action(
-            node.get_up, get_up_goal(201), group
+            node.get_up, get_up_goal(), group
         )
         time.sleep(0.05)
         group.stop("backend")

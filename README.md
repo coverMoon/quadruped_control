@@ -247,7 +247,15 @@ RL 速度控制：
 | 左摇杆 | `vx` / `vy` |
 | 右摇杆左右 | `yaw` |
 
-blackW 还提供 Bridge、Low-bar 和 Car 三种固定姿态轮驱组合键。手柄型号和轴映射配置位于 `configs/input/gamepads.yaml`。
+blackW 还提供 Bridge、Low-bar 和 Car 三种固定姿态轮驱组合键：
+
+| 输入             | 功能    |
+| ---------------- | ------- |
+| `RB + DPadRight` | Bridge  |
+| `RB + DPadDown`  | Low-bar |
+| `RB + DPadLeft`  | Car     |
+
+手柄型号和轴映射配置位于 `configs/input/gamepads.yaml`。
 
 ## Configuration
 

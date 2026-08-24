@@ -1,7 +1,6 @@
-# 请求从当前姿态进入站立流程。
-uint64 request_id
+# 请求从当前姿态进入站立流程；内部请求编号由 gateway 分配。
 ---
-# 结果必须与输入 request_id 关联，并遵循 ModeResult 状态语义。
+# 结果携带 gateway 分配的内部 request_id，并遵循 ModeResult 状态语义。
 quadruped_interfaces/ModeResult result
 ---
 # feedback 是该请求当前的 Accepted、Running 或终态快照。

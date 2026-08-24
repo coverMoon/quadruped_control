@@ -1,8 +1,7 @@
 # 请求切换到指定策略；具体策略过渡由 MotionRuntime 决定。
-uint64 request_id
 string policy_name
 ---
-# 结果必须与输入 request_id 关联，并遵循 ModeResult 状态语义。
+# 结果携带 gateway 分配的内部 request_id，并遵循 ModeResult 状态语义。
 quadruped_interfaces/ModeResult result
 ---
 # feedback 是该请求当前的 Accepted、Running 或终态快照。

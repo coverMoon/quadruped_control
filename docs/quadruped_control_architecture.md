@@ -128,7 +128,8 @@ Accepted → Running → Completed
 Rejected
 ```
 
-`request_id` 用于请求去重和结果关联。
+`request_id` 由 gateway 统一生成，用于内部请求去重和结果关联。ROS 客户端不负责维护该
+编号。
 
 ## 4. MotionRuntime
 

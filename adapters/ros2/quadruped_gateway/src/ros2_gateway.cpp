@@ -205,9 +205,9 @@ public:
 
         get_up_server_ = rclcpp_action::create_server<GetUp>(
             this, "/motion/get_up",
-            [this](const rclcpp_action::GoalUUID&, std::shared_ptr<const GetUp::Goal> goal)
+            [this](const rclcpp_action::GoalUUID&, std::shared_ptr<const GetUp::Goal>)
             {
-                return goal_callback(goal->request_id);
+                return goal_callback();
             },
             [this](const std::shared_ptr<GoalHandle<GetUp>> goal_handle)
             {
@@ -219,9 +219,9 @@ public:
             });
         get_down_server_ = rclcpp_action::create_server<GetDown>(
             this, "/motion/get_down",
-            [this](const rclcpp_action::GoalUUID&, std::shared_ptr<const GetDown::Goal> goal)
+            [this](const rclcpp_action::GoalUUID&, std::shared_ptr<const GetDown::Goal>)
             {
-                return goal_callback(goal->request_id);
+                return goal_callback();
             },
             [this](const std::shared_ptr<GoalHandle<GetDown>> goal_handle)
             {
@@ -234,9 +234,9 @@ public:
         start_behavior_server_ = rclcpp_action::create_server<StartBehavior>(
             this, "/motion/start_behavior",
             [this](const rclcpp_action::GoalUUID&,
-                std::shared_ptr<const StartBehavior::Goal> goal)
+                std::shared_ptr<const StartBehavior::Goal>)
             {
-                return goal_callback(goal->request_id);
+                return goal_callback();
             },
             [this](const std::shared_ptr<GoalHandle<StartBehavior>> goal_handle)
             {
@@ -249,9 +249,9 @@ public:
         switch_policy_server_ = rclcpp_action::create_server<SwitchPolicy>(
             this, "/motion/switch_policy",
             [this](const rclcpp_action::GoalUUID&,
-                std::shared_ptr<const SwitchPolicy::Goal> goal)
+                std::shared_ptr<const SwitchPolicy::Goal>)
             {
-                return goal_callback(goal->request_id);
+                return goal_callback();
             },
             [this](const std::shared_ptr<GoalHandle<SwitchPolicy>> goal_handle)
             {
@@ -323,13 +323,8 @@ private:
     template<typename ActionT>
     using GoalHandle = rclcpp_action::ServerGoalHandle<ActionT>;
 
-    rclcpp_action::GoalResponse goal_callback(const std::uint64_t request_id) const
+    rclcpp_action::GoalResponse goal_callback() const
     {
-        if (request_id == 0)
-        {
-            RCLCPP_WARN(get_logger(), "拒绝 request_id=0 的 ROS action 请求");
-            return rclcpp_action::GoalResponse::REJECT;
-        }
         return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
     }
 
@@ -389,14 +384,31 @@ private:
         return qi::queue_push(memory_->layout().requests, wire);
     }
 
+    std::uint64_t next_request_id()
+    {
+        std::uint64_t observed = local_request_id_.load(std::memory_order_relaxed);
+        while (true)
+        {
+            const std::int64_t now_ns = qi::monotonic_now_ns();
+            const std::uint64_t monotonic_id = now_ns > 0
+                ? static_cast<std::uint64_t>(now_ns)
+                : 1;
+            const std::uint64_t candidate = std::max(monotonic_id, observed + 1);
+            if (local_request_id_.compare_exchange_weak(
+                    observed, candidate, std::memory_order_relaxed))
+            {
+                return candidate;
+            }
+        }
+    }
+
     qc::ModeRequest make_request(
-        const std::uint64_t request_id,
         const qc::ModeRequestType type,
         const std::string& behavior_name = {},
-        const std::string& policy_name = {}) const
+        const std::string& policy_name = {})
     {
         qc::ModeRequest request;
-        request.request_id = request_id;
+        request.request_id = next_request_id();
         request.timestamp_ns = qi::monotonic_now_ns();
         request.type = type;
         request.behavior_name = behavior_name;
@@ -477,7 +489,6 @@ private:
             last_joy_buttons_ = {};
             if (was_online)
             {
-                manual_input_active_.store(false);
                 set_manual_command(0.0, 0.0, 0.0);
             }
             return;
@@ -498,19 +509,15 @@ private:
         if (!was_online)
         {
             last_joy_buttons_ = {};
-            manual_input_active_.store(true);
         }
         last_joy_ns_.store(qi::monotonic_now_ns());
-        if (manual_input_active_.load())
-        {
-            const double vx = std::clamp(static_cast<double>(message.axes[1]), -1.0, 1.0) *
-                command_limit(0);
-            const double vy = std::clamp(static_cast<double>(message.axes[0]), -1.0, 1.0) *
-                command_limit(1);
-            const double wz = std::clamp(static_cast<double>(message.axes[3]), -1.0, 1.0) *
-                command_limit(2);
-            set_manual_command(vx, vy, wz);
-        }
+        const double vx = std::clamp(static_cast<double>(message.axes[1]), -1.0, 1.0) *
+            command_limit(0);
+        const double vy = std::clamp(static_cast<double>(message.axes[0]), -1.0, 1.0) *
+            command_limit(1);
+        const double wz = std::clamp(static_cast<double>(message.axes[3]), -1.0, 1.0) *
+            command_limit(2);
+        set_manual_command(vx, vy, wz);
         publish_joy_edges(message);
     }
 
@@ -554,7 +561,6 @@ private:
                 std::lock_guard<std::mutex> lock(joy_info_mutex_);
                 joy_profile_name_.clear();
             }
-            manual_input_active_.store(false);
             set_manual_command(0.0, 0.0, 0.0);
             last_joy_buttons_ = {};
         }
@@ -788,8 +794,7 @@ private:
 
     void accept_get_up(const std::shared_ptr<GoalHandle<GetUp>>& goal_handle)
     {
-        const auto request = make_request(
-            goal_handle->get_goal()->request_id, qc::ModeRequestType::GetUp);
+        const auto request = make_request(qc::ModeRequestType::GetUp);
         if (!submit_request(request))
         {
             finish_action_immediately<GetUp>(goal_handle, request.request_id, "motiond unavailable");
@@ -801,8 +806,7 @@ private:
 
     void accept_get_down(const std::shared_ptr<GoalHandle<GetDown>>& goal_handle)
     {
-        const auto request = make_request(
-            goal_handle->get_goal()->request_id, qc::ModeRequestType::GetDown);
+        const auto request = make_request(qc::ModeRequestType::GetDown);
         if (!submit_request(request))
         {
             finish_action_immediately<GetDown>(
@@ -816,7 +820,6 @@ private:
     void accept_start_behavior(const std::shared_ptr<GoalHandle<StartBehavior>>& goal_handle)
     {
         const auto request = make_request(
-            goal_handle->get_goal()->request_id,
             qc::ModeRequestType::StartBehavior,
             goal_handle->get_goal()->behavior_name);
         if (!submit_request(request))
@@ -832,7 +835,6 @@ private:
     void accept_switch_policy(const std::shared_ptr<GoalHandle<SwitchPolicy>>& goal_handle)
     {
         const auto request = make_request(
-            goal_handle->get_goal()->request_id,
             qc::ModeRequestType::SwitchPolicy,
             {}, goal_handle->get_goal()->policy_name);
         if (!submit_request(request))
@@ -859,23 +861,23 @@ private:
     }
 
     void handle_enter_passive(
-        const qsrv::EnterPassive::Request& request,
+        const qsrv::EnterPassive::Request&,
         qsrv::EnterPassive::Response& response)
     {
         const std::uint64_t interrupted_request_id = active_action_request_id_.load();
-        const auto mode_request = make_request(
-            request.request_id, qc::ModeRequestType::EnterPassive);
+        const auto mode_request = make_request(qc::ModeRequestType::EnterPassive);
         if (!submit_request(mode_request))
         {
-            response.result.request_id = request.request_id;
+            response.result.request_id = mode_request.request_id;
             response.result.state = static_cast<std::uint8_t>(qc::ModeResultState::Failed);
             response.result.message = "motiond unavailable";
             return;
         }
-        const auto result = wait_for_result(request.request_id);
+        const auto result = wait_for_result(mode_request.request_id);
         response.result = result;
         response.has_interrupted_request = false;
-        if (interrupted_request_id != 0 && interrupted_request_id != request.request_id)
+        if (interrupted_request_id != 0 &&
+            interrupted_request_id != mode_request.request_id)
         {
             qmsg::ModeResult interrupted_result;
             if (wait_for_terminal_result(
@@ -888,19 +890,18 @@ private:
     }
 
     void handle_reset_fault(
-        const qsrv::ResetFault::Request& request,
+        const qsrv::ResetFault::Request&,
         qsrv::ResetFault::Response& response)
     {
-        const auto mode_request = make_request(
-            request.request_id, qc::ModeRequestType::ResetFault);
+        const auto mode_request = make_request(qc::ModeRequestType::ResetFault);
         if (!submit_request(mode_request))
         {
-            response.result.request_id = request.request_id;
+            response.result.request_id = mode_request.request_id;
             response.result.state = static_cast<std::uint8_t>(qc::ModeResultState::Failed);
             response.result.message = "motiond unavailable";
             return;
         }
-        response.result = wait_for_result(request.request_id);
+        response.result = wait_for_result(mode_request.request_id);
     }
 
     bool wait_for_terminal_result(
@@ -982,10 +983,24 @@ private:
 
     void submit_start_rl_behavior()
     {
-        // MotionRuntime 要求启动 RL 前已有有效 BaseCommand；键盘模式也先发布零速度。
-        set_manual_command(0.0, 0.0, 0.0);
-        manual_input_active_.store(true);
-        publish_base_command(0.0, 0.0, 0.0, qc::CommandSource::Gamepad, 110);
+        // 启动 RL 前补一帧当前输入源命令，但不能借此改变持久输入模式。
+        if (manual_input_active_.load())
+        {
+            set_manual_command(0.0, 0.0, 0.0);
+            publish_base_command(0.0, 0.0, 0.0, qc::CommandSource::Gamepad, 110);
+        }
+        else
+        {
+            const std::int64_t now_ns = qi::monotonic_now_ns();
+            const std::int64_t last_cmd_vel_ns = last_cmd_vel_ns_.load();
+            const bool navigation_fresh = last_cmd_vel_ns != 0 && now_ns >= last_cmd_vel_ns &&
+                now_ns - last_cmd_vel_ns <= command_timeout_ns_;
+            publish_base_command(
+                navigation_fresh ? navigation_vx_.load() : 0.0,
+                navigation_fresh ? navigation_vy_.load() : 0.0,
+                navigation_fresh ? navigation_wz_.load() : 0.0,
+                qc::CommandSource::Navigation, 100);
+        }
         submit_keyboard_request(qc::ModeRequestType::StartBehavior, "rl_locomotion");
     }
 
@@ -994,11 +1009,11 @@ private:
         const std::string& behavior_name = {},
         const std::string& policy_name = {})
     {
-        const std::uint64_t request_id = ++local_request_id_;
-        const auto request = make_request(request_id, type, behavior_name, policy_name);
+        const auto request = make_request(type, behavior_name, policy_name);
         if (!submit_request(request))
         {
-            RCLCPP_WARN(get_logger(), "人工请求提交失败 request_id=%lu", request_id);
+            RCLCPP_WARN(
+                get_logger(), "人工请求提交失败 request_id=%lu", request.request_id);
         }
     }
 
@@ -1020,7 +1035,7 @@ private:
         request.schema_version = qc::kFrameSchemaVersion;
         request.startup_id = heartbeat.startup_id;
         request.session_id = session_id;
-        request.request_id = ++local_request_id_;
+        request.request_id = next_request_id();
         // 用户按键只复位仿真姿态，不建立新会话，保持当前运动行为。
         request.type =
             static_cast<std::uint8_t>(qi::WireControlType::SimulationStateReset);
@@ -1049,7 +1064,7 @@ private:
         request.schema_version = qc::kFrameSchemaVersion;
         request.startup_id = heartbeat.startup_id;
         request.session_id = session_id;
-        request.request_id = ++local_request_id_;
+        request.request_id = next_request_id();
         request.type = static_cast<std::uint8_t>(qi::WireControlType::PauseToggle);
         std::lock_guard<std::mutex> lock(request_mutex_);
         if (!qi::queue_push(memory_->layout().control_requests, request))
@@ -1153,7 +1168,7 @@ private:
         case '\n':
         case '\r': submit_backend_pause_toggle(); return;
         case 'n': manual_input_active_.store(!manual_input_active_.load()); return;
-        case ' ': set_manual_command(0.0, 0.0, 0.0); manual_input_active_.store(true); return;
+        case ' ': set_manual_command(0.0, 0.0, 0.0); return;
         case 'x': stopping_.store(true); rclcpp::shutdown(); return;
         case 27:
             // 方向键以 ESC [ A/B/C/D 开头；不能把 ESC 直接当作退出键。
@@ -1184,7 +1199,6 @@ private:
         else if (key == 'e') wz -= kKeyboardIncrement;
         else return;
         set_manual_command(vx, vy, wz);
-        manual_input_active_.store(true);
     }
 
     void render_terminal_status(const qc::MotionStatus& motion_status)
@@ -1359,7 +1373,8 @@ private:
     std::atomic<bool> joy_online_{false};
     std::mutex joy_info_mutex_{};
     std::string joy_profile_name_{};
-    std::atomic<bool> manual_input_active_{false};
+    // 与旧 rl_sar 一致：启动时为手动模式，只有导航切换键能改变该选择。
+    std::atomic<bool> manual_input_active_{true};
     std::atomic<double> manual_vx_{0.0};
     std::atomic<double> manual_vy_{0.0};
     std::atomic<double> manual_wz_{0.0};

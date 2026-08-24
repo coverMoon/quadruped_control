@@ -1,5 +1,4 @@
-# 请求立即进入 Passive；request_id 用于关联统一 ModeResult。
-uint64 request_id
+# 请求立即进入 Passive；内部请求编号由 gateway 分配。
 ---
 # result 是 EnterPassive 请求自身的结果。
 quadruped_interfaces/ModeResult result
