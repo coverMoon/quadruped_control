@@ -17,7 +17,7 @@ namespace quadruped::ipc
 {
 
 constexpr std::uint32_t kWireMagic = 0x51435043U;
-constexpr std::uint32_t kWireSchemaVersion = 1;
+constexpr std::uint32_t kWireSchemaVersion = 2;
 constexpr std::size_t kWireNameCapacity = 64;
 constexpr std::size_t kWireMessageCapacity = 256;
 constexpr std::size_t kRequestQueueCapacity = 32;
@@ -208,10 +208,19 @@ struct alignas(64) SpscQueue
     std::array<T, Capacity> entries{};
 };
 
+// 事件只表示“可能有新数据”，通知可以合并，消费者仍须读取对应数据面。
+struct alignas(64) WireEvent
+{
+    std::atomic<std::uint32_t> sequence{0};
+};
+
 struct SharedLayout
 {
     std::atomic<std::uint32_t> ready{0};
     WireIdentity identity{};
+    WireEvent motion_event{};
+    WireEvent backend_event{};
+    WireEvent gateway_event{};
     LatestSlot<WireHeartbeat> backend_heartbeat{};
     LatestSlot<WireHeartbeat> motion_heartbeat{};
     LatestSlot<WireHeartbeat> gateway_heartbeat{};
@@ -230,5 +239,7 @@ static_assert(std::is_trivially_copyable_v<WireStateFrame>);
 static_assert(std::is_trivially_copyable_v<WireCommandFrame>);
 static_assert(std::is_trivially_copyable_v<WireModeRequest>);
 static_assert(std::is_trivially_copyable_v<WireModeResult>);
+static_assert(sizeof(std::atomic<std::uint32_t>) == sizeof(std::uint32_t));
+static_assert(alignof(WireEvent) == 64);
 
 }  // 命名空间 quadruped::ipc

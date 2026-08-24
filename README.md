@@ -17,7 +17,7 @@
 - black 的 flat / obstacle 策略；
 - blackW 的 flat / obstacle / stair 策略；
 - 运行时策略切换；
-- blackW Retry、Event chain 和固定姿态轮驱行为；
+- black/blackW Retry，以及 blackW Event chain 和固定姿态轮驱行为；
 - 键盘、手柄和 ROS 2 `/cmd_vel` 控制；
 - `ros2_gateway`、`motiond`、`mujoco_backendd` 三进程运行；
 - 单元测试、MuJoCo 集成测试和 ROS 2 headless 端到端测试。
@@ -44,7 +44,8 @@ keyboard / joystick / ROS 2
 
 `ros2_gateway` 负责外部指令与 ROS 2 接口，`motiond` 运行运动状态机和强化学习策略，`mujoco_backendd` 负责 MuJoCo 物理仿真与机器人状态读写。三个进程之间通过本机 IPC 通信。
 
-更完整的模块关系和运行语义见 [系统架构](docs/quadruped_control_architecture.md) 和 [三进程运行架构](docs/three_process_runtime.md)。
+更完整的模块关系和运行语义见 [系统架构](docs/architecture.md) 和
+[运行时与 IPC](docs/runtime_ipc.md)。
 
 ## Repository Structure
 
@@ -213,6 +214,7 @@ headless 模式：
 | `1` | 启动 RL locomotion |
 | `2` / `3` | 切换策略或 blackW 行为 |
 | `4` | blackW Car drive |
+| `5` | Retry |
 | `6` | Event chain |
 | `9` | 趴下并进入 Passive |
 | `P` | 进入 Passive |
@@ -241,6 +243,7 @@ RL 速度控制：
 | `RB + DPadUp` | RL locomotion |
 | `Y` | 切换策略 |
 | `LB + DPadUp` | Event chain |
+| `LB + B` | Retry |
 | `LB + X` | Passive |
 | `RB + Y` | MuJoCo reset |
 | `X` | 切换手动输入与 `/cmd_vel` |
@@ -301,7 +304,7 @@ ros2 topic pub --rate 10 /cmd_vel geometry_msgs/msg/Twist \
   "{linear: {x: 0.3, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
 ```
 
-完整 topic、action、service 和 QoS 定义见 [ROS 2 接口契约](docs/ros2_interface_contract.md)。
+完整 topic、action、service 和 QoS 定义见 [ROS 2 接口](docs/ros2_interface.md)。
 
 ## Development
 
@@ -323,13 +326,17 @@ ros2 topic pub --rate 10 /cmd_vel geometry_msgs/msg/Twist \
 ./scripts/debug/mujoco_sim.sh
 ```
 
+单进程调试使用相同的数字行为键，其中 `5` 为 Retry、`6` 为 Event chain；按 `K`
+暂停或继续物理线程，按 `H` 查看完整终端帮助。
+
 ## Documentation
 
-- [文档索引](docs/README.md)
-- [当前能力与验证状态](docs/current_status.md)
-- [系统架构](docs/quadruped_control_architecture.md)
-- [RL 与 MuJoCo 运行说明](docs/rl_mujoco_runtime.md)
-- [三进程运行架构](docs/three_process_runtime.md)
-- [ROS 2 接口契约](docs/ros2_interface_contract.md)
-- [blackW 模型、策略与行为](docs/blackW_模型与行为.md)
-- [故障、诊断与回放](docs/fault_logging_replay.md)
+详细文档按主题维护，完整入口见 [文档导航](docs/README.md)：
+
+| 文档 | 适合解决的问题 |
+| --- | --- |
+| [系统架构](docs/architecture.md) | 理解模块边界、核心数据、MotionRuntime 和配置职责 |
+| [运行时与 IPC](docs/runtime_ipc.md) | 理解三进程、共享内存、futex、session、周期和退出语义 |
+| [ROS 2 接口](docs/ros2_interface.md) | 查询 topic、action、service、QoS 和调用示例 |
+| [机器人模型与行为](docs/robot_models_and_behaviors.md) | 对比 black/blackW 模型、策略和行为能力 |
+| [诊断与回放](docs/diagnostics_replay.md) | 排查故障、读取诊断、记录日志和离线回放 |

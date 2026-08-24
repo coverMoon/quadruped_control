@@ -15,4 +15,4 @@
 
 来源仓库根目录未提供许可证文件，因此这些队内模型与网格不能作为可向外再分发的第三方素材。
 当前运行契约以本仓库模型、`configs/robots/blackW.yaml` 和
-`docs/blackW_模型与行为.md` 为准。
+`docs/robot_models_and_behaviors.md` 为准。

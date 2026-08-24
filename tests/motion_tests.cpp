@@ -857,6 +857,55 @@ void test_rl_behavior_requires_base_command()
         "rl_locomotion 首次推理失败必须返回 Failed");
 }
 
+// 与 rl_sar 对齐：RL 中的 GetUp 应停止策略，并从当前姿态平滑回到 Stand。
+void test_rl_getup_returns_to_stand()
+{
+    auto created = make_rl_runtime();
+    if (!created.ok())
+    {
+        return;
+    }
+    const auto model = make_rl_model();
+    const auto stand_pose = config_stand_pose();
+    FakePolicy policy;
+    std::string error;
+    created.runtime->attach_policy(make_rl_config("flat", stand_pose), policy, error);
+
+    motion_test::FakeRobotIO io;
+    io.state = motion_test::make_state(model, motion_test::make_rest_positions());
+    motion_test::drive_getup(*created.runtime, io, 1);
+    io.state = motion_test::make_state(model, stand_pose);
+
+    const auto command = make_base_command();
+    auto start = motion_test::make_request(2, qc::ModeRequestType::StartBehavior);
+    start.behavior_name = "rl_locomotion";
+    const auto running = update_with_command(*created.runtime, io, command, &start);
+    expect(running.status.mode == qc::MotionMode::Running &&
+            running.status.behavior_name == "rl_locomotion",
+        "RL 应先进入 Running");
+
+    auto near_stand = stand_pose;
+    near_stand[1] += 0.04;
+    io.state = motion_test::make_state(model, near_stand);
+    const auto getup = motion_test::make_request(3, qc::ModeRequestType::GetUp);
+    const auto accepted = update_with_command(*created.runtime, io, command, &getup);
+    expect(accepted.result.state == qc::ModeResultState::Accepted &&
+            accepted.status.mode == qc::MotionMode::GetUp,
+        "RL 中的 GetUp 应被接受");
+    expect(accepted.status.behavior_name.empty(),
+        "离开 RL 后应清空行为名称");
+    expect_command_positions(io, lerp_positions(near_stand, stand_pose, 0.5),
+        "接近默认姿态时应跳过预起立阶段并平滑返回站姿");
+
+    motion_test::update(*created.runtime, io);
+    const auto standing = motion_test::update(*created.runtime, io);
+    expect(standing.status.mode == qc::MotionMode::Stand,
+        "RL 的 GetUp 完成后应进入 Stand");
+    expect(created.runtime->query_result(getup.request_id).state ==
+            qc::ModeResultState::Completed,
+        "RL 返回 Stand 后 GetUp 请求应完成");
+}
+
 // 已加载策略可以在 Running 中直接 reload，并保留最新 BaseCommand。
 void test_direct_policy_switches()
 {
@@ -1484,6 +1533,7 @@ int main()
     test_session_change_returns_to_passive();
     test_request_lifecycle_and_ordering();
     test_rl_behavior_requires_base_command();
+    test_rl_getup_returns_to_stand();
     test_request_interruptions_and_explicit_rejections();
     test_fault_fails_active_request();
     test_robot_io_fault_injection_matrix();

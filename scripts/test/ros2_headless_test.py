@@ -355,6 +355,28 @@ def functional_and_gateway_timeout(args):
             group.assert_running,
         )
 
+        retry_buttons = [0] * 6
+        retry_buttons[1] = 1
+        retry_buttons[4] = 1
+        node.publish_joy(buttons=retry_buttons)
+        time.sleep(0.05)
+        node.publish_joy()
+        node.spin_until(
+            lambda: node.motion_status.mode == MODE_RUNNING
+            and node.motion_status.behavior_name == "retry"
+            and node.motion_status.behavior_phase == "locked",
+            3.0,
+            "LB+B 未启动 Retry 或误触发 GetDown",
+            group.assert_running,
+        )
+        node.finish_action(node.get_up, get_up_goal(), group, COMPLETED)
+        node.spin_until(
+            lambda: node.motion_status.mode == MODE_STAND,
+            3.0,
+            "Retry 后 GetUp 未恢复 Stand",
+            group.assert_running,
+        )
+
         # 与旧 rl_sar 一致，启动时为 manual，手柄 X 显式进入 navigation。
         node.publish_joy()
         time.sleep(0.05)

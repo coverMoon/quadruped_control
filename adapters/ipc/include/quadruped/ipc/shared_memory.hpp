@@ -1,6 +1,6 @@
 /**
  * @file shared_memory.hpp
- * @brief 声明共享内存生命周期、最新值槽和单生产者队列操作。
+ * @brief 声明共享内存生命周期、数据通道和 futex 事件操作。
  */
 
 #pragma once
@@ -13,6 +13,14 @@
 
 namespace quadruped::ipc
 {
+
+enum class EventWaitResult
+{
+    Changed,
+    TimedOut,
+    Interrupted,
+    Failed,
+};
 
 class SharedMemory
 {
@@ -59,6 +67,18 @@ private:
 
 [[nodiscard]] std::int64_t monotonic_now_ns() noexcept;
 
+// 返回当前序列快照。处理数据后应再次比较快照，再决定是否等待。
+[[nodiscard]] std::uint32_t event_sequence(const WireEvent& event) noexcept;
+
+// 先发布递增后的序列，再唤醒所有进程共享等待者。
+void notify_event(WireEvent& event) noexcept;
+
+// 使用相对单调时钟超时等待；序列已变化时立即返回 Changed。
+[[nodiscard]] EventWaitResult wait_event(
+    WireEvent& event,
+    std::uint32_t expected_sequence,
+    std::int64_t timeout_ns) noexcept;
+
 template<typename T>
 void publish_latest(LatestSlot<T>& slot, const T& value) noexcept
 {
@@ -68,6 +88,16 @@ void publish_latest(LatestSlot<T>& slot, const T& value) noexcept
     slot.value = value;
     slot.version.fetch_add(1, std::memory_order_release);
     slot.lock.store(0, std::memory_order_release);
+}
+
+template<typename T>
+void publish_latest_and_notify(
+    LatestSlot<T>& slot,
+    const T& value,
+    WireEvent& event) noexcept
+{
+    publish_latest(slot, value);
+    notify_event(event);
 }
 
 template<typename T>
@@ -117,6 +147,20 @@ bool queue_push(SpscQueue<T, Capacity>& queue, const T& value) noexcept
     }
     queue.entries[write % Capacity] = value;
     queue.write_index.store(write + 1, std::memory_order_release);
+    return true;
+}
+
+template<typename T, std::size_t Capacity>
+bool queue_push_and_notify(
+    SpscQueue<T, Capacity>& queue,
+    const T& value,
+    WireEvent& event) noexcept
+{
+    if (!queue_push(queue, value))
+    {
+        return false;
+    }
+    notify_event(event);
     return true;
 }
 

@@ -40,6 +40,10 @@ bool RemoteRobotIO::read_backend_heartbeat(WireHeartbeat& heartbeat) const noexc
 
 bool RemoteRobotIO::backend_online() const noexcept
 {
+    if (memory_.layout().ready.load(std::memory_order_acquire) != 1)
+    {
+        return false;
+    }
     WireHeartbeat heartbeat;
     if (!read_backend_heartbeat(heartbeat) || heartbeat.online == 0)
     {
@@ -132,7 +136,10 @@ core::RobotIOCode RemoteRobotIO::submit(const core::CommandFrame& frame)
         ++cached_status_.rejected_command_frames;
         return core::RobotIOCode::InvalidFrame;
     }
-    publish_latest(memory_.layout().command, to_wire(frame));
+    publish_latest_and_notify(
+        memory_.layout().command,
+        to_wire(frame),
+        memory_.layout().backend_event);
     cached_status_.latest_command_sequence = frame.header.sequence;
     return core::RobotIOCode::Ok;
 }

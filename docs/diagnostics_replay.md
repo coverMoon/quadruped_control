@@ -1,4 +1,4 @@
-# 故障、诊断与回放
+# 诊断与回放
 
 ## 1. 故障处理
 
@@ -18,7 +18,8 @@ MotionRuntime 在状态、策略或命令链路出现运行错误时结束当前
 | policy forward 失败 | Passive | Failed |
 | policy inference 超时 | Passive | Failed |
 
-共享内存 latest slot 的一次锁竞争不会直接视为断开。RemoteRobotIO 会在同一 backend session 内复用最近有效状态，连接状态仍由 heartbeat 判断。
+共享内存锁竞争、futex timeout、session 和 heartbeat 的详细语义见
+[运行时与 IPC](runtime_ipc.md)。
 
 测试中的故障注入使用 `FakeRobotIO`，不会进入正式 MuJoCo 或 IPC 链路。
 

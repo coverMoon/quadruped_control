@@ -162,7 +162,10 @@ void publish_backend_state(
     qc::StateFrame state;
     if (io.read_latest(state) == qc::RobotIOCode::Ok)
     {
-        qi::publish_latest(layout.state, qi::to_wire(state));
+        qi::publish_latest_and_notify(
+            layout.state,
+            qi::to_wire(state),
+            layout.motion_event);
     }
     qi::WireRobotIOStatus status = qi::to_wire(io.status());
     status.startup_id = startup_id;
@@ -183,6 +186,7 @@ bool reset_session(
     const std::uint64_t startup_id,
     std::uint64_t& session_id,
     std::uint64_t& command_version,
+    bool& has_pending_command,
     std::string* error_message = nullptr)
 {
     const std::uint64_t next_session_id = session_id + 1;
@@ -198,8 +202,8 @@ bool reset_session(
     session_id = next_session_id;
 
     // reset 前共享槽中的旧命令不得在新会话再次提交。
-    qi::WireCommandFrame ignored_command;
-    static_cast<void>(qi::read_latest(layout.command, ignored_command, &command_version));
+    command_version = layout.command.version.load(std::memory_order_acquire);
+    has_pending_command = false;
     publish_backend_state(layout, io, startup_id, session_id);
     return true;
 }
@@ -231,6 +235,7 @@ void process_control_requests(
     const std::uint64_t startup_id,
     std::uint64_t& session_id,
     std::uint64_t& command_version,
+    bool& has_pending_command,
     qsim::SimWindow* const window)
 {
     qi::WireControlRequest request;
@@ -306,7 +311,13 @@ void process_control_requests(
         {
             std::string error_message;
             if (reset_session(
-                    layout, io, startup_id, session_id, command_version, &error_message))
+                    layout,
+                    io,
+                    startup_id,
+                    session_id,
+                    command_version,
+                    has_pending_command,
+                    &error_message))
             {
                 result.success = 1;
                 result.session_id = session_id;
@@ -327,6 +338,24 @@ void process_control_requests(
             std::cerr << "后端控制结果队列已满\n";
         }
     }
+}
+
+void cache_latest_command(
+    qi::SharedLayout& layout,
+    std::uint64_t& command_version,
+    qc::CommandFrame& pending_command,
+    bool& has_pending_command)
+{
+    qi::WireCommandFrame wire_command;
+    std::uint64_t current_version = 0;
+    if (!qi::read_latest(layout.command, wire_command, &current_version) ||
+        current_version == command_version)
+    {
+        return;
+    }
+
+    command_version = current_version;
+    has_pending_command = qi::from_wire(wire_command, pending_command);
 }
 
 int run_physics_loop(
@@ -366,10 +395,21 @@ int run_physics_loop(
     auto next_tick = clock::now();
     auto next_visual_sync = next_tick;
     std::uint64_t command_version = 0;
+    qc::CommandFrame pending_command;
+    bool has_pending_command = false;
     while (!stop_requested.load() && (window == nullptr || !window->should_close()))
     {
+        const std::uint32_t event_snapshot = qi::event_sequence(layout.backend_event);
         process_control_requests(
-            layout, io, startup_id, session_id, command_version, window);
+            layout,
+            io,
+            startup_id,
+            session_id,
+            command_version,
+            has_pending_command,
+            window);
+        cache_latest_command(
+            layout, command_version, pending_command, has_pending_command);
 
         const auto now = clock::now();
         if (window != nullptr && now >= next_visual_sync)
@@ -399,20 +439,34 @@ int run_physics_loop(
             next_visual_sync = now + visual_tick;
         }
 
+        if (now < next_tick)
+        {
+            if (qi::event_sequence(layout.backend_event) == event_snapshot)
+            {
+                const std::int64_t timeout_ns =
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(next_tick - now)
+                        .count();
+                const qi::EventWaitResult wait_result = qi::wait_event(
+                    layout.backend_event, event_snapshot, timeout_ns);
+                if (wait_result == qi::EventWaitResult::Failed)
+                {
+                    std::cerr << "等待 backend event 失败\n";
+                    return 1;
+                }
+            }
+            continue;
+        }
+
         const bool paused = window != nullptr && window->paused();
         if (!paused)
         {
-            qi::WireCommandFrame wire_command;
-            std::uint64_t current_version = 0;
-            if (qi::read_latest(layout.command, wire_command, &current_version) &&
-                current_version != command_version)
+            // event 可提前缓存命令，但只在固定物理周期边界提交和步进。
+            cache_latest_command(
+                layout, command_version, pending_command, has_pending_command);
+            if (has_pending_command)
             {
-                qc::CommandFrame command;
-                if (qi::from_wire(wire_command, command))
-                {
-                    static_cast<void>(io.submit(command));
-                }
-                command_version = current_version;
+                static_cast<void>(io.submit(pending_command));
+                has_pending_command = false;
             }
 
             if (io.step() != qc::RobotIOCode::Ok)
@@ -433,14 +487,13 @@ int run_physics_loop(
         }
 
         next_tick += tick;
-        const auto sleep_now = clock::now();
-        if (next_tick < sleep_now)
+        const auto deadline_now = clock::now();
+        if (next_tick < deadline_now)
         {
             // 普通 Linux 调度或 GUI 同步可能让物理线程错过截止时间。
             // 丢弃墙钟欠账，防止连续无休眠步进造成画面快放和状态发布突发。
-            next_tick = sleep_now;
+            next_tick = deadline_now;
         }
-        std::this_thread::sleep_until(next_tick);
     }
 
     qi::WireHeartbeat heartbeat;

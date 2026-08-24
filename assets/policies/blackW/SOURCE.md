@@ -16,4 +16,4 @@
 
 三个模型的输入形状均为 `[1, 342]`，输出形状均为 `[1, 16]`，其中
 `342 = 57 × 6`。模型已接入 blackW 的 16 关节 RL 控制路径；详细张量和动作契约由
-`configs/policies/blackW/*.yaml` 及 `docs/blackW_模型与行为.md` 定义。
+`configs/policies/blackW/*.yaml` 及 `docs/robot_models_and_behaviors.md` 定义。

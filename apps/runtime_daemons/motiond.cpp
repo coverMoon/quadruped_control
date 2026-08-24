@@ -40,7 +40,6 @@ constexpr const char* kDefaultControllerConfigPath = QUADRUPED_DEFAULT_CONTROLLE
 constexpr const char* kDefaultPolicySwitchConfigPath = QUADRUPED_DEFAULT_POLICY_SWITCH_CONFIG_PATH;
 constexpr const char* kDefaultRetryConfigPath = QUADRUPED_DEFAULT_RETRY_CONFIG_PATH;
 constexpr std::int64_t kOpenTimeoutNs = 10'000'000'000;
-constexpr auto kPollInterval = std::chrono::microseconds(250);
 
 std::atomic<bool> stop_requested{false};
 
@@ -298,7 +297,7 @@ bool publish_result(
     qi::WireModeResult wire = qi::to_wire(result);
     wire.startup_id = startup_id;
     wire.session_id = session_id;
-    if (!qi::queue_push(layout.results, wire))
+    if (!qi::queue_push_and_notify(layout.results, wire, layout.gateway_event))
     {
         std::cerr << "ModeResult 队列已满，无法交付 request_id=" << result.request_id << '\n';
         return false;
@@ -430,6 +429,7 @@ int run(const Options& options)
     std::cout << "motiond ready: shm=" << options.shared_memory_name << '\n';
     while (!stop_requested.load())
     {
+        const std::uint32_t event_snapshot = qi::event_sequence(layout.motion_event);
         qc::StateFrame state_snapshot;
         std::uint64_t current_state_version = 0;
         const qc::RobotIOCode state_read_code =
@@ -570,7 +570,18 @@ int run(const Options& options)
         heartbeat.monotonic_ns = qi::monotonic_now_ns();
         heartbeat.online = 1;
         qi::publish_latest(layout.motion_heartbeat, heartbeat);
-        std::this_thread::sleep_for(kPollInterval);
+        if (qi::event_sequence(layout.motion_event) == event_snapshot)
+        {
+            const qi::EventWaitResult wait_result = qi::wait_event(
+                layout.motion_event,
+                event_snapshot,
+                controller.config.control_period_ns);
+            if (wait_result == qi::EventWaitResult::Failed)
+            {
+                std::cerr << "等待 motion event 失败\n";
+                return 1;
+            }
+        }
     }
 
     qi::WireHeartbeat heartbeat;

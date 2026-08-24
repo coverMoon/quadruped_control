@@ -24,16 +24,17 @@
 
 #include <algorithm>
 #include <array>
-#include <cmath>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <condition_variable>
 #include <cstdint>
 #include <iomanip>
 #include <iostream>
 #include <memory>
-#include <optional>
 #include <mutex>
+#include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -41,6 +42,7 @@
 #include <utility>
 #include <vector>
 
+#include <sys/ioctl.h>
 #include <sys/select.h>
 #include <termios.h>
 #include <unistd.h>
@@ -62,7 +64,6 @@ constexpr const char* kDefaultSharedMemoryName = "/quadruped_control_black";
 constexpr std::int64_t kDefaultCommandTimeoutNs = 200'000'000;
 constexpr std::int64_t kResultWaitTimeoutNs = 10'000'000'000;
 constexpr std::int64_t kHeartbeatTimeoutNs = 500'000'000;
-constexpr auto kPumpInterval = std::chrono::milliseconds(2);
 constexpr auto kStatusPeriod = std::chrono::milliseconds(50);
 constexpr auto kKeyboardPollPeriod = std::chrono::milliseconds(50);
 constexpr std::int64_t kDefaultJoyTimeoutNs = 250'000'000;
@@ -78,6 +79,7 @@ struct JoyEdgeState
     bool lb{false};
     bool rb{false};
     bool passive_combo{false};
+    bool retry_combo{false};
     bool reset_combo{false};
     bool rl_combo{false};
     bool event_chain_combo{false};
@@ -126,18 +128,47 @@ const char* motion_mode_name(const qc::MotionMode mode) noexcept
     switch (mode)
     {
     case qc::MotionMode::Passive:
-        return "Passive";
+        return "PASSIVE";
     case qc::MotionMode::GetUp:
-        return "GetUp";
+        return "GET UP";
     case qc::MotionMode::Stand:
-        return "Stand";
+        return "STAND";
     case qc::MotionMode::Running:
-        return "Running";
+        return "RUNNING";
     case qc::MotionMode::GetDown:
-        return "GetDown";
+        return "GET DOWN";
     default:
-        return "Unknown";
+        return "UNKNOWN";
     }
+}
+
+std::string behavior_display_name(const std::string& name)
+{
+    if (name == "rl_locomotion")
+    {
+        return "RL Locomotion";
+    }
+    if (name == "retry")
+    {
+        return "Retry";
+    }
+    if (name == "event_chain")
+    {
+        return "Event Chain";
+    }
+    if (name == "bridge_drive")
+    {
+        return "Bridge Drive";
+    }
+    if (name == "low_bar_drive")
+    {
+        return "Low-bar Drive";
+    }
+    if (name == "car_drive")
+    {
+        return "Car Drive";
+    }
+    return name;
 }
 
 
@@ -294,6 +325,7 @@ public:
     ~Ros2Gateway() override
     {
         stopping_.store(true);
+        qi::notify_event(memory_->layout().gateway_event);
         result_condition_.notify_all();
         if (terminal_ui_enabled_)
         {
@@ -340,7 +372,8 @@ private:
     {
         qi::WireStateFrame state;
         qi::WireHeartbeat heartbeat;
-        if (!qi::read_latest(memory_->layout().state, state) ||
+        if (memory_->layout().ready.load(std::memory_order_acquire) != 1 ||
+            !qi::read_latest(memory_->layout().state, state) ||
             !qi::read_latest(memory_->layout().backend_heartbeat, heartbeat) ||
             heartbeat.online == 0 || state.startup_id != heartbeat.startup_id ||
             state.session_id != heartbeat.session_id)
@@ -356,7 +389,8 @@ private:
     bool motion_online(const std::uint64_t session_id) const
     {
         qi::WireHeartbeat heartbeat;
-        if (!qi::read_latest(memory_->layout().motion_heartbeat, heartbeat) ||
+        if (memory_->layout().ready.load(std::memory_order_acquire) != 1 ||
+            !qi::read_latest(memory_->layout().motion_heartbeat, heartbeat) ||
             heartbeat.online == 0 || heartbeat.session_id != session_id)
         {
             return false;
@@ -381,7 +415,10 @@ private:
         wire.session_id = session_id;
         wire.timestamp_ns = state_timestamp_ns;
         std::lock_guard<std::mutex> lock(request_mutex_);
-        return qi::queue_push(memory_->layout().requests, wire);
+        return qi::queue_push_and_notify(
+            memory_->layout().requests,
+            wire,
+            memory_->layout().motion_event);
     }
 
     std::uint64_t next_request_id()
@@ -452,7 +489,10 @@ private:
         wire.startup_id = gateway_startup_id_;
         wire.session_id = session_id;
         std::lock_guard<std::mutex> lock(command_mutex_);
-        qi::publish_latest(memory_->layout().base_command, wire);
+        qi::publish_latest_and_notify(
+            memory_->layout().base_command,
+            wire,
+            memory_->layout().motion_event);
     }
 
     void handle_cmd_vel(const geometry_msgs::msg::Twist& message)
@@ -599,6 +639,7 @@ private:
         const bool dpad_left = message.axes[6] < -0.5;
         const bool dpad_right = message.axes[6] > 0.5;
         const bool passive_combo = lb && x;
+        const bool retry_combo = lb && b;
         const bool reset_combo = rb && y;
         const bool rl_combo = rb && dpad_up;
         const bool event_chain_combo = lb && dpad_up;
@@ -611,7 +652,7 @@ private:
         {
             submit_keyboard_request(qc::ModeRequestType::GetUp);
         }
-        if (b && !last_joy_buttons_.b)
+        if (b && !lb && !rb && !last_joy_buttons_.b)
         {
             submit_keyboard_request(qc::ModeRequestType::GetDown);
         }
@@ -626,6 +667,10 @@ private:
         if (passive_combo && !last_joy_buttons_.passive_combo)
         {
             submit_keyboard_request(qc::ModeRequestType::EnterPassive);
+        }
+        if (retry_combo && !last_joy_buttons_.retry_combo)
+        {
+            submit_keyboard_request(qc::ModeRequestType::StartBehavior, "retry");
         }
         if (reset_combo && !last_joy_buttons_.reset_combo)
         {
@@ -666,6 +711,7 @@ private:
         last_joy_buttons_.lb = lb;
         last_joy_buttons_.rb = rb;
         last_joy_buttons_.passive_combo = passive_combo;
+        last_joy_buttons_.retry_combo = retry_combo;
         last_joy_buttons_.reset_combo = reset_combo;
         last_joy_buttons_.rl_combo = rl_combo;
         last_joy_buttons_.event_chain_combo = event_chain_combo;
@@ -948,6 +994,8 @@ private:
     {
         while (!stopping_.load())
         {
+            const std::uint32_t event_snapshot =
+                qi::event_sequence(memory_->layout().gateway_event);
             qi::WireModeResult wire;
             bool received = false;
             while (qi::queue_pop(memory_->layout().results, wire))
@@ -955,6 +1003,7 @@ private:
                 qi::WireHeartbeat motion_heartbeat;
                 qi::WireStateFrame state;
                 const bool current =
+                    memory_->layout().ready.load(std::memory_order_acquire) == 1 &&
                     qi::read_latest(memory_->layout().motion_heartbeat, motion_heartbeat) &&
                     qi::read_latest(memory_->layout().state, state) &&
                     wire.startup_id == motion_heartbeat.startup_id &&
@@ -977,7 +1026,19 @@ private:
             {
                 result_condition_.notify_all();
             }
-            std::this_thread::sleep_for(kPumpInterval);
+            if (qi::event_sequence(memory_->layout().gateway_event) == event_snapshot)
+            {
+                const qi::EventWaitResult wait_result = qi::wait_event(
+                    memory_->layout().gateway_event,
+                    event_snapshot,
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        std::chrono::milliseconds(50)).count());
+                if (wait_result == qi::EventWaitResult::Failed)
+                {
+                    RCLCPP_ERROR(get_logger(), "等待 gateway event 失败");
+                    return;
+                }
+            }
         }
     }
 
@@ -1040,7 +1101,10 @@ private:
         request.type =
             static_cast<std::uint8_t>(qi::WireControlType::SimulationStateReset);
         std::lock_guard<std::mutex> lock(request_mutex_);
-        if (!qi::queue_push(memory_->layout().control_requests, request))
+        if (!qi::queue_push_and_notify(
+                memory_->layout().control_requests,
+                request,
+                memory_->layout().backend_event))
         {
             RCLCPP_WARN(get_logger(), "后端 reset 请求队列已满");
         }
@@ -1067,7 +1131,10 @@ private:
         request.request_id = next_request_id();
         request.type = static_cast<std::uint8_t>(qi::WireControlType::PauseToggle);
         std::lock_guard<std::mutex> lock(request_mutex_);
-        if (!qi::queue_push(memory_->layout().control_requests, request))
+        if (!qi::queue_push_and_notify(
+                memory_->layout().control_requests,
+                request,
+                memory_->layout().backend_event))
         {
             RCLCPP_WARN(get_logger(), "后端暂停请求队列已满");
         }
@@ -1160,6 +1227,8 @@ private:
                 submit_keyboard_request(qc::ModeRequestType::StartBehavior, "car_drive");
             }
             return;
+        case '5': submit_keyboard_request(
+            qc::ModeRequestType::StartBehavior, "retry"); return;
         case '6': submit_keyboard_request(
             qc::ModeRequestType::StartBehavior, "event_chain"); return;
         case '9': submit_keyboard_request(qc::ModeRequestType::GetDown); return;
@@ -1177,7 +1246,7 @@ private:
             RCLCPP_INFO(
                 get_logger(),
                 "0 Stand 1 RL locomotion 2/3 Switch policy or Bridge/Low-bar "
-                "4 Car 6 Event chain "
+                "4 Car 5 Retry 6 Event chain "
                 "9 Lie down P Passive "
                 "R Reset Enter Pause/continue W/S A/D Q/E Command speed "
                 "Space Clear command N Navigation X Exit");
@@ -1210,8 +1279,6 @@ private:
         const double vx = published_command_vx_.load();
         const double vy = published_command_vy_.load();
         const double wz = published_command_wz_.load();
-        const bool rl_running = motion_status.mode == qc::MotionMode::Running &&
-            motion_status.behavior_name == "rl_locomotion";
         const char* const policy = motion_status.policy_name.empty()
             ? "-"
             : motion_status.policy_name.c_str();
@@ -1221,46 +1288,69 @@ private:
             std::lock_guard<std::mutex> lock(joy_info_mutex_);
             joy_profile = joy_profile_name_;
         }
-        std::lock_guard<std::mutex> lock(terminal_output_mutex_);
-        if (terminal_status_rendered_)
-        {
-            // 光标当前位于第二行；回到第一行后整体刷新两行状态。
-            std::cout << "\033[1A";
-        }
-        std::cout << "\r\033[2K[Controller] ";
+
+        std::string controller_status;
         if (joy_online_.load())
         {
-            std::cout << "Connected";
-            if (!joy_profile.empty())
-            {
-                std::cout << ": " << joy_profile;
-            }
+            controller_status = joy_profile.empty()
+                ? "Connected"
+                : "Connected: " + joy_profile;
         }
         else
         {
-            std::cout << "\033[33mNot connected\033[0m";
+            controller_status = "Disconnected";
         }
-        std::cout << "\n\r\033[2K" << std::fixed << std::setprecision(2);
-        if (rl_running)
+
+        std::ostringstream status;
+        status << "[" << motion_mode_name(motion_status.mode) << "] ";
+        if (motion_status.behavior_name.empty())
         {
-            // 指令单位分别为 m/s、m/s、rad/s。
-            std::cout << "RL Controller policy=" << policy
-                      << " x:" << vx
-                      << " y:" << vy
-                      << " yaw:" << wz;
+            status << "policy=" << policy;
         }
         else
         {
-            std::cout << "mode=" << motion_mode_name(motion_status.mode)
-                      << " policy=" << policy
-                      << " input=" << input
-                      << " command=" << vx << "," << vy << "," << wz;
-            if (!motion_status.error_message.empty())
+            status << behavior_display_name(motion_status.behavior_name);
+            if (!motion_status.behavior_phase.empty())
             {
-                std::cout << " error=" << motion_status.error_message;
+                status << " · " << motion_status.behavior_phase;
+            }
+            if (motion_status.behavior_name == "rl_locomotion")
+            {
+                status << " · " << policy;
             }
         }
-        std::cout << std::flush;
+        status << " | " << input
+               << " | vx=" << std::fixed << std::setprecision(2)
+               << vx << " vy=" << vy << " wz=" << wz;
+        std::string status_line = status.str();
+        winsize terminal_size{};
+        if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &terminal_size) == 0 &&
+            terminal_size.ws_col > 1 && status_line.size() >= terminal_size.ws_col)
+        {
+            status_line.resize(static_cast<std::size_t>(terminal_size.ws_col - 1));
+        }
+
+        std::lock_guard<std::mutex> lock(terminal_output_mutex_);
+        const bool controller_changed = controller_status != last_controller_status_;
+        const bool error_changed = motion_status.error_message != last_terminal_error_;
+        if (status_line == last_terminal_status_line_ &&
+            !controller_changed && !error_changed)
+        {
+            return;
+        }
+        if (controller_changed)
+        {
+            std::cout << "\r\033[2K[Controller] " << controller_status << '\n';
+        }
+        if (error_changed && !motion_status.error_message.empty())
+        {
+            std::cout << "\r\033[2K[MotionError] "
+                      << motion_status.error_message << '\n';
+        }
+        std::cout << "\r\033[2K" << status_line << std::flush;
+        last_controller_status_ = controller_status;
+        last_terminal_status_line_ = status_line;
+        last_terminal_error_ = motion_status.error_message;
         terminal_status_rendered_ = true;
     }
 
@@ -1393,6 +1483,9 @@ private:
     termios original_termios_{};
     std::atomic<bool> terminal_active_{false};
     bool terminal_status_rendered_{false};
+    std::string last_controller_status_{};
+    std::string last_terminal_status_line_{};
+    std::string last_terminal_error_{};
     std::mutex command_mutex_{};
     std::mutex policy_mutex_{};
     std::string current_policy_{};

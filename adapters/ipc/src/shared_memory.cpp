@@ -1,6 +1,6 @@
 /**
  * @file shared_memory.cpp
- * @brief 实现 POSIX 共享内存的创建、映射、校验和释放。
+ * @brief 实现 POSIX 共享内存生命周期和进程共享 futex 事件。
  */
 
 #include "quadruped/ipc/shared_memory.hpp"
@@ -8,12 +8,16 @@
 #include <cerrno>
 #include <chrono>
 #include <cstring>
+#include <limits>
 #include <new>
 
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <unistd.h>
+
+#include <linux/futex.h>
 
 namespace quadruped::ipc
 {
@@ -140,6 +144,9 @@ SharedMemory::~SharedMemory()
         if (owner_)
         {
             layout_->ready.store(0, std::memory_order_release);
+            notify_event(layout_->motion_event);
+            notify_event(layout_->backend_event);
+            notify_event(layout_->gateway_event);
         }
         munmap(layout_, sizeof(SharedLayout));
     }
@@ -158,6 +165,64 @@ std::int64_t monotonic_now_ns() noexcept
     return std::chrono::duration_cast<std::chrono::nanoseconds>(
                std::chrono::steady_clock::now().time_since_epoch())
         .count();
+}
+
+std::uint32_t event_sequence(const WireEvent& event) noexcept
+{
+    return event.sequence.load(std::memory_order_acquire);
+}
+
+void notify_event(WireEvent& event) noexcept
+{
+    event.sequence.fetch_add(1, std::memory_order_release);
+    static_cast<void>(syscall(
+        SYS_futex,
+        reinterpret_cast<std::uint32_t*>(&event.sequence),
+        FUTEX_WAKE,
+        std::numeric_limits<int>::max(),
+        nullptr,
+        nullptr,
+        0));
+}
+
+EventWaitResult wait_event(
+    WireEvent& event,
+    const std::uint32_t expected_sequence,
+    const std::int64_t timeout_ns) noexcept
+{
+    if (event_sequence(event) != expected_sequence)
+    {
+        return EventWaitResult::Changed;
+    }
+    if (timeout_ns <= 0)
+    {
+        return EventWaitResult::TimedOut;
+    }
+
+    timespec timeout{};
+    timeout.tv_sec = static_cast<time_t>(timeout_ns / 1'000'000'000);
+    timeout.tv_nsec = static_cast<long>(timeout_ns % 1'000'000'000);
+    const long result = syscall(
+        SYS_futex,
+        reinterpret_cast<std::uint32_t*>(&event.sequence),
+        FUTEX_WAIT,
+        expected_sequence,
+        &timeout,
+        nullptr,
+        0);
+    if (result == 0 || errno == EAGAIN)
+    {
+        return EventWaitResult::Changed;
+    }
+    if (errno == ETIMEDOUT)
+    {
+        return EventWaitResult::TimedOut;
+    }
+    if (errno == EINTR)
+    {
+        return EventWaitResult::Interrupted;
+    }
+    return EventWaitResult::Failed;
 }
 
 }  // 命名空间 quadruped::ipc

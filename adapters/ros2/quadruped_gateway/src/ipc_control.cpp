@@ -63,7 +63,10 @@ int main(int argc, char** argv)
     request.session_id = heartbeat.session_id;
     request.request_id = make_request_id();
     request.type = static_cast<std::uint8_t>(qi::WireControlType::Reset);
-    if (!qi::queue_push(layout.control_requests, request))
+    if (!qi::queue_push_and_notify(
+            layout.control_requests,
+            request,
+            layout.backend_event))
     {
         std::cerr << "后端控制请求队列已满\n";
         return 1;

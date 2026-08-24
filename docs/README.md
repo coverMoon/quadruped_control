@@ -1,16 +1,27 @@
-# 文档
+# 文档导航
 
-根目录 [README](../README.md) 提供安装、构建和基本运行方法。这里记录系统设计、接口和专项运行说明。
+根目录 [README](../README.md) 提供项目概览、安装、构建和基本运行方法。`docs/` 只保留系统设计、接口契约和需要长期维护的专项说明。
 
-| 文档 | 内容 |
-| --- | --- |
-| [系统架构](quadruped_control_architecture.md) | 模块边界、核心数据结构、MotionRuntime 与配置职责 |
-| [三进程运行架构](three_process_runtime.md) | `ros2_gateway`、`motiond`、`mujoco_backendd`、IPC 与 session |
-| [ROS 2 接口契约](ros2_interface_contract.md) | topic、action、service、字段映射与 QoS |
-| [RL 与 MuJoCo](rl_mujoco_runtime.md) | 单进程调试、控制频率与策略运行 |
-| [blackW 模型与行为](blackW_模型与行为.md) | 16 关节模型、轮足策略、Event chain 与固定轮驱 |
-| [故障、诊断与回放](fault_logging_replay.md) | 故障结果、诊断字段和 ReplayRobotIO |
-| [当前状态](current_status.md) | 已支持功能与仍需场景验证的内容 |
+## 按需求阅读
+
+| 目标 | 文档 | 内容 |
+| --- | --- | --- |
+| 理解整体设计 | [系统架构](architecture.md) | 模块边界、核心数据、MotionRuntime、策略与配置职责 |
+| 理解正式运行链路 | [运行时与 IPC](runtime_ipc.md) | 三进程职责、共享内存、futex、周期、session 和退出语义 |
+| 接入 ROS 2 | [ROS 2 接口](ros2_interface.md) | topic、action、service、字段、QoS 和调用示例 |
+| 区分机器人能力 | [机器人模型与行为](robot_models_and_behaviors.md) | black/blackW 模型、策略、Retry、Event chain 和轮驱行为 |
+| 排查与复现问题 | [诊断与回放](diagnostics_replay.md) | 故障结果、诊断字段、CSV 日志和 ReplayRobotIO |
+
+建议首次阅读顺序为：根 README → 系统架构 → 运行时与 IPC。只使用 ROS 2 接口时，可以从根 README 直接进入 ROS 2 接口文档。
+
+## 文档职责
+
+- 根 README 维护安装、构建、启动、操作和当前能力概览。
+- 系统架构维护稳定的模块边界和内部数据语义。
+- 运行时与 IPC 是三进程、共享内存和 futex 机制的唯一权威说明。
+- ROS 2 接口只维护外部契约，不重复内部调度实现。
+- 机器人模型与行为只记录 black/blackW 的结构、策略和行为差异。
+- 诊断与回放只记录故障观测、日志格式和离线复现。
 
 ## 参考工程
 
@@ -20,8 +31,4 @@
 - `../real_robot`：MuJoCo 场景与历史交互行为；
 - `../URDF`：机器人几何与关节限制。
 
-实际运行参数以本仓库代码和 `configs/` 为准。
-
-## 图表
-
-架构图源文件位于 `diagrams/`。`.dot` 为 Graphviz 源文件，`.svg` 为文档引用的生成结果。
+实际运行参数以本仓库代码、`configs/` 和 `assets/` 为准。

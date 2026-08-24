@@ -1,4 +1,4 @@
-# quadruped_control 架构
+# 系统架构
 
 `quadruped_control` 将运动控制、机器人后端和外部接口分开，MotionRuntime 通过统一的 `RobotIO` 与具体机器人或仿真环境连接。
 
@@ -21,8 +21,6 @@ apps
 adapters/ros2
  └── IPC ↔ ROS 2
 ```
-
-![控制系统总览](diagrams/quadruped_control_overview.svg)
 
 主要模块职责：
 
@@ -63,7 +61,8 @@ keyboard / joystick / ROS 2
 - `motiond`：MotionRuntime、行为状态机和策略推理；
 - `mujoco_backendd`：物理步进、状态读取和关节命令执行。
 
-三个进程通过 POSIX 共享内存通信。详细 IPC、session 和超时规则见 [ROS 2 三进程运行架构](ros2_three_process_runtime.md)。
+三个进程通过 POSIX 共享内存通信。详细 IPC、futex、session 和调度规则见
+[运行时与 IPC](runtime_ipc.md)。
 
 ### 单进程调试
 
@@ -71,7 +70,8 @@ keyboard / joystick / ROS 2
 
 ### 回放
 
-`ReplayRobotIO` 从日志提供 `StateFrame`，并记录 MotionRuntime 生成的 `CommandFrame`。回放格式见 [故障、诊断与回放](fault_logging_replay.md)。
+`ReplayRobotIO` 从日志提供 `StateFrame`，并记录 MotionRuntime 生成的 `CommandFrame`。
+回放格式见 [诊断与回放](diagnostics_replay.md)。
 
 ## 3. 核心数据
 
@@ -165,6 +165,9 @@ StateFrame
 
 MotionRuntime 以控制周期提交 CommandFrame，策略按照 decimation 更新动作。切换策略时会重置目标策略的历史和旧动作；默认姿态差异较大时先执行姿态过渡。
 
+black 与 blackW 的观测维度、动作转换和行为差异见
+[机器人模型与行为](robot_models_and_behaviors.md)。
+
 ## 5. 数据约定
 
 - C++17；
@@ -225,14 +228,4 @@ MotionRuntime 以控制周期提交 CommandFrame，策略按照 decimation 更�
 ./scripts/build.sh
 ./scripts/test/ctest.sh
 ./scripts/test/ros2_headless.sh
-```
-
-## 9. 架构图
-
-Graphviz 源文件和生成的 SVG 位于 `docs/diagrams/`：
-
-```bash
-for src in docs/diagrams/*.dot; do
-  dot -Tsvg "$src" -o "${src%.dot}.svg"
-done
 ```

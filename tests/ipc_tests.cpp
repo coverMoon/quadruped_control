@@ -1,6 +1,6 @@
 /**
  * @file ipc_tests.cpp
- * @brief 测试三进程共享内存 wire 转换、最新值、可靠队列和会话安全语义。
+ * @brief 测试共享内存 wire、数据通道、futex 通知和会话安全语义。
  */
 
 #include "quadruped/config/robot_config.hpp"
@@ -9,11 +9,16 @@
 #include "quadruped/ipc/remote_robot_io.hpp"
 #include "quadruped/ipc/shared_memory.hpp"
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <csignal>
 #include <iostream>
 #include <limits>
 #include <string>
+#include <thread>
+
+#include <pthread.h>
 #include <unistd.h>
 
 namespace qc = quadruped::core;
@@ -23,6 +28,10 @@ namespace
 {
 
 int failures = 0;
+
+void handle_test_signal(int)
+{
+}
 
 void expect(const bool condition, const std::string& description)
 {
@@ -157,6 +166,79 @@ void test_latest_and_queue()
     expect(qi::queue_pop(queue, output) && output.request_id == 10, "queue preserves FIFO first");
     expect(qi::queue_pop(queue, output) && output.request_id == 11, "queue preserves FIFO second");
     expect(!qi::queue_pop(queue, output), "empty queue reports no value");
+
+    qi::WireEvent event;
+    expect(qi::queue_push(queue, first) && qi::queue_push(queue, second),
+        "queue can be filled again for notification test");
+    const std::uint32_t full_sequence = qi::event_sequence(event);
+    expect(!qi::queue_push_and_notify(queue, first, event),
+        "full queue does not publish an event");
+    expect(qi::event_sequence(event) == full_sequence,
+        "full queue leaves event sequence unchanged");
+}
+
+void test_event_waiting()
+{
+    qi::WireEvent event;
+    const std::uint32_t initial = qi::event_sequence(event);
+    expect(qi::wait_event(event, initial, 1'000'000) == qi::EventWaitResult::TimedOut,
+        "event wait reports timeout");
+
+    qi::notify_event(event);
+    expect(qi::wait_event(event, initial, 1'000'000) == qi::EventWaitResult::Changed,
+        "notification before wait is not lost");
+
+    const std::uint32_t waiting_sequence = qi::event_sequence(event);
+    std::atomic<qi::EventWaitResult> wake_result{qi::EventWaitResult::Failed};
+    std::thread waiter([&]()
+    {
+        wake_result.store(qi::wait_event(event, waiting_sequence, 1'000'000'000));
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    qi::notify_event(event);
+    waiter.join();
+    expect(wake_result.load() == qi::EventWaitResult::Changed,
+        "waiting consumer is woken by notification");
+
+    qi::LatestSlot<qi::WireHeartbeat> slot;
+    qi::WireHeartbeat published;
+    published.startup_id = 77;
+    const std::uint32_t data_sequence = qi::event_sequence(event);
+    qi::publish_latest_and_notify(slot, published, event);
+    qi::WireHeartbeat received;
+    expect(qi::wait_event(event, data_sequence, 1'000'000) == qi::EventWaitResult::Changed &&
+            qi::read_latest(slot, received) && received.startup_id == 77,
+        "latest value is visible after event notification");
+
+    const std::uint32_t merged_sequence = qi::event_sequence(event);
+    published.startup_id = 78;
+    qi::publish_latest_and_notify(slot, published, event);
+    published.startup_id = 79;
+    qi::publish_latest_and_notify(slot, published, event);
+    expect(qi::wait_event(event, merged_sequence, 1'000'000) == qi::EventWaitResult::Changed &&
+            qi::read_latest(slot, received) && received.startup_id == 79,
+        "multiple notifications can merge while latest value is preserved");
+
+    struct sigaction action{};
+    action.sa_handler = handle_test_signal;
+    sigemptyset(&action.sa_mask);
+    sigaction(SIGUSR1, &action, nullptr);
+    const std::uint32_t interrupted_sequence = qi::event_sequence(event);
+    std::atomic<bool> waiting{false};
+    wake_result.store(qi::EventWaitResult::Failed);
+    std::thread interrupted_waiter([&]()
+    {
+        waiting.store(true, std::memory_order_release);
+        wake_result.store(qi::wait_event(event, interrupted_sequence, 1'000'000'000));
+    });
+    while (!waiting.load(std::memory_order_acquire))
+    {
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    pthread_kill(interrupted_waiter.native_handle(), SIGUSR1);
+    interrupted_waiter.join();
+    expect(wake_result.load() == qi::EventWaitResult::Interrupted,
+        "signal interruption is reported separately");
 }
 
 void test_shared_memory_and_remote_io(const qc::RobotModel& model)
@@ -174,6 +256,27 @@ void test_shared_memory_and_remote_io(const qc::RobotModel& model)
     {
         return;
     }
+
+    const std::uint32_t cross_mapping_sequence =
+        qi::event_sequence(client.memory->layout().motion_event);
+    std::atomic<qi::EventWaitResult> cross_mapping_result{qi::EventWaitResult::Failed};
+    std::thread cross_mapping_waiter([&]()
+    {
+        cross_mapping_result.store(qi::wait_event(
+            client.memory->layout().motion_event,
+            cross_mapping_sequence,
+            1'000'000'000));
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    qi::notify_event(owner.memory->layout().motion_event);
+    cross_mapping_waiter.join();
+    expect(cross_mapping_result.load() == qi::EventWaitResult::Changed,
+        "futex wakes a waiter through another shared mapping");
+
+    owner.memory->layout().identity.wire_schema_version = 1;
+    const auto incompatible = qi::SharedMemory::open_existing(name);
+    expect(!incompatible.ok(), "schema v1 mapping is rejected by schema v2 client");
+    owner.memory->layout().identity.wire_schema_version = qi::kWireSchemaVersion;
 
     constexpr std::uint64_t startup_id = 31;
     constexpr std::uint64_t session_id = 41;
@@ -227,6 +330,23 @@ void test_shared_memory_and_remote_io(const qc::RobotModel& model)
     qi::publish_latest(owner.memory->layout().backend_heartbeat, heartbeat);
     expect(io.read_latest(state) == qc::RobotIOCode::Disconnected,
         "expired backend heartbeat disconnects RemoteRobotIO");
+
+    const std::uint32_t close_sequence =
+        qi::event_sequence(client.memory->layout().gateway_event);
+    std::atomic<qi::EventWaitResult> close_result{qi::EventWaitResult::Failed};
+    std::thread close_waiter([&]()
+    {
+        close_result.store(qi::wait_event(
+            client.memory->layout().gateway_event,
+            close_sequence,
+            1'000'000'000));
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    owner.memory.reset();
+    close_waiter.join();
+    expect(close_result.load() == qi::EventWaitResult::Changed &&
+            client.memory->layout().ready.load(std::memory_order_acquire) == 0,
+        "owner shutdown clears ready and wakes event waiters");
 }
 
 }  // 匿名命名空间
@@ -242,6 +362,7 @@ int main()
 
     test_identity_and_conversions(loaded.model);
     test_latest_and_queue();
+    test_event_waiting();
     test_shared_memory_and_remote_io(loaded.model);
 
     if (failures == 0)

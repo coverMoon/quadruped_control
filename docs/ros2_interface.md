@@ -115,8 +115,8 @@ ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist \
 
 输入选择与旧 `rl_sar` 一致：gateway 启动时为 manual；按键盘 `N` 或手柄 `X` 后进入
 navigation，再次按下才返回 manual。该选择是持久状态，手柄连接、断开、超时或重连都不会
-改变它。navigation 中只忽略手柄摇杆和键盘速度增量，起立、趴下、Passive、策略切换、事件
-链和仿真控制等离散按键仍然有效。
+改变它。navigation 中只忽略手柄摇杆和键盘速度增量，起立、趴下、Passive、Retry、策略
+切换、事件链和仿真控制等离散按键仍然有效。
 
 `MotionStatus.command_limits` 顺序固定为 `[abs(vx), abs(vy), abs(wz)]`。策略就绪后使用策略
 配置值；策略未就绪时使用回退值 `[3.0, 1.0, 3.0]`。例如限制为
@@ -182,8 +182,9 @@ ros2 action send_goal /motion/get_up quadruped_interfaces/action/GetUp \
   "{}" --feedback
 ```
 
-成功后进入 Stand。它要求最新状态有效且安全状态为 `CONTROL_ENABLED`。已经处于 GetUp 或
-Stand、状态无效，或正在运行不可中断行为时会被拒绝。
+成功后进入 Stand。它要求最新状态有效且安全状态为 `CONTROL_ENABLED`。RL locomotion 中
+请求 GetUp 会停止策略，并从当前反馈姿态平滑返回站姿。已经处于 GetUp 或 Stand、状态
+无效，或正在运行不可中断行为时会被拒绝。
 
 ### 5.2 GetDown
 
@@ -525,4 +526,4 @@ sequence 和 timestamp。时间戳必须按后端单调时间解释；startup �
   同名接口。
 
 三进程拓扑、共享内存所有权和故障语义见
-[三进程运行架构](three_process_runtime.md)。
+[运行时与 IPC](runtime_ipc.md)。

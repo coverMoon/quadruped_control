@@ -7,6 +7,7 @@
 
 #include "quadruped/core/validation.hpp"
 
+#include <cmath>
 #include <cstddef>
 
 namespace quadruped::motion
@@ -31,6 +32,9 @@ double interpolate(const double start, const double target, const double percent
 {
     return (1.0 - percent) * start + percent * target;
 }
+
+// 与 rl_sar 的 black 起立逻辑一致：已经接近默认站姿时不再先收腿。
+constexpr double kGetUpStandPoseTolerance = 0.08;
 
 }  // 匿名命名空间
 
@@ -201,7 +205,8 @@ core::ModeResult MotionRuntime::dispatch_getup(
     }
     if (mode_ == core::MotionMode::Running)
     {
-        if (status_.behavior_name != "retry" &&
+        if (status_.behavior_name != "rl_locomotion" &&
+            status_.behavior_name != "retry" &&
             status_.behavior_name != "event_chain" &&
             find_fixed_drive(status_.behavior_name) == kInvalidFixedDriveIndex)
         {
@@ -649,11 +654,48 @@ core::ModeResult MotionRuntime::accept_getup(const std::uint64_t request_id)
         abort_active_request("interrupted by getup");
     }
 
+    // rl_sar 在离开运行行为时停止策略执行；下次进入 RL 时重新建立历史。
+    if (mode_ == core::MotionMode::Running)
+    {
+        rl_control_cycle_ = 0;
+        rl_command_ = {};
+        if (rl_controller_ != nullptr)
+        {
+            rl_controller_->reset();
+        }
+    }
+    pending_policy_index_ = kInvalidPolicyIndex;
+    policy_transition_active_ = false;
+    event_to_rl_transition_ = false;
+    fixed_drive_to_rl_transition_ = false;
+    active_fixed_drive_index_ = kInvalidFixedDriveIndex;
+    retry_locked_ = false;
+    event_initialized_ = false;
+    event_motion_complete_ = false;
+    event_chain_complete_ = false;
+
     interp_start_ = current_positions_;
-    interp_target_ = config_.pre_getup_position;
-    interp_total_cycles_ = config_.getup_pre_cycles;
+    bool pre_pose_differs_from_stand = false;
+    bool current_pose_matches_stand = true;
+    for (std::size_t i = 0; i < model_.joint_count; ++i)
+    {
+        pre_pose_differs_from_stand = pre_pose_differs_from_stand ||
+            std::fabs(config_.pre_getup_position[i] - config_.stand_position[i]) >
+                kGetUpStandPoseTolerance;
+        current_pose_matches_stand = current_pose_matches_stand &&
+            std::fabs(current_positions_[i] - config_.stand_position[i]) <=
+                kGetUpStandPoseTolerance;
+    }
+    const bool skip_pre_stage = pre_pose_differs_from_stand &&
+        current_pose_matches_stand;
+    interp_target_ = skip_pre_stage
+        ? config_.stand_position
+        : config_.pre_getup_position;
+    interp_total_cycles_ = skip_pre_stage
+        ? config_.getup_cycles
+        : config_.getup_pre_cycles;
     interp_elapsed_cycles_ = 0;
-    getup_second_phase_ = false;
+    getup_second_phase_ = skip_pre_stage;
     mode_ = core::MotionMode::GetUp;
     status_.active_source = core::CommandSource::None;
     status_.behavior_name.clear();
