@@ -329,7 +329,7 @@ ros2 topic pub --rate 10 /cmd_vel geometry_msgs/msg/Twist \
 - [当前能力与验证状态](docs/current_status.md)
 - [系统架构](docs/quadruped_control_architecture.md)
 - [RL 与 MuJoCo 运行说明](docs/rl_mujoco_runtime.md)
-- [ROS 2 三进程运行架构](docs/ros2_three_process_runtime.md)
+- [三进程运行架构](docs/three_process_runtime.md)
 - [ROS 2 接口契约](docs/ros2_interface_contract.md)
 - [blackW 模型、策略与行为](docs/blackW_模型与行为.md)
 - [故障、诊断与回放](docs/fault_logging_replay.md)
