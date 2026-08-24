@@ -2,12 +2,12 @@
 
 ## 1. 当前边界
 
-故障注入仅存在于测试辅助 `FakeRobotIO`，不会进入 MuJoCo、共享内存或未来硬件后端。
+故障注入仅存在于测试辅助 `FakeRobotIO`，不会进入 MuJoCo 或共享内存运行链路。
 生产代码只增加固定字段的 `MotionDiagnostics` 快照；`MotionRuntime` 不分配日志缓冲、不访问
 文件，也不等待日志消费者。
 
 `ReplayRobotIO` 只读取历史 `StateFrame`。MotionRuntime 提交给它的 `CommandFrame` 只保存在
-当前回放进程内，用于确定性对比，不会转发到 MuJoCo、共享内存或真实机器人。
+当前回放进程内，用于确定性对比，不会转发到 MuJoCo 或共享内存。
 
 ## 2. 故障结果矩阵
 
@@ -49,7 +49,7 @@ effective sequence 标记该目标是否实际生效。
 身份、关节顺序、帧维度、数值、时间或同会话序号不合法的数据。
 
 当前运行入口尚未自动录制这种 `state_log.csv`；仓库已经提供格式读写器和测试生成样例，
-但不能把 `/state/diagnostic` 导出的诊断 CSV 直接当作回放输入。接入生产状态录制器后，
+但不能把 `/state/diagnostic` 导出的诊断 CSV 直接当作回放输入。准备符合格式的状态日志后，
 回放命令如下：
 
 ```bash

@@ -433,6 +433,13 @@ int run_physics_loop(
         }
 
         next_tick += tick;
+        const auto sleep_now = clock::now();
+        if (next_tick < sleep_now)
+        {
+            // 普通 Linux 调度或 GUI 同步可能让物理线程错过截止时间。
+            // 丢弃墙钟欠账，防止连续无休眠步进造成画面快放和状态发布突发。
+            next_tick = sleep_now;
+        }
         std::this_thread::sleep_until(next_tick);
     }
 

@@ -1,5 +1,5 @@
 # 文件：CMakeLists.txt
-# 作用：构建阶段 6 的 motiond 和无界面 MuJoCo 后端进程。
+# 作用：构建三进程仿真使用的 motiond 和 MuJoCo 后端进程。
 
 if(QUADRUPED_ENABLE_MUJOCO)
     add_executable(quadruped_mujoco_backendd mujoco_backendd.cpp)

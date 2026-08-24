@@ -1,8 +1,8 @@
-# ROS 2 三进程无界面仿真运行架构
+# ROS 2 三进程仿真运行架构
 
 ## 1. 范围
 
-阶段 7 将 black 的控制闭环拆为三个独立进程，并支持 backend headless/GUI 两种运行模式：
+当前正式仿真把控制闭环拆为三个独立进程，并支持 backend headless/GUI 两种运行模式：
 
 ```text
 ROS 2 topic/action/service
@@ -17,12 +17,12 @@ ROS 2 topic/action/service
      mujoco_backendd
             │
             ▼
-      MuJoCo headless
+     MuJoCo GUI/headless
 ```
 
-本阶段实现 Linux 本机 black 的 headless/GUI 仿真链路和 ROS 2 launch。blackW、真实硬件
-和跨机器协议不在本阶段范围内。GUI 通过独立显示 model/data 副本读取后端状态，不直接修改
-backend authoritative mjData；GUI reset 由 backend 转换为新的 session。
+black 和 blackW 使用同一进程拓扑，通过启动参数选择各自模型、控制器、策略和行为配置。
+GUI 使用独立显示 model/data 副本；物理状态、reset 和鼠标扰动力由 backend 统一应用到
+authoritative mjData。普通姿态 reset 保持当前 session，管理级 reset 才建立新 session。
 
 ## 2. 进程职责
 
@@ -37,8 +37,8 @@ backend authoritative mjData；GUI reset 由 backend 转换为新的 session。
 
 ### 2.2 `motiond`
 
-- 加载 black 的 RobotModel、ControllerConfig，以及
-  `configs/policies/black/policy_switch.yaml` 中列出的策略；
+- 加载所选机器人的 RobotModel、ControllerConfig、行为配置，以及
+  `configs/policies/<robot>/policy_switch.yaml` 中列出的策略；
 - 创建并周期调用 `MotionRuntime`；
 - 通过 `RemoteRobotIO` 读取 StateFrame、提交 CommandFrame；
 - 消费 BaseCommand 和 ModeRequest，发布 MotionStatus 和 ModeResult；
@@ -47,10 +47,10 @@ backend authoritative mjData；GUI reset 由 backend 转换为新的 session。
 ### 2.3 `mujoco_backendd`
 
 - 创建共享内存并成为唯一 owner；
-- 加载 black MuJoCo scene 和 `MujocoRobotIO`；
-- 按 MJCF physics timestep 实时无界面步进；
+- 加载所选机器人的 MuJoCo scene 和 `MujocoRobotIO`；
+- 按 MJCF physics timestep 在独立物理线程中步进；
 - 消费最新 CommandFrame，发布 StateFrame、RobotIOStatus 和 heartbeat；
-- 处理 reset 请求并递增 session；
+- 处理保持 session 的姿态 reset，以及显式递增 session 的管理级 reset；
 - 不依赖 ROS 2 或 Torch。
 
 ## 3. IPC wire schema
@@ -88,8 +88,8 @@ latest slot 使用共享 spin lock 保护普通 payload，避免用非法的无�
 ## 4. 周期和超时
 
 - `mujoco_backendd`：按 MuJoCo scene 的 physics timestep 步进；
-- `motiond`：按 `ControllerConfig.control_period_ns` 调度，black 当前为 5 ms；
-- CommandFrame：按 controller 配置失效，black 当前为 10 ms；
+- `motiond`：按 `ControllerConfig.control_period_ns` 调度，black/blackW 当前均为 5 ms；
+- CommandFrame：按 controller 配置失效，black/blackW 当前均为 10 ms；
 - BaseCommand：gateway 默认有效 200 ms，可用 `cmd_vel_timeout_ns` 参数覆盖；
 - backend、motion heartbeat：500 ms 后判定断开；
 - ROS action/service：gateway 最长等待 motion 结果 10 s；
@@ -102,6 +102,7 @@ latest slot 的短暂锁竞争不表示进程断开。读取端采用有界 CAS 
 backend startup/session 内保留最后一次有效 heartbeat 和 StateFrame，只在槽正被发布者占用
 时复用。heartbeat 超过 500 ms 或明确发布 offline 后仍会按真实断线处理。MuJoCo GUI 的显示
 同步同样使用非阻塞取锁；渲染线程繁忙时只丢弃一帧画面同步，不得阻塞物理步进和 heartbeat。
+物理线程错过墙钟截止时间时从当前时刻重新排程，不连续补跑已经积压的物理步。
 
 ## 5. reset 和会话
 

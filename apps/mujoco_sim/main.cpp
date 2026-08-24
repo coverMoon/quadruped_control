@@ -365,6 +365,12 @@ int run_physics_loop(
         }
 
         next_tick += tick_duration;
+        const auto sleep_now = clock::now();
+        if (next_tick < sleep_now)
+        {
+            // 物理线程超期时从当前墙钟重新排程，避免积压步数导致画面快放。
+            next_tick = sleep_now;
+        }
         std::this_thread::sleep_until(next_tick);
     }
     return 0;

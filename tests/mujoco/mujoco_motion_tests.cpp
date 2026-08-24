@@ -563,7 +563,7 @@ void check_blackw_wheel_direction(
     }
 }
 
-// 阶段 10 验证 blackW 的映射、轮方向和无 Torch 基础动作闭环。
+// 验证 blackW 的映射、轮方向、基础动作和策略闭环。
 void check_blackw_model_and_basic_motion()
 {
     const auto model =

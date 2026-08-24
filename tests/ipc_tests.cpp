@@ -190,7 +190,10 @@ void test_shared_memory_and_remote_io(const qc::RobotModel& model)
 
     qi::RemoteRobotIO io(*client.memory, model);
     qc::StateFrame state;
-    expect(io.read_latest(state) == qc::RobotIOCode::Ok, "RemoteRobotIO reads matching state");
+    std::uint64_t state_version = 0;
+    expect(io.read_latest(state, state_version) == qc::RobotIOCode::Ok,
+        "RemoteRobotIO reads matching state");
+    expect(state_version == 1, "RemoteRobotIO returns the state slot version");
 
     const auto command = make_command(model, startup_id, session_id, state_time);
     expect(io.submit(command) == qc::RobotIOCode::Ok, "RemoteRobotIO publishes matching command");
@@ -208,6 +211,10 @@ void test_shared_memory_and_remote_io(const qc::RobotModel& model)
         "busy state slot reuses the matching cached state");
     expect(cached_state.header.sequence == state.header.sequence,
         "cached state preserves the last valid sequence");
+    std::uint64_t cached_version = 0;
+    expect(io.read_latest(cached_state, cached_version) == qc::RobotIOCode::Ok &&
+            cached_version == state_version,
+        "cached state preserves its matching slot version");
     owner.memory->layout().state.lock.store(0, std::memory_order_release);
 
     auto old_session_command = command;

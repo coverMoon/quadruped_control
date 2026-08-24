@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # 文件：ros2_headless_test.py
-# 作用：启动并验证阶段 8 三进程 ROS 2 无界面仿真链路及进程故障退路。
+# 作用：启动并验证指定机器人三进程 ROS 2 无界面仿真链路及进程故障退路。
 
 import argparse
 import os
@@ -57,7 +57,7 @@ class RuntimeGroup:
             "backend",
             [
                 self.args.backend_script,
-                "black",
+                self.args.robot,
                 "plain",
                 "--mode",
                 "headless",
@@ -71,7 +71,13 @@ class RuntimeGroup:
     def start_motion(self):
         return self._start(
             "motion",
-            [self.args.motion_script, "black", "flat", "--shm", self.shared_memory_name],
+            [
+                self.args.motion_script,
+                self.args.robot,
+                "flat",
+                "--shm",
+                self.shared_memory_name,
+            ],
         )
 
     def start_gateway(self):
@@ -79,7 +85,7 @@ class RuntimeGroup:
             "gateway",
             [
                 self.args.command_script,
-                "black",
+                self.args.robot,
                 "keyboard",
                 "--shm",
                 self.shared_memory_name,
@@ -224,6 +230,21 @@ class TestNode(Node):
         message.angular.z = wz
         self.cmd_vel.publish(message)
 
+    def assert_rl_stable(self, group, duration):
+        deadline = time.monotonic() + duration
+        while time.monotonic() < deadline:
+            group.assert_running()
+            self.publish_velocity(0.2, 0.0, 0.0)
+            rclpy.spin_once(self, timeout_sec=0.02)
+            if self.motion_status is None:
+                continue
+            if self.motion_status.mode != MODE_RUNNING:
+                raise AssertionError(
+                    "RL 持续运行期间意外退出: " + self.motion_status.error_message
+                )
+            if "frame timestamp is invalid or in the future" in self.motion_status.error_message:
+                raise AssertionError("RL 持续运行期间出现跨帧时间戳竞态")
+
     def begin_action(self, client, goal, group, timeout=10.0):
         self.spin_until(
             lambda: client.wait_for_server(timeout_sec=0.0),
@@ -358,6 +379,7 @@ def functional_and_gateway_timeout(args):
             COMPLETED,
             on_spin=lambda: node.publish_velocity(0.2, 0.0, 0.0),
         )
+        node.assert_rl_stable(group, 2.0)
 
         node.call_enter_passive(5, group)
         node.spin_until(
@@ -475,6 +497,7 @@ def parse_args():
     parser.add_argument("--motion-script", required=True)
     parser.add_argument("--command-script", required=True)
     parser.add_argument("--ipc-control", required=True)
+    parser.add_argument("--robot", default="black")
     parser.add_argument("--real-time-factor", type=float, default=1.0)
     return parser.parse_args()
 
@@ -488,7 +511,7 @@ def main():
         backend_failure(args)
     finally:
         rclpy.shutdown()
-    print("阶段 8 ROS 2 headless 端到端测试全部通过")
+    print(f"{args.robot} ROS 2 headless 端到端测试全部通过")
 
 
 if __name__ == "__main__":

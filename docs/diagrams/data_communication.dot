@@ -1,38 +1,43 @@
 digraph Communication {
   graph [rankdir=TB, bgcolor="white", pad=0.25, nodesep=0.55, ranksep=0.7,
          splines=ortho, fontname="Noto Sans CJK SC", fontsize=18,
-         label="数据类型与通信方式", labelloc=t, labeljust=l];
+         label="三进程仿真数据流", labelloc=t, labeljust=l];
   node [shape=box, style="rounded,filled", fillcolor="white", color="#64748b",
         fontname="Noto Sans CJK SC", fontsize=12, margin="0.18,0.12"];
   edge [color="#64748b", fontname="Noto Sans CJK SC", fontsize=10,
         arrowsize=0.75, penwidth=1.4];
 
-  sources [label="手柄 / 导航 / 上位机", fillcolor="#f8fafc"];
-  motion [label="MotionRuntime", fillcolor="#dbeafe", color="#2563eb", penwidth=2];
-  robot [label="RobotRuntime\nrobotd 或 STM32H7", fillcolor="#dcfce7", color="#15803d", penwidth=2];
-  observers [label="日志 / 显示 / 对比工具", fillcolor="#f8fafc", style="rounded,filled,dashed"];
+  sources [label="键盘 / 手柄 / 导航", fillcolor="#f8fafc"];
+  gateway [label="ros2_gateway", fillcolor="#e0f2fe", color="#0284c7"];
+  motion [label="motiond\nMotionRuntime", fillcolor="#dbeafe", color="#2563eb",
+          penwidth=2];
+  robot [label="robotd\nMuJoCoRobotIO", fillcolor="#ede9fe", color="#7c3aed",
+         penwidth=2];
 
-  base [label="BaseCommand\n只保留最新值 · 会过期", fillcolor="#fef3c7", color="#d97706"];
-  mode [label="ModeRequest / Result\n不能丢 · 必须返回结果", fillcolor="#ffedd5", color="#ea580c"];
+  base [label="BaseCommand\n最新值，可覆盖", fillcolor="#fef3c7", color="#d97706"];
+  request [label="ModeRequest\n可靠队列", fillcolor="#ffedd5", color="#ea580c"];
+  result [label="ModeRequestResult\n可靠队列", fillcolor="#ffedd5", color="#ea580c"];
   state [label="StateFrame\n最新完整状态", fillcolor="#e0f2fe", color="#0284c7"];
-  command [label="CommandFrame\n最新且未过期的关节命令", fillcolor="#dbeafe", color="#2563eb"];
-  actual [label="实际命令帧\n底层真正执行的命令", fillcolor="#e2e8f0"];
+  command [label="CommandFrame\n最新且未过期", fillcolor="#dbeafe", color="#2563eb"];
+  status [label="MotionStatus\n最新运行状态", fillcolor="#f1f5f9"];
 
-  sources -> base -> motion [label="ROS 2 Topic\n或最新值通道"];
-  sources -> mode -> motion [label="Service / Action\n或请求—应答连接"];
-  robot -> state [label="共享内存\nH7 方案经过网线", constraint=false];
-  state -> motion [constraint=false];
-  motion -> command -> robot [label="共享内存\nH7 方案经过网线"];
-  robot -> actual -> observers [style=dashed, label="只读"];
-  state -> observers [style=dashed, label="只读"];
+  sources -> gateway;
+  gateway -> base -> motion;
+  gateway -> request -> motion;
+  motion -> result -> gateway;
+  robot -> state -> motion;
+  motion -> command -> robot;
+  motion -> status;
+  status -> gateway [style=dashed];
 
-  latest [label="连续数据：允许覆盖旧值", shape=note, fillcolor="#f0f9ff", color="#0284c7"];
-  reliable [label="一次性操作：需要明确结果", shape=note, fillcolor="#fff7ed", color="#ea580c"];
+  latest [label="连续量使用 latest-value slot", shape=note,
+          fillcolor="#f0f9ff", color="#0284c7"];
+  reliable [label="一次性操作必须返回结果", shape=note,
+            fillcolor="#fff7ed", color="#ea580c"];
   state -> latest [style=dashed, arrowhead=none];
-  mode -> reliable [style=dashed, arrowhead=none];
+  request -> reliable [style=dashed, arrowhead=none];
 
-  {rank=same; base; mode;}
-  {rank=same; command; state;}
-  {rank=same; actual; observers;}
+  {rank=same; base; request; result;}
+  {rank=same; state; command; status;}
   {rank=same; latest; reliable;}
 }

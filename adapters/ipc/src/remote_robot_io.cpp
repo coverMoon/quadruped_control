@@ -52,6 +52,15 @@ bool RemoteRobotIO::backend_online() const noexcept
 
 core::RobotIOCode RemoteRobotIO::read_latest(core::StateFrame& frame)
 {
+    std::uint64_t ignored_version = 0;
+    return read_latest(frame, ignored_version);
+}
+
+core::RobotIOCode RemoteRobotIO::read_latest(
+    core::StateFrame& frame,
+    std::uint64_t& version)
+{
+    version = 0;
     WireHeartbeat heartbeat;
     if (!read_backend_heartbeat(heartbeat) || heartbeat.online == 0)
     {
@@ -67,7 +76,8 @@ core::RobotIOCode RemoteRobotIO::read_latest(core::StateFrame& frame)
     }
 
     WireStateFrame wire;
-    if (!ipc::read_latest(memory_.layout().state, wire))
+    std::uint64_t current_version = 0;
+    if (!ipc::read_latest(memory_.layout().state, wire, &current_version))
     {
         // 发布者短暂占用状态槽时复用同一 backend 会话内最后一帧。
         // heartbeat 的 500 ms 时限仍会让真正断线进入安全退路。
@@ -76,6 +86,7 @@ core::RobotIOCode RemoteRobotIO::read_latest(core::StateFrame& frame)
             cached_state_.header.session_id == heartbeat.session_id)
         {
             frame = cached_state_;
+            version = cached_state_version_;
             cached_status_.state = core::RobotIOState::Ready;
             cached_status_.latest_state_sequence = frame.header.sequence;
             return core::RobotIOCode::Ok;
@@ -91,7 +102,9 @@ core::RobotIOCode RemoteRobotIO::read_latest(core::StateFrame& frame)
         return core::RobotIOCode::InvalidFrame;
     }
     cached_state_ = frame;
+    cached_state_version_ = current_version;
     has_cached_state_ = true;
+    version = current_version;
     cached_status_.state = core::RobotIOState::Ready;
     cached_status_.latest_state_sequence = frame.header.sequence;
     return core::RobotIOCode::Ok;

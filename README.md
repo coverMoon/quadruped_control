@@ -1,38 +1,39 @@
 # quadruped_control
 
 `quadruped_control` 是一个面向四足与轮足机器人的运动控制工程。当前仓库已经集成
-**black 四足机器人、MuJoCo、TorchScript 强化学习策略和 ROS 2 指令入口**，可以在 Linux
+**black、blackW、MuJoCo、TorchScript 强化学习策略和 ROS 2 指令入口**，可以在 Linux
 以三个独立进程运行完整仿真控制链路。
 
-本 README 以仓库怎样安装、构建和运行为主。系统设计、接口约束和后续开发计划请参阅
+本 README 以仓库怎样安装、构建和运行为主。系统设计与接口约束请参阅
 [`docs/`](docs/README.md)。
 
 ## 快速导航
 
-- [当前支持范围](#1-当前可以做什么)
+- [当前支持范围](#1-当前支持范围)
 - [仓库目录](#2-仓库目录)
 - [环境要求](#3-环境要求)
-- [从零搭建环境](#4-从零搭建环境)
-- [构建与测试](#5-构建与测试)
-- [三终端启动仿真](#6-三终端启动仿真)
-- [键盘控制](#7-键盘控制)
-- [手柄控制](#8-手柄控制)
-- [策略配置与切换](#9-策略配置与切换)
-- [其他配置文件](#10-其他配置文件)
-- [ROS 2 使用补充](#11-ros-2-使用补充)
-- [常见问题](#12-常见问题)
-- [当前限制与待补充](#13-当前限制与待补充)
+- [构建与测试](#4-构建与测试)
+- [启动仿真](#5-启动仿真)
+- [键盘控制](#6-键盘控制)
+- [手柄控制](#7-手柄控制)
+- [策略配置与切换](#8-策略配置与切换)
+- [其他配置文件](#9-其他配置文件)
+- [ROS 2 使用补充](#10-ros-2-使用补充)
+- [常见问题](#11-常见问题)
+- [只读日志回放](#12-只读日志回放)
+- [当前验证边界](#13-当前验证边界)
 - [进一步阅读](#14-进一步阅读)
 
 ## 1. 当前支持范围
 
 当前已支持：
 
-- black 12 关节四足机器人；
+- black 12 关节四足机器人和 blackW 16 关节轮足机器人；
 - MuJoCo 3.9.0 GUI 与 headless 仿真；
 - 起立、站立、趴下、Passive、reset 和暂停；
 - LibTorch 加载真实 TorchScript 策略；
-- `flat`、`obstacle` 策略及配置驱动的运行时循环切换；
+- black 的 flat/obstacle 与 blackW 的 flat/obstacle/stair 策略；
+- 配置驱动的运行时策略切换、Retry、Event chain 和 blackW 固定姿态轮驱；
 - 键盘、手柄和 ROS 2 `/cmd_vel` 速度指令；
 - `ros2_gateway`、`motiond`、`mujoco_backendd` 三进程本机运行；
 - 核心单元测试、MuJoCo 集成测试和 ROS 2 headless 端到端测试。
@@ -55,8 +56,8 @@ keyboard / joystick / ROS 2
            MuJoCo
 ```
 
-当前主要面向仿真验证，black 与 blackW 已共用基础动作、RL、Retry 和 Event chain 运行链路；
-尚未提供真实硬件 `RobotIO`、电机标定、实机安全监督和机械臂控制。
+当前范围聚焦仿真、测试和回放；具体已实现能力和场景验证边界见
+[当前能力与验证边界](docs/current_status.md)。
 
 ## 2. 仓库目录
 
@@ -75,7 +76,7 @@ quadruped_control/
 ├── config_loader/        YAML 配置加载和启动期校验
 ├── policy/               LibTorch/TorchScript 策略适配器
 ├── tests/                单元、集成和仿真测试
-├── docs/                 架构、接口、运行原理和后续开发文档
+├── docs/                 当前能力、架构、接口和运行原理文档
 └── cmake/                CMake 依赖查找模块
 ```
 
@@ -195,7 +196,7 @@ Conda 或 Python 版 PyTorch：
 | `./scripts/build.sh --no-test` | 构建所选 profile，但跳过 CTest |
 | `./scripts/build.sh --clean` | 清理所选 profile 后重新配置和构建 |
 
-### 5.2 单独准备 ROS 2 工程环境
+### 4.2 单独准备 ROS 2 工程环境
 
 ```bash
 ./scripts/setup/ros2.sh
@@ -210,7 +211,7 @@ Conda 或 Python 版 PyTorch：
 `command.sh` 在发现 `.build/ros2/install/setup.bash` 或 gateway 缺失时，也会自动调用此脚本。
 系统级 ROS 2 Humble 仍需提前安装。
 
-### 5.3 测试
+### 4.3 测试
 
 运行 RL profile 的 CTest：
 
@@ -234,11 +235,11 @@ Conda 或 Python 版 PyTorch：
 
 该测试要求 RL profile 和 ROS 2 工程环境已经构建完成。
 
-## 6. 启动仿真
+## 5. 启动仿真
 
 正式人工运行使用三个终端，分别启动 backend、motion 和 command。建议按下面的顺序启动。
 
-### 6.1 终端 1：启动 MuJoCo backend
+### 5.1 终端 1：启动 MuJoCo backend
 
 平地 GUI：
 
@@ -278,7 +279,7 @@ backend.sh [robot] [scene]
     --vsync true
 ```
 
-### 6.2 终端 2：启动 MotionRuntime 和策略
+### 5.2 终端 2：启动 MotionRuntime 和策略
 
 ```bash
 ./scripts/run/motion.sh black
@@ -295,7 +296,7 @@ backend.sh [robot] [scene]
 `motion.sh` 会自动选择当前机器人的 robot、controller、policy switch 和策略配置，不需要在命令行
 重复传入各个 YAML 或模型路径。
 
-### 6.3 终端 3：启动键盘或手柄指令入口
+### 5.3 终端 3：启动键盘或手柄指令入口
 
 默认机器人和默认键盘：
 
@@ -324,7 +325,15 @@ backend.sh [robot] [scene]
 `command.sh` 的默认机器人是 `black`，默认输入方式是 `keyboard`。单参数 `keyboard`、
 `joystick` 或兼容别名 `gamepad` 会被识别为输入方式，不需要先写机器人名称。
 
-### 6.4 推荐操作顺序
+blackW 使用同一组入口，只需让三个终端选择相同机器人：
+
+```bash
+./scripts/run/backend.sh blackW terrain
+./scripts/run/motion.sh blackW
+./scripts/run/command.sh blackW keyboard
+```
+
+### 5.4 推荐操作顺序
 
 仿真窗口和三个进程均启动后：
 
@@ -336,11 +345,11 @@ backend.sh [robot] [scene]
 
 键盘模式可按 `X` 退出 command，也可以在各终端使用 `Ctrl+C`。
 
-## 7. 键盘控制
+## 6. 键盘控制
 
 键盘由运行 `command.sh` 的终端读取，不需要在 MuJoCo 窗口中按键，也不需要按 Enter 确认。
 
-### 7.1 模式和运行控制
+### 6.1 模式和运行控制
 
 | 按键 | 功能 |
 |---|---|
@@ -359,7 +368,7 @@ backend.sh [robot] [scene]
 
 `Enter` 的暂停请求只适用于 GUI backend；headless 模式没有可暂停的 GUI 交互状态。
 
-### 7.2 RL 速度控制
+### 6.2 RL 速度控制
 
 | 按键 | 指令变化 |
 |---|---|
@@ -381,7 +390,7 @@ MotionRuntime 会按当前策略 YAML 的 `command_limits` 做最终限幅，并
 上限传给 command gateway。键盘、导航输入均按该值限幅；手柄的 `[-1, 1]` 归一化轴会自动
 缩放到当前策略的完整 `[-limit, limit]` 量程，策略切换后同步更新。
 
-### 7.3 单进程调试程序的按键差异
+### 6.3 单进程调试程序的按键差异
 
 单进程 MuJoCo 调试入口使用：
 
@@ -397,14 +406,15 @@ MotionRuntime 会按当前策略 YAML 的 `command_limits` 做最终限幅，并
 
 调试程序中的运动和速度键与上表相同，但有以下差异：
 
+- `5`：进入 Retry；
 - `K`：暂停/继续；
 - `H`：重新显示帮助；
 - `X` 或 `Esc`：退出；
 - 不使用 `N` 切换 ROS 2 `/cmd_vel`，因为该入口不是三进程 ROS 2 主路径。
 
-## 8. 手柄控制
+## 7. 手柄控制
 
-### 8.1 启动和连接状态
+### 7.1 启动和连接状态
 
 使用手柄时必须选择 `joystick` 模式：
 
@@ -439,7 +449,7 @@ configs/input/gamepads.yaml
 
 未知手柄不会套用一个可能危险的默认映射，需要先在该文件中增加并验证 profile。
 
-### 8.2 手柄键位
+### 7.2 手柄键位
 
 键位语义与旧 `rl_sar` 的 black 基础操作对齐：
 
@@ -467,7 +477,7 @@ configs/input/gamepads.yaml
 black 保持 `2`/`3` 策略切换且不响应 blackW 专用 D-pad 组合；blackW 启动脚本会加载三份
 固定姿态轮驱配置并启用对应键位。`LB + DPadUp` 通过同一公共请求启动 Event chain。
 
-### 8.3 手柄无响应时检查
+### 7.3 手柄无响应时检查
 
 先确认 Python 依赖：
 
@@ -490,7 +500,7 @@ black 保持 `2`/`3` 策略切换且不响应 blackW 专用 D-pad 组合；black
 /tmp/quadruped_control_ros2_logs/controller_input.log
 ```
 
-## 9. 策略配置与切换
+## 8. 策略配置与切换
 
 每个机器人的策略目录位于：
 
@@ -507,7 +517,10 @@ configs/policies/black/
 └── policy_switch.yaml
 ```
 
-### 9.1 `policy_switch.yaml`
+blackW 目录结构相同，并包含 `flat.yaml`、`obstacle.yaml`、`stair.yaml` 和
+`policy_switch.yaml`。行为配置不放在策略循环中，统一位于 `configs/behaviors/<robot>/`。
+
+### 8.1 `policy_switch.yaml`
 
 当前配置示例：
 
@@ -532,7 +545,7 @@ black:
 - 重复、非法或找不到 YAML 的项目会在启动阶段给出警告并跳过；如果最终没有可用策略，motion 不会继续启动；
 - 当前运行时最多注册 8 个策略，超过容量会启动失败。
 
-### 9.2 单个策略 YAML
+### 8.2 单个策略 YAML
 
 例如 `configs/policies/black/flat.yaml` 主要定义：
 
@@ -560,9 +573,9 @@ assets/policies/<robot>/<policy>/
 
 只新增模型和 YAML 时不需要重新编译 C++；修改运行时代码后才需要重新执行对应 build target。
 
-## 10. 其他配置文件
+## 9. 其他配置文件
 
-### 10.1 机器人配置
+### 9.1 机器人配置
 
 ```text
 configs/robots/<robot>.yaml
@@ -577,10 +590,10 @@ configs/robots/<robot>.yaml
 - 位置、速度、力矩和增益上限。
 
 `role` 表示关节在控制系统中的**功能角色**，例如 `leg`、`wheel`，不是 URDF/MJCF 中的关节
-类型，也不能根据关节名称或运动范围自动推断。它用于让上层控制逻辑理解关节用途；关节的真实
-几何类型仍由 URDF/MJCF 或硬件描述负责。
+类型，也不能根据关节名称或运动范围自动推断。它用于让上层控制逻辑理解关节用途；仿真几何
+和物理关节类型仍由 URDF/MJCF 定义。
 
-### 10.2 控制器配置
+### 9.2 控制器配置
 
 ```text
 configs/controllers/<robot>.yaml
@@ -594,23 +607,22 @@ configs/controllers/<robot>.yaml
 - 基础动作使用的固定 KP/KD；
 - 与机器人配置一致的关节顺序。
 
-### 10.3 仿真配置
+### 9.3 仿真配置
 
 ```text
 configs/simulation/<robot>_mujoco.yaml
 ```
 
-当前 `black_mujoco.yaml` 定义：
+当前 black 和 blackW 各有一份 MuJoCo 配置，均定义：
 
 - `real_time_factor`：仿真时间相对墙钟时间的倍率；
 - `visual_sync_hz`：物理状态提交给 GUI 的频率；
 - `vsync`：是否启用垂直同步。
 
-该 YAML 当前由单进程 `mujoco_sim` 调试入口读取。三进程 `backend.sh` 使用同名命令行参数和
-等价默认值；如果需要临时覆盖，应在启动 backend 时传入参数。以后增加不同机器人或不同 backend
-时，建议按机器人和仿真器分别维护配置，而不是把所有机器人的场景参数放在一个文件中。
+这些 YAML 由单进程 `mujoco_sim` 调试入口读取。三进程 `backend.sh` 使用同名命令行参数和
+等价默认值；临时覆盖仿真参数时，在启动 backend 时传入对应参数。
 
-### 10.4 手柄配置
+### 9.4 手柄配置
 
 ```text
 configs/input/gamepads.yaml
@@ -619,7 +631,7 @@ configs/input/gamepads.yaml
 该文件只负责把不同品牌手柄转换为统一的 8 轴、12 按钮 `sensor_msgs/msg/Joy` 布局，不定义
 GetUp、RL、Passive 等机器人动作语义。动作语义由 ROS 2 gateway 统一处理。
 
-## 11. ROS 2 使用补充
+## 10. ROS 2 使用补充
 
 手动使用 ROS 2 CLI 前，需要加载系统环境和本仓库安装环境：
 
@@ -650,7 +662,7 @@ ros2 topic pub --rate 10 /cmd_vel geometry_msgs/msg/Twist \
 完整 action、service、topic 和 QoS 契约见
 [`docs/ros2_interface_contract.md`](docs/ros2_interface_contract.md)。
 
-## 12. 常见问题
+## 11. 常见问题
 
 ### 构建提示找不到 MuJoCo 或 LibTorch
 
@@ -719,32 +731,31 @@ configs/policies/<robot>/policy_switch.yaml
 
 并确认对应 YAML、模型路径和机器人名称均有效。
 
-## 13. 只读日志回放
+## 12. 只读日志回放
 
 默认构建会生成 `.build/default/apps/replay/quadruped_replay`。它读取带机器人名称和显式
 关节顺序的 StateFrame CSV，只读驱动 MotionRuntime，并输出实际状态、目标命令和帧统计
 对比；生成命令不会连接任何执行设备。格式和命令见
 [故障注入、诊断日志与回放](docs/fault_logging_replay.md)。
 
-## 14. 当前限制与待补充
+## 13. 当前验证边界
 
-当前仍需后续完善：
+以下内容需要继续做仿真和工具链验证：
 
-- blackW Car/Bridge/Low-bar 的专用障碍场景验收、完整墙体接触验收、机械臂和其他行为；
-- 真实硬件 backend、电机标定、IMU、通信看门狗和急停；
+- blackW Car/Bridge/Low-bar 的专用障碍场景验收和完整墙体接触验收；
 - 不同实体手柄的长期 SDL/pygame 现场验证；
 - MuJoCo GUI 长时间运行和多显示环境验证；
 - 面向长时间运行的自动日志采集、绘图和性能统计；
 - 将三进程 backend 的仿真参数进一步统一到 simulation YAML；
 - 更多机器人、场景和策略的回归测试。
 
-## 15. 进一步阅读
+## 14. 进一步阅读
 
 - [文档索引](docs/README.md)
-- [当前状态与参考工程差距](docs/current_status.md)
+- [当前能力与验证边界](docs/current_status.md)
 - [RL 与 MuJoCo 运行说明](docs/rl_mujoco_runtime.md)
 - [ROS 2 三进程运行架构](docs/ros2_three_process_runtime.md)
 - [ROS 2 接口契约](docs/ros2_interface_contract.md)
 - [系统架构](docs/quadruped_control_architecture.md)
+- [blackW 模型、策略与行为](docs/blackW_模型与行为.md)
 - [故障注入、诊断日志与回放](docs/fault_logging_replay.md)
-- [仿真部分后续指导](docs/仿真部分后续指导.md)

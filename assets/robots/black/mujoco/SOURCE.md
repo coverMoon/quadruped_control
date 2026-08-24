@@ -1,24 +1,22 @@
 # black MuJoCo 模型来源
 
-本目录存放 M1 阶段固定使用的 black 平地仿真模型，从专用资产仓库按提交复制，
-复制后不再依赖相邻目录。模型参数（关节方向、零点、惯量、执行器范围等）以源提交为准，
-本仓库不自行修改。
+本目录保存 black 当前使用的 MuJoCo 模型、场景和网格。资产复制到本仓库后独立使用，后续
+修改由本仓库 Git 历史追踪。
 
-## 来源
+## 模型来源
 
-- 源仓库：`XJTURoboCon_quadruped_assets`（机器人模型资产仓库-private）
-- 源提交：`22c120bad450a81af2c4d6fcbf221262e2884928`
-- 原路径：`mujoco/black/`
+- 源仓库：`../URDF`；
+- 源提交：`22c120bad450a81af2c4d6fcbf221262e2884928`；
+- 原路径：`mujoco/black/`。
 
-## 导入说明
+`black_description.xml` 导入时只清理了行尾空白，模型语义不变。`scene.xml` 是平地入口，
+`assets/` 中的 14 个网格是该模型引用的本地资源。
 
-`black_description.xml` 复制后清理了行尾空白（共 12 处），模型语义不变。
-本仓库通过上述源提交和自身 Git 历史追踪导入来源及后续修改。
+## 当前场景
 
-`assets/` 内的 14 个网格为上述两个 XML 实际引用的全部文件。
+- `scene.xml`：平地场景；
+- `scene_terrain.xml`：仓库内维护的综合地形场景，包含墙体、台阶、斜坡、桥面和低矮通道等
+  测试对象。
 
-## 未复制的内容
-
-- `scene_terrain.xml` 和高度图：复杂地形与 M1 的控制接口验证无关；
-- `FL_foot.STL`、`FR_foot.STL`、`RL_foot.STL`、`RR_foot.STL`：源目录中存在，
-  但当前两个 XML 均未引用。
+场景文件负责世界几何和初始 keyframe，机器人关节名称、限制与控制顺序仍由模型 XML 和
+`configs/robots/black.yaml` 共同校验。

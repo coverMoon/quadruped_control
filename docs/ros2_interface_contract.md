@@ -1,12 +1,11 @@
 # ROS 2 顶层接口契约
 
-本文件冻结阶段 5 的 ROS 2 消息、动作、服务、命名和请求语义。阶段 6 已由
-`adapters/ros2/quadruped_gateway/` 实现顶层 gateway，并通过本机 IPC 连接独立的 motiond
-和 mujoco_backendd；接口字段和请求语义仍以本文件为准。
+本文件记录当前 ROS 2 消息、动作、服务、命名和请求语义。顶层 gateway 位于
+`adapters/ros2/quadruped_gateway/`，通过本机 IPC 连接独立的 motiond 和 mujoco_backendd。
 
 ## 1. 包和主题命名
 
-接口包名称为 `quadruped_interfaces`。阶段 6 的 `ros2_gateway` 使用以下名称：
+接口包名称为 `quadruped_interfaces`。`ros2_gateway` 使用以下名称：
 
 | 类型 | 名称 | ROS 类型 | 语义 |
 | --- | --- | --- | --- |
@@ -41,8 +40,8 @@
 | `twist.linear.y` | `vy` | m/s |
 | `twist.angular.z` | `wz` | rad/s |
 
-`linear.z`、`angular.x` 和 `angular.y` 当前不进入控制语义。后续 adapter 应在收到非零
-未支持字段时记录诊断并按项目策略拒绝或忽略，不能把它们映射到未知 core 字段。
+`linear.z`、`angular.x` 和 `angular.y` 不进入当前控制语义，gateway 不得把它们映射到未知
+core 字段。
 
 adapter 必须：
 
@@ -54,11 +53,11 @@ adapter 必须：
 - 该超时只约束 `BaseCommand`，不得复用 10 ms 级的 `CommandFrame` 有效期；
 - 不把 ROS wall time 或 `builtin_interfaces/msg/Time` 直接写入 core 时间戳；
 - 只保留同一来源的最新命令，旧消息允许丢弃；
-- 只通过后续 motion 层提交 `BaseCommand`，ROS callback 不直接调用
+- 只通过 motiond 提交 `BaseCommand`，ROS callback 不直接调用
   `MotionRuntime::update()` 或 `RobotIO::submit()`。
 
-当前 black 配置的控制周期为 5 ms、命令有效期为 10 ms。这个数值来自
-`configs/controllers/black.yaml`，不是 ROS 接口的固定默认值；不同机器人必须使用对应
+当前 black 和 blackW 配置的控制周期均为 5 ms、命令有效期均为 10 ms。这些数值来自各自的
+`configs/controllers/<robot>.yaml`，不是 ROS 接口的固定默认值；运行时必须使用当前
 `ControllerConfig` 的有效期。
 
 命令在 `now_ns > expires_at_ns` 时过期。过期后 adapter 必须提供零速语义：清除当前有效
@@ -78,6 +77,7 @@ adapter 必须：
 | `policy_name` | `policy_name` |
 | `error_message` | `error_message` |
 | `policy_ready` | `policy_ready` |
+| `command_limits[3]` | `command_limits`，顺序为 vx、vy、wz |
 
 消息中的常量冻结当前 core 枚举值。`behavior_phase` 只用于诊断，不得被 ROS 节点用作
 控制分支；行为仍由 `behavior_name` 和 core 的请求语义选择。
@@ -156,7 +156,7 @@ MotionRuntime 的既有去重语义通过 ROS 统一保留：
 - `GetDown`：请求 `ModeRequestType::GetDown`，完成后进入 `Passive`；允许
   `EnterPassive` 打断。
 - `StartBehavior`：`behavior_name` 原样映射到
-  `ModeRequest::behavior_name`。未注册行为直接 `Rejected`。当前阶段不新增行为实现。
+  `ModeRequest::behavior_name`。未注册或不适用于当前机器人的行为直接 `Rejected`。
 - `SwitchPolicy`：`policy_name` 原样映射到 `ModeRequest::policy_name`。可以在 Running
   状态接收；切换期间旧策略暂停，feedback 保持 `Running`，完成后才报告 `Completed`。
 
@@ -172,10 +172,9 @@ MotionRuntime 的既有去重语义通过 ROS 统一保留：
 了活动请求，`has_interrupted_request` 为 true，`interrupted_result` 携带被打断请求的
 `Failed` 终态，并且该终态也必须通过 `/motion/result` 发布。没有活动请求时该字段为 false。
 
-`ResetFault` 使用 `ModeRequestType::ResetFault`。当前 `core::RobotIO` 没有真实的故障复位
-边界，MotionRuntime 对该请求返回 `Rejected`，消息应保留
-`fault reset is not supported by RobotIO` 语义。ROS service 不得伪造复位成功；后续新增
-明确的 RobotIO 复位能力时，才可以扩展 adapter 行为。
+`ResetFault` 使用 `ModeRequestType::ResetFault`。当前 RobotIO 没有可由该接口复位的锁存
+故障，因此 MotionRuntime 返回 `Rejected`，并保留
+`fault reset is not supported by RobotIO` 语义。ROS service 不得伪造复位成功。
 
 ## 4. QoS 和线程边界
 
@@ -192,14 +191,12 @@ QoS 是顶层 adapter 的约定，不改变 core 的固定容量数据结构。R
 `BaseCommand` / `ModeRequest` 并调用 `MotionRuntime::update()`。ROS 接口不能绕过
 `RobotIO` 提交 `CommandFrame`，也不能把 ROS 消息类型放入 core。
 
-## 5. 当前实现边界
+## 5. 接口边界
 
-阶段 7 已实现 ROS 2 node、executor、IPC、session、三进程故障退路和统一 launch，仍明确不包含：
-
-- GUI 长时间压力测试和多显示环境适配；
-- ROS 到 RobotIO 的直接提交；
-- blackW、真实硬件或跨机器协议；
-- 新的通用行为框架。
+- ROS 2 只传递 BaseCommand、ModeRequest 和低频状态，不提交关节 CommandFrame；
+- black 与 blackW 复用同一接口，机器人差异由配置和行为能力检查处理；
+- `behavior_phase` 和错误文本只供诊断，调用方不能据此代替 ModeResult 做控制判断；
+- launch 和人工三终端启动使用相同 topic/action/service 契约。
 
 三进程运行、构建和故障规则见
 [`ros2_three_process_runtime.md`](ros2_three_process_runtime.md)。

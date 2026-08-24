@@ -44,6 +44,45 @@ constexpr auto kPollInterval = std::chrono::microseconds(250);
 
 std::atomic<bool> stop_requested{false};
 
+// 一个控制周期只允许 MotionRuntime 看到调度时取得的状态，避免共享槽在周期中
+// 更新后出现“旧 now_ns 校验新 StateFrame”的跨帧竞态。命令与状态查询仍委托
+// 给远端 RobotIO。
+class CycleRobotIO final : public qc::RobotIO
+{
+public:
+    CycleRobotIO(
+        qi::RemoteRobotIO& remote,
+        const qc::RobotIOCode read_code,
+        const qc::StateFrame& state)
+        : remote_(remote), read_code_(read_code), state_(state)
+    {
+    }
+
+    qc::RobotIOCode read_latest(qc::StateFrame& frame) override
+    {
+        if (read_code_ == qc::RobotIOCode::Ok)
+        {
+            frame = state_;
+        }
+        return read_code_;
+    }
+
+    qc::RobotIOCode submit(const qc::CommandFrame& frame) override
+    {
+        return remote_.submit(frame);
+    }
+
+    qc::RobotIOStatus status() const noexcept override
+    {
+        return remote_.status();
+    }
+
+private:
+    qi::RemoteRobotIO& remote_;
+    qc::RobotIOCode read_code_{qc::RobotIOCode::NoData};
+    const qc::StateFrame& state_;
+};
+
 struct Options
 {
     std::string shared_memory_name{kDefaultSharedMemoryName};
@@ -386,22 +425,24 @@ int run(const Options& options)
     std::uint64_t latest_session_id = 0;
     std::uint64_t tracked_request_id = 0;
     qc::ModeResultState tracked_state = qc::ModeResultState::Rejected;
-    auto next_disconnected_update = std::chrono::steady_clock::now();
+    auto next_unavailable_update = std::chrono::steady_clock::now();
 
     std::cout << "motiond ready: shm=" << options.shared_memory_name << '\n';
     while (!stop_requested.load())
     {
-        qi::WireStateFrame wire_state;
+        qc::StateFrame state_snapshot;
         std::uint64_t current_state_version = 0;
-        const bool has_state = qi::read_latest(layout.state, wire_state, &current_state_version);
+        const qc::RobotIOCode state_read_code =
+            io.read_latest(state_snapshot, current_state_version);
+        const bool has_state = state_read_code == qc::RobotIOCode::Ok;
         if (has_state)
         {
             const bool session_changed = latest_startup_id != 0 &&
-                (wire_state.startup_id != latest_startup_id ||
-                    wire_state.session_id != latest_session_id);
-            latest_state_ns = wire_state.timestamp_ns;
-            latest_startup_id = wire_state.startup_id;
-            latest_session_id = wire_state.session_id;
+                (state_snapshot.header.startup_id != latest_startup_id ||
+                    state_snapshot.header.session_id != latest_session_id);
+            latest_state_ns = state_snapshot.header.timestamp_ns;
+            latest_startup_id = state_snapshot.header.startup_id;
+            latest_session_id = state_snapshot.header.session_id;
             if (session_changed)
             {
                 has_base_command = false;
@@ -412,7 +453,8 @@ int run(const Options& options)
 
         const bool new_state = has_state && current_state_version != state_version;
         const auto wall_now = std::chrono::steady_clock::now();
-        const bool disconnected_tick = !io.backend_online() && wall_now >= next_disconnected_update;
+        const bool unavailable_tick = state_read_code != qc::RobotIOCode::Ok &&
+            wall_now >= next_unavailable_update;
         bool control_due = false;
         if (new_state)
         {
@@ -422,10 +464,10 @@ int run(const Options& options)
                 control_due = true;
             }
         }
-        if (disconnected_tick)
+        if (unavailable_tick)
         {
             control_due = true;
-            next_disconnected_update = wall_now +
+            next_unavailable_update = wall_now +
                 std::chrono::nanoseconds(controller.config.control_period_ns);
         }
 
@@ -467,7 +509,8 @@ int run(const Options& options)
             input.now_ns = latest_state_ns;
             input.base_command = has_base_command ? &base_command : nullptr;
             input.request = has_request ? &request : nullptr;
-            const qm::MotionUpdateOutput output = runtime.runtime->update(io, input);
+            CycleRobotIO cycle_io(io, state_read_code, state_snapshot);
+            const qm::MotionUpdateOutput output = runtime.runtime->update(cycle_io, input);
 
             qi::WireMotionStatus motion_status = qi::to_wire(output.status);
             motion_status.startup_id = motion_startup_id;

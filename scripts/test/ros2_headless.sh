@@ -20,4 +20,5 @@ exec /usr/bin/python3 "${project_dir}/scripts/test/ros2_headless_test.py" \
     --motion-script "${project_dir}/scripts/run/motion.sh" \
     --command-script "${project_dir}/scripts/run/command.sh" \
     --ipc-control "${ros_install}/quadruped_gateway/lib/quadruped_gateway/quadruped_ipc_control" \
+    --robot "${QUADRUPED_TEST_ROBOT:-black}" \
     --real-time-factor "${QUADRUPED_TEST_REAL_TIME_FACTOR:-1.0}"

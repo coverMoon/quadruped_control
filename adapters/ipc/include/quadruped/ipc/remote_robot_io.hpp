@@ -20,6 +20,11 @@ public:
     RemoteRobotIO(SharedMemory& memory, core::RobotModel model);
 
     core::RobotIOCode read_latest(core::StateFrame& frame) override;
+
+    // 同时返回共享状态槽版本，供 motiond 用同一状态快照完成调度和
+    // 一次控制更新。
+    // 状态槽忙而复用缓存时返回缓存对应的版本；失败时 version 置零。
+    core::RobotIOCode read_latest(core::StateFrame& frame, std::uint64_t& version);
     core::RobotIOCode submit(const core::CommandFrame& frame) override;
     core::RobotIOStatus status() const noexcept override;
 
@@ -34,6 +39,7 @@ private:
     mutable WireHeartbeat cached_backend_heartbeat_{};
     mutable bool has_cached_backend_heartbeat_{false};
     core::StateFrame cached_state_{};
+    std::uint64_t cached_state_version_{0};
     bool has_cached_state_{false};
 };
 
