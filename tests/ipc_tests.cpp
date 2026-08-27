@@ -85,8 +85,11 @@ qc::CommandFrame make_command(
     frame.source = qc::CommandSource::Test;
     for (std::size_t i = 0; i < frame.joint_count; ++i)
     {
+        const auto& limits = model.joints[i].limits;
         frame.joints[i].mode = qc::ControlMode::JointImpedance;
-        frame.joints[i].target_position = 0.01 * static_cast<double>(i);
+        frame.joints[i].target_position = limits.position_limited
+            ? 0.5 * (limits.min_position + limits.max_position)
+            : 0.01 * static_cast<double>(i);
         frame.joints[i].kp = 10.0;
         frame.joints[i].kd = 1.0;
     }

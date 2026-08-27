@@ -5,15 +5,15 @@ joints:
   # role 是控制系统中的用途，不是 URDF/MJCF 里的源关节类型。
   # role: 参见 core/include/quadruped/code/types.hpp 中的 enum class JointRole。
   # 位置限制单位为 rad，速度为 rad/s，力矩为 N·m，增益为 N·m/rad 和 N·m·s/rad。
-  - {name: FL_hip_joint,   role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
-  - {name: FL_thigh_joint, role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
-  - {name: FL_calf_joint,  role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
-  - {name: FR_hip_joint,   role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
-  - {name: FR_thigh_joint, role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
-  - {name: FR_calf_joint,  role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
-  - {name: RL_hip_joint,   role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
-  - {name: RL_thigh_joint, role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
-  - {name: RL_calf_joint,  role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
-  - {name: RR_hip_joint,   role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
-  - {name: RR_thigh_joint, role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
-  - {name: RR_calf_joint,  role: leg, position_limited: true, min_position: -10.0, max_position: 10.0, max_velocity: 20.0, max_effort: 40.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: FL_hip_joint,   role: leg, position_limited: true, min_position: -0.5, max_position: 0.5,   max_velocity: 20.0, max_effort: 20.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: FL_thigh_joint, role: leg, position_limited: true, min_position: -1.2, max_position: 1.6,   max_velocity: 20.0, max_effort: 20.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: FL_calf_joint,  role: leg, position_limited: true, min_position: -2.5, max_position: -0.85, max_velocity: 20.0, max_effort: 20.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: FR_hip_joint,   role: leg, position_limited: true, min_position: -0.5, max_position: 0.5,   max_velocity: 20.0, max_effort: 20.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: FR_thigh_joint, role: leg, position_limited: true, min_position: -1.6, max_position: 1.2,   max_velocity: 20.0, max_effort: 20.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: FR_calf_joint,  role: leg, position_limited: true, min_position: 0.85, max_position: 2.5,   max_velocity: 20.0, max_effort: 20.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: RL_hip_joint,   role: leg, position_limited: true, min_position: -0.5, max_position: 0.5,   max_velocity: 20.0, max_effort: 20.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: RL_thigh_joint, role: leg, position_limited: true, min_position: -1.2, max_position: 1.6,   max_velocity: 20.0, max_effort: 20.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: RL_calf_joint,  role: leg, position_limited: true, min_position: -2.5, max_position: -0.85, max_velocity: 20.0, max_effort: 20.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: RR_hip_joint,   role: leg, position_limited: true, min_position: -0.5, max_position: 0.5,   max_velocity: 20.0, max_effort: 20.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: RR_thigh_joint, role: leg, position_limited: true, min_position: -1.6, max_position: 1.2,   max_velocity: 20.0, max_effort: 20.0, max_kp: 100.0, max_kd: 10.0}
+  - {name: RR_calf_joint,  role: leg, position_limited: true, min_position: 0.85, max_position: 2.5,   max_velocity: 20.0, max_effort: 20.0, max_kp: 100.0, max_kd: 10.0}
