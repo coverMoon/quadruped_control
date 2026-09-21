@@ -1,9 +1,11 @@
 # REAL_HARDWARE_BASELINE
 
-> 参考仓库：`N-W-wolf/real_robot_black-W`  
+> 核查源码：本机 `../real_robot`，origin 为 `git@github.com:coverMoon/real_robot.git`
+> 源码版本：`4662151ab5c72e7fa28d4af2c66b5d6b0d7018d0`（核查时工作区干净）
 > 适用平台：`black`、`blackW`  
 > 文档定位：记录旧实机代码中已经存在的硬件连接、通信参数、执行器映射、换算关系、IMU、校准、安全与时序行为。  
-> 本文用于迁移核对，不负责定义新架构。无法仅凭当前代码完全确认的内容统一标记为 **待确认**。
+> 下述旧行为来自源码静态核查，不代表已经验证当前硬件。新后端约定见
+> [实机后端迁移架构参考](REAL_ROBOT_BACKEND_MIGRATION_REFERENCE.md)。
 
 ---
 
@@ -187,13 +189,25 @@ SerialPort(portName, 16, 4000000, 5000)
 
 # 4. Unitree Motor SDK
 
-当前 SDK 中只声明：
+本地 `unitreeMotor/unitreeMotor.h` 中只声明：
 
 ```cpp
 MotorType::GO_M8010_6
 ```
 
-支持 ARM64 与 x86-64 动态库。
+仓库带 ARM64 与 x86-64 动态库，两种机器人对应架构的库 SHA-256 相同：
+
+| 架构 | SHA-256 |
+|---|---|
+| ARM64 | `c2a23b6adf68f90f1fc459c7bb0708d4f39d6330f4b80f19c130baf03f45d93f` |
+| x86-64 | `7b53d6ffc779860e753fa8a90d35af55cd30a0964226419e17c82025b726559f` |
+
+本地只有 `SerialPort` 声明，未找到其 `.cpp` 实现；动态符号确认 `sendRecv`
+及反馈解码位于 SDK 库。不能从函数名或返回 bool 推断整组响应全部有效、超时总预算、
+自动重连或电机断联停机行为。这些需要供应商源码/资料或台架验证。
+
+SDK 头文件声明 `mode=0` 为刹车、`1` 为 FOC、`2` 为电机标定。旧运行路径使用
+`mode=1`，零力矩查询不等于 SDK `mode=0`。以上为头文件语义，尚未验证固件行为。
 
 SDK 对命令字段的定义：
 
@@ -291,7 +305,7 @@ motor.W   = -joint.dq  × 15.825
 motor.T   = -joint.tau / 15.825
 ```
 
-零位修正存在时：
+初始化完成后的零位修正如下，`motor_offset` 是第 7.2 节的完整 `O`：
 
 ```text
 target_motor_pos -= motor_offset
@@ -329,7 +343,7 @@ corrected_motor_pos = raw_motor_pos + motor_offset
 
 当前代码能够确认：
 
-- SDK 的 `Pos/W/T` 是电机转子侧量；
+- SDK 头文件将 `Pos/W/T` 标为电机转子侧量；
 - `6.33` 被用于电机侧与关节侧转换；
 - calf 在此基础上额外乘 `2.5`；
 - calf 方向取反。
@@ -425,57 +439,50 @@ line 2: creep_position[12]
 
 ---
 
-## 7.2 启动时多圈 offset
+## 7.2 完整零位公式
 
-初始化阶段：
-
-1. 向本腿电机发送零增益、零力矩命令；
-2. 读取当前 `MotorData.Pos`；
-3. 与保存的 `creep_position` 比较；
-4. 计算相差的完整 `2π` 圈数；
-5. 生成当前启动对应的 rotor offset。
-
-代码关系：
+依据两套 `src/utils/set_zero.cpp::get_motor_offset()` 和
+`include/real_runner/utils/set_zero.h::get_offset_()`，对腿关节索引
+`i = leg * 3 + joint`：
 
 ```text
-diff   = current_motor_pos - creep_position
-rounds = round(diff / 2π)
-offset = -rounds × 2π
+P0 = 本次启动读取的转子位置（rad）
+C  = creep_position[i]（保存的转子位置，rad）
+S  = straight_position[i]（保存的转子位置，rad）
+R  = -round((P0 - C) / (2π)) × 2π
+A  = 46.66 × π/180 × 6.33 × 2.5
+B  = -A（i=2,8），+A（i=5,11），0（其他关节）
+O  = R - S + B
 ```
 
-之后：
+`round` 为 C++ `std::round`，半整数向远离零方向取整。
+`R` 是本次启动整圈补偿；`O` 才是用于命令和反馈的完整 offset。
+不能省略 `-S`，也不能把本次启动的 `R` 保存为型号固定零位。
+
+设方向 `d=+1`（hip/thigh）、`d=-1`（calf），传动比 `r` 见第 5 节：
 
 ```text
-command target position -= offset
-state raw position       += offset
+motor.Pos = d × r × joint.q - O
+motor.W   = d × r × joint.dq
+motor.T   = d × joint.tau / r
+motor.K_P = joint.kp / r²
+motor.K_W = joint.kd / r²
+
+joint.q   = d × (motor.Pos + O) / r
+joint.dq  = d × motor.W / r
+joint.tau = d × motor.T × r
 ```
 
-这使当前电机多圈编码值重新落到 calibration 所定义的机械位置附近。
+这些公式描述旧代码数值关系；机械效率和 SDK 增益的固件解释尚未实测。
+blackW 的校准索引仍是 12 个腿关节，不能使用含轮子的 `leg*4+joint` 直接索引校准数组。
 
----
+## 7.3 校准成立条件
 
-## 7.3 calf calibration 特殊修正
+整圈选择依赖上电姿态与保存的 creep 参考关系，源码没有验证机械姿态是否满足这一前提。
+任意姿态上电是否会选错圈需要实机核对。`46.66°` 的机械来源及正负号也需核对安装。
 
-`get_offset_()` 中还存在 calf 的固定补偿：
-
-```text
-offset_calf = 46.66° × 6.33 × 2.5
-```
-
-转换为 rad 后参与 rotor-side offset。
-
-全局 motor index：
-
-```text
-2, 8  -> subtract offset_calf
-5, 11 -> add offset_calf
-```
-
-也就是四个 calf 的补偿方向并不全部相同。
-
-> **待确认：**
->
-> 该 `46.66°` 的机械来源以及四腿正负号与实际连杆安装的对应关系。
+旧构造函数未因校准读取失败而停止启动：缺失文件保留零初始化值，格式错误可能留下
+部分读入值。新后端应在校准完整性检查失败时拒绝主动控制，不能迁移该默认退路。
 
 ---
 
@@ -517,7 +524,9 @@ q : 退出
 sleep 2 ms
 ```
 
-因此工具循环 nominal 为 500 Hz，但仍受实际串口 transaction 时间影响。
+工具每轮顺序执行四路事务后再 sleep 2 ms，实际周期是事务与处理耗时加 2 ms，
+不能按严格 500 Hz 描述。`record_position()` 在事务失败后仍会继续复制数据，采集
+straight/creep 时未统一检查每电机有效性；新工具应只接受完整有效样本。
 
 ---
 
@@ -721,28 +730,30 @@ K_P != 0
 
 该保护发生在 motor-side position 空间。
 
-> `not_first_command` 的完整生命周期需要在迁移前再次核对，确认其具体何时被置为 true。
+`not_first_command` 在构造时为 false；收到第一条 ROS 命令后，
+`_commandCallback()` 将它设为 true，运行期间未见复位。因此首条外部命令也可能触发检查，
+并不是“第一条命令执行成功后才检查”。blackW 先校验数组长度，black 没有相应长度检查。
+两者均未在该回调校验 NaN/Inf 或命令有效期。
+
+触发位置跳变分支时，函数直接 return，此前可能已写入部分命令缓冲；保护默认关闭时
+`setIsSafe(false)` 不会建立 unsafe 状态。这不是可复用的完整帧安全提交实现。
 
 ---
 
 # 14. 失衡安全保护
 
-旧代码使用全局 `SafetyStateManager`。
+实际判定在 `real_runner.cpp::_processImuSafety()`，比较的是绝对值：
 
-阈值：
+| 型号 | roll / pitch 阈值 |
+|---|---|
+| black | `abs(angle) > π/6`，30° |
+| blackW | `abs(angle) > π/3`，60° |
 
-```text
-roll  > 30°
-pitch > 30°
-```
+两套 `utils/secure_protect.hpp` 都另有 30° 常量，但上述调用使用的是
+`real_runner.cpp` 的全局常量。不能据头文件认定 blackW 使用 30°。
 
-即：
-
-```cpp
-π / 6
-```
-
-超出任一阈值时，将 safety state 标记为 unsafe。
+若启用保护，首次 unsafe 后 `_processImuSafety()` 会提前返回，姿态恢复不会自动解除；
+默认关闭保护时则不会形成这个锁存效果。
 
 ---
 
@@ -1030,55 +1041,54 @@ z 取反
 
 ---
 
-# 20. VQF
+# 20. VQF 与最终姿态来源
 
-当前默认启用 VQF。
-
-配置：
+两套 `_handleImuSample()` 先按第 19 节的 Euler 符号构造 raw quaternion。
+默认 `imu_vqf_enabled=true`；当 gyro/accel 各分量有限且加速度模长大于 `1e-6` 时，
+转换后的 gyro、accel 输入 VQF，`getQuat6D()` 的 `w,x,y,z` 覆盖 raw quaternion。
+最终结果同时写入 `/_lowState/imu` 和聚合 joint state 内的 IMU，姿态保护也使用该结果。
 
 ```text
 tauAcc = 3.0
-gyrTs  = 0.002 s
-accTs  = 0.002 s
+gyrTs = accTs = 0.002 s
 ```
 
-因此实现假定 gyro / accel nominal 为 500 Hz。
+每个成功解析的帧更新一次 VQF，不按接收时间差调整 dt；串口批量到达时仍逐帧更新。
+禁用 VQF 或该帧不满足输入检查时保留 raw quaternion，仍发布消息并喂 IMU watchdog。
+CRC 正确不等于数值有效；旧代码没有对最终整份 IMU 做统一有限值和单位四元数检查。
 
-旧链路同时保留了 IMU 原始 Euler angle，可以构造 raw quaternion；VQF 则通过 gyro + accel 生成后续姿态估计。
+接收错误后重开串口，未见清空 parser 残留或重新初始化 VQF 的处理。
+实际采样率、加速度原始单位、安装坐标和重连后的估计恢复仍需验证。
 
-迁移初期应记录并对比：
+# 21. IMU watchdog、命令失联与退出
 
-```text
-raw sensor Euler
-raw converted quaternion
-VQF quaternion
-gyro
-acceleration
-```
+两套源码中的 IMU 参数相同：
 
-以确认实际发布的 orientation 来源与旧系统一致。
+| 参数 | 实际值与含义 |
+|---|---|
+| 稳定间隔 | 相邻处理时间间隔 `0 < gap <= 20 ms` |
+| 稳定计数 | 累积 250 个连续合格间隔后启用监控 |
+| 超时 | 距最后处理帧 `> 0.5 s` |
+| 确认 | exchange loop 连续 3 次超时检查 |
+| 恢复 | 新帧清空 strike，设置 alive；不重新关闭已启用的监控 |
 
----
+确认超时后调用 `setIsSafe(false)`；默认保护关闭时该调用仍保持 safe，日志中
+“触发阻尼”不能证明实际已输出阻尼。喂狗时间使用 ROS 节点 `this->now()`，不是传感器
+采样时间，也不是新后端所需的独立单调时间。
 
-# 21. IMU watchdog
+| 情况 | 旧运行路径实际处理 |
+|---|---|
+| 未收到或未稳定的 IMU | 提示等待，不因此阻止电机命令 |
+| ROS 命令停止更新 | 持续复用 `_lowCmd`，无命令年龄/heartbeat 检查 |
+| 电机初始化 `sendRecv=false` | 零增益查询，等待约 10 ms 后重试 |
+| 正常电机通信 `sendRecv=false` | 记录错误；触发 safety 的语句被注释，仍拷贝 localState |
+| 正常电机 `correct=false` / ID 不符 | SerialPack 未统一逐电机拒绝；SDK bool 与部分反馈语义待验证 |
+| `MError!=0` | blackW 仅额外记录 leg 0 第三个电机错误变化，未形成全电机故障覆盖 |
+| 正常退出 | RealRunner 停止并 join IMU/exchange；SerialPack 停止并 join 总线线程 |
 
-当前代码包含 IMU：
-
-```text
-last receive time
-alive state
-stable-frame count
-timeout strike count
-timeout monitoring enable
-```
-
-逻辑上先等待数据流达到稳定状态，再启用 timeout 监控，避免启动阶段立即触发故障。
-
-IMU 数据恢复时会清除 timeout strike。
-
-> **待确认：**
->
-> 当前 timeout 阈值、连续 strike 数量以及 timeout 最终是否真正触发 motor safety，需要在迁移前继续核对 `real_runner.cpp` 后半部分。
+应用析构和循环退出路径未显式发送最终零增益或阻尼帧；SDK 析构和电机固件的断联行为
+尚不能由当前可见源码确认。新后端需要明确发送侧超时、逐电机故障检查及退出动作，
+不能依赖旧 ROS 输入或进程析构完成安全停机。
 
 ---
 
@@ -1130,6 +1140,7 @@ robot_msgs::msg::RobotCommand
 | wheel q state | — | 固定 0 |
 | wheel dq state | — | `-motor.W` |
 | wheel torque state | — | `-motor.T` |
+| 姿态阈值（保护默认关闭） | 30° | 60° |
 | motor thread target | 2 ms | 2 ms |
 | main exchange | 5 ms | 5 ms |
 | IMU | AB5465 + VQF | 同类链路 |
@@ -1228,7 +1239,7 @@ body-frame convention
 ### Safety
 
 ```text
-30° roll/pitch threshold
+black 30° / blackW 60° roll/pitch threshold（旧值，非新默认值）
 8π motor-position mismatch
 damping command
 startup zero-gain behavior
@@ -1251,27 +1262,36 @@ actual jitter
 
 ---
 
-# 26. 待确认项
+# 26. 源码证据与剩余确认项
 
-以下信息不应在迁移代码中依靠猜测：
+源码根为 `../real_robot/<black或blackW>/src/real_robot/real_runner/`。
+版本见文首，以下符号用于复核；它们不是新后端接口：
 
-1. black / blackW 当前实机上每个 bus 的实际 motor ID；
-2. `6.33` 在机械与 SDK 语义中的精确定义；
-3. calf `2.5` 外部传动的机械来源；
-4. calf `46.66°` calibration 修正的机械来源；
-5. 四个 calf offset 正负号与实际腿安装关系；
-6. wheel joint axis 与旧代码负号之间的对应关系；
-7. acceleration 原始单位；
-8. IMU 的物理安装方向；
-9. VQF 最终 orientation 与 raw Euler orientation 的实际使用路径；
-10. IMU timeout 阈值与故障动作；
-11. motor `correct=false` / `MError!=0` 在当前 runtime 中的最终处理；
-12. `not_first_command` 的设置时机；
-13. 发送线程与上层 staging 中 calf damping ratio 不一致的原因；
-14. black 当前 20 ms SerialPort timeout 是否为有意配置；
-15. blackW 5 ms timeout 是否经过稳定实机验证。
+| 核查内容 | 源文件与符号 |
+|---|---|
+| 总线、ID、换算、线程、失联 | `include/real_runner/utils/serial_packages.hpp`：构造、`sendRecv`、`_sendRecvMotorGroup`、析构 |
+| 标定读写与整圈计算 | `src/utils/set_zero.cpp`：`load_calibration_file`、`get_motor_offset`、`record_position` |
+| 完整 offset | `include/real_runner/utils/set_zero.h`：`get_offset_` |
+| SDK 单位、模式及声明限值 | `include/real_runner/unitreeMotor/unitreeMotor.h` |
+| 串口默认参数与超时存储 | `include/real_runner/serialPort/SerialPort.h`、`IOPort/IOPort.h` |
+| IMU、watchdog、命令及退出 | `src/real_runner.cpp`：`_handleImuSample`、`_processImuSafety`、`_exchangeLoop`、`_commandCallback`、析构 |
+| 保护开关 | `include/real_runner/utils/secure_protect.hpp`、`src/utils/secure_protect.cpp` |
 
-这些内容应在实现新的 `RealRobotIO` 前，通过旧代码继续核查或通过静态实机测试确认。
+以下仍需硬件/SDK资料或台架验证，不能仅靠旧程序常量确认：
+
+1. 四路设备节点、每个 bus 的实际 motor ID，尤其 blackW wheel；
+2. SDK 固件单位与增益定义、传动比和机械方向；wheel 未缩放是否代表输出轴量；
+3. calf `2.5`、`46.66°` 的机械依据与每腿安装关系；
+4. 当前机器校准文件、允许的上电姿态、整圈选择及掉电后的编码器行为；
+5. wheel 连续角、跨圈、方向和新模型轴向；旧固定零轮角不能支持现有 Event chain 行程计算；
+6. IMU 原始加速度单位、安装变换、实际帧率及重连后的 VQF 恢复；
+7. SDK 整组事务中逐电机的成功条件、响应校验、实际超时和重连行为；
+8. 电机固件断联停机、通信彻底中断/进程被杀后的行为，以及硬件停机通道；
+9. 总线实际周期与抖动，旧 20 ms / 5 ms timeout 是否适合当前设备；
+10. 新后端采用的姿态阈值和阻尼参数。旧 black calf 两层阻尼换算不一致，不能同时复现。
+
+第 7、13、20、21 节已经确认完整零位、首命令检查时机、最终姿态来源和 watchdog
+参数；不再把这些列为等待源码核查的事项。
 
 ---
 

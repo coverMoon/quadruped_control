@@ -1,857 +1,158 @@
 # 实机后端迁移架构参考
 
-> 适用仓库：`N-W-wolf/quadruped_control`  
-> 参考旧实现：`N-W-wolf/real_robot_black-W`  
-> 文档定位：用于指导 black / blackW 实机控制链路迁移与后端设计。本文只固定整体结构、职责边界和实施顺序，不规定具体类内部实现。
+实机接入复用现有 MotionRuntime、RobotIO 与 IPC，将电机通信、IMU、校准和执行侧
+保护放入 `backends/real/`。black 与 blackW 共用实现，通过配置表达硬件差异。
 
----
+旧源码的版本、数学关系和已知缺口见
+[硬件行为基线](REAL_HARDWARE_BASELINE.md)。该基线是静态源码核查结果，不代表新后端
+已经实现，也不代表当前实体设备已经验证。以下是第一版实现约定。
 
-## 1. 目标
-
-将旧仓库中已经经过实机验证的电机通信、IMU、零位校准和安全保护能力迁移到 `quadruped_control`，并接入现有 `RobotIO + MotionRuntime + IPC` 架构。
-
-迁移后的实机链路应与 MuJoCo 后端保持一致的上层接口：
+## 1. 运行链路与职责
 
 ```text
-ROS 2 / External Control
-          │
-          ▼
-     ros2_gateway
-          │
-      Shared IPC
-          │
-          ▼
-       motiond
-    MotionRuntime
-          │
-     CommandFrame
-          │
-          ▼
-    real_backendd
-          │
-      RealRobotIO
-          │
-          ▼
-     Physical Robot
-```
-
-核心目标：
-
-- `MotionRuntime` 不感知 MuJoCo 或实机差异；
-- black 与 blackW 共用同一套实机后端框架；
-- 厂商 SDK、串口、电机 ID、方向、传动比、零位等硬件细节全部限制在 backend 内；
-- ROS 2 不直接参与电机和 IMU 的底层通信；
-- 实机 backend 在 `motiond` 或 ROS 2 异常时仍具备独立安全停机能力。
-
----
-
-## 2. 总体模块关系
-
-推荐结构：
-
-```text
-                  RobotModel
-              black / blackW
-                     │
-                     ▼
-                MotionRuntime
-                     │
-                CommandFrame
-                     │
-                     ▼
-                  IPC
-                     │
-                     ▼
-               real_backendd
-                     │
-                RealRobotIO
-          ┌──────────┼──────────┐
-          │          │          │
-          ▼          ▼          ▼
-   MotorBusGroup   IMU      HardwareSafety
-          │          │
-          ▼          ▼
-   Actuator Codec  AB5465
-          │          │
-          ▼          ▼
-     Unitree SDK    VQF
-          │          │
-          └────┬─────┘
-               ▼
-         Physical Robot
-```
-
-其中：
-
-- `motiond`：运动控制、状态机、RL、行为切换；
-- `real_backendd`：实机 backend 进程生命周期、IPC、heartbeat、session、命令接收；
-- `RealRobotIO`：物理机器人统一 I/O；
-- `MotorBusGroup`：多路电机总线管理；
-- `Actuator Codec`：电机侧量与逻辑关节量之间的转换；
-- `IMU`：串口、协议解析和姿态估计；
-- `HardwareSafety`：实机底层安全保护。
-
----
-
-## 3. 与现有 backend 的关系
-
-新仓库已经存在：
-
-```text
-backends/
-├── mujoco/
-└── replay/
-```
-
-实机应作为同级 backend：
-
-```text
-backends/
-├── mujoco/
-├── replay/
-└── real/
-```
-
-三种 backend 对上层统一暴露 `RobotIO` 语义：
-
-```text
-MujocoRobotIO ─┐
-ReplayRobotIO ─┼─> RobotIO
-RealRobotIO   ─┘
-```
-
-因此不再建立独立的“real motion runtime”或“real ROS node”。
-
----
-
-## 4. RealRobotIO 的职责
-
-`RealRobotIO` 是实机硬件的统一入口，负责协调底层设备，但不负责运动策略。
-
-主要职责：
-
-```text
-RealRobotIO
-├── 初始化 / 关闭物理设备
-├── 接收 CommandFrame
-├── 输出 StateFrame
-├── 管理 motor bus
-├── 管理 IMU
-├── 维护最新硬件状态
-├── 执行底层安全保护
-└── 上报 RobotIOStatus
-```
-
-不应负责：
-
-- RL policy 推理；
-- GetUp / Stand / GetDown 状态机；
-- ROS 2 topic / service / action；
-- 用户输入；
-- 行为切换逻辑。
-
-这些仍由现有 motion / adapter 层负责。
-
----
-
-## 5. 电机通信层
-
-旧代码中的 `SerialPack` 同时包含：
-
-- 串口；
-- Unitree 电机 SDK；
-- motor ID；
-- black / blackW 差异；
-- 方向；
-- calf 额外传动；
-- wheel 控制；
-- 电机状态换算。
-
-迁移后建议拆成两层。
-
-### 5.1 MotorBus
-
-负责纯硬件通信：
-
-```text
-MotorBus
-├── serial device
-├── baudrate
-├── motor IDs
-├── send
-├── receive
-├── vendor SDK
-└── raw motor state
-```
-
-MotorBus 不应知道：
-
-```text
-FL_hip
-FR_calf
-wheel
-zero_offset
-robot model
-default pose
-```
-
----
-
-### 5.2 Actuator Codec / Mapping
-
-负责把逻辑关节与实际执行器建立映射：
-
-```text
-JointCommand
-      │
-      ▼
-Actuator Codec
-      │
-      ▼
-MotorCommand
-```
-
-以及：
-
-```text
-MotorState
-     │
-     ▼
-Actuator Codec
-     │
-     ▼
-JointState
-```
-
-这里处理：
-
-- 电机方向；
-- 零位；
-- 厂商单位；
-- 减速器；
-- calf 外部传动；
-- wheel 特殊控制方式；
-- black / blackW 执行器差异。
-
-第一版应优先复现旧实机代码的实际数学关系，确认实机行为一致后再进一步简化公式。
-
----
-
-## 6. black 与 blackW 的关系
-
-不为 black 和 blackW 分别复制一套 backend。
-
-共用：
-
-```text
-RealRobotIO
-MotorBus
-Unitree SDK
-IMU
-HardwareSafety
-IPC
-real_backendd
-```
-
-差异通过配置描述：
-
-```text
-RobotConfig
-HardwareConfig
-JointRole
-Actuator Mapping
-```
-
-逻辑模型：
-
-### black
-
-```text
-FL: hip thigh calf
-FR: hip thigh calf
-RL: hip thigh calf
-RR: hip thigh calf
-```
-
-共 12 个 actuator。
-
-### blackW
-
-```text
-FL: hip thigh calf wheel
-FR: hip thigh calf wheel
-RL: hip thigh calf wheel
-RR: hip thigh calf wheel
-```
-
-共 16 个 actuator。
-
----
-
-## 7. RobotConfig 与 HardwareConfig
-
-两类配置需要保持职责分离。
-
-### RobotConfig
-
-描述机器人控制语义：
-
-```text
-joint name
-joint order
-JointRole
-default pose
-控制相关参数
-运动学相关信息
-```
-
-例如：
-
-```text
-FL_hip
-FL_thigh
-FL_calf
-```
-
----
-
-### HardwareConfig
-
-描述某台真实机器人实际如何连接：
-
-```text
-串口设备
-baudrate
-motor bus
-motor id
-zero offset
-direction
-传动关系
-IMU device
-IMU baudrate
-安全参数
-```
-
-推荐目录：
-
-```text
-configs/
-├── robots/
-│   ├── black.yaml
-│   └── blackW.yaml
-│
-└── hardware/
-    ├── black.yaml
-    └── blackW.yaml
-```
-
-HardwareConfig 的结构可逐步演进，初期不需要为了通用性设计过多抽象。
-
----
-
-## 8. 零位与校准
-
-旧仓库中的 `motor_calibration.conf` 依赖固定数组顺序解释零位。
-
-新配置应改为显式关节名，例如：
-
-```yaml
-zero_offset:
-  FL_hip: ...
-  FL_thigh: ...
-  FL_calf: ...
-  FR_hip: ...
-```
-
-这样可以避免 actuator 顺序变化后产生静默错误。
-
-零位工具单独作为 hardware tool，不进入 backend 主程序：
-
-```text
-apps/hardware_tools/
-├── motor_zero
-└── motor_test
-```
-
----
-
-## 9. IMU
-
-第一版优先保持旧实机链路：
-
-```text
-/dev/IMU_Link
-      │
-   460800
-      │
-      ▼
-AB5465 Parser
-      │
-      ├── Gyroscope
-      └── Accelerometer
+ROS 2 / keyboard / joystick
              │
-             ▼
-            VQF
+        ros2_gateway
              │
-             ▼
-        StateFrame IMU
+           motiond
+      MotionRuntime / RL
+             │
+         现有本机 IPC
+             │
+       real_backendd
+             │
+        RealRobotIO
+        ┌────┴────┐
+    四路电机总线   IMU / VQF
 ```
 
-初期不更换姿态估计算法。
+| 位置 | 职责 |
+|---|---|
+| `core/` | 继续定义归一化帧、RobotIO 和通用校验，不引入 SDK 或硬件配置 |
+| `motion/` | 继续处理基础动作、RL、策略切换与行为，不感知电机 ID、方向或零位 |
+| `backends/real/` | 设备生命周期、执行器换算、反馈整理、IMU 与最终发送侧保护 |
+| `real_backendd` | 共享内存 owner、会话、heartbeat、命令接收和状态发布 |
+| `config_loader/` | 按现有加载方式读取硬件配置，依赖单向指向配置类型 |
+| `apps/hardware_tools/` | 有独立操作需求时添加零位采集、单电机调试等工具 |
 
-迁移时重点保证输出语义与 MuJoCo backend 一致：
+后端内部按通信、换算、IMU 和安全职责组织，优先使用私有类型和函数。
+不预建多厂商插件层、通用 estimator 或两套机器人源树。
 
-- 坐标轴；
-- body frame；
-- gyro 单位；
-- acceleration 单位；
-- quaternion 顺序；
-- gravity 方向；
-- IMU 安装方向。
+## 2. 硬件配置与校准
 
-后续如果引入 EKF、其他 state estimation 或直接使用 IMU 自带姿态，再单独设计 estimator 层。
+`RobotModel` 继续负责名称、有序关节、JointRole 和归一化限制；控制周期、姿态和控制
+增益保留在 controller/policy 配置中。硬件配置描述具体设备连接和执行器换算。
 
----
+第一版配置内容如下，字段名称在实现时确定：
 
-## 10. 控制与通信频率
-
-旧实机代码已经隐含两层频率：
-
-```text
-Motor I/O Thread
-     ≈ 500 Hz
-         │
-         ▼
- latest hardware state
-         │
-         ▼
-RealRobotIO / Backend
-       200 Hz
-         │
-         ▼
-MotionRuntime
-       200 Hz
-         │
-         ▼
-RL Policy
-        50 Hz
-```
-
-因此不要求电机通信、MotionRuntime 和 policy 共用一个循环。
-
-建议保留：
-
-- 电机总线独立通信线程；
-- backend 固定周期读取最新状态；
-- MotionRuntime 保持现有 200 Hz；
-- policy 保持现有 decimation / 50 Hz。
-
-实际串口通信频率和 jitter 需要在新 backend bring-up 时实测，不直接假定 `sleep 2 ms` 就等于严格 500 Hz。
-
----
-
-## 11. 安全职责
-
-安全分成两层。
-
-### Motion Safety
-
-位于 `MotionRuntime`，负责：
-
-- 模式切换；
-- 行为状态；
-- command limit；
-- 控制目标合法性；
-- Passive / Stand / Running 等运动状态。
-
-### Hardware Safety
-
-位于 `real_backendd / RealRobotIO`，负责：
-
-- CommandFrame 超时；
-- motiond heartbeat 丢失；
-- motor communication timeout；
-- motor fault；
-- IMU timeout；
-- NaN / invalid state；
-- 姿态异常；
-- backend shutdown；
-- 紧急阻尼。
-
-基本原则：
-
-```text
-motiond 故障
-    │
-    ▼
-real_backendd
-仍必须能够主动进入安全状态
-```
-
-命令优先级建议：
-
-```text
-Hardware Fault
-      ↓
-Emergency Damping
-
-Command Timeout
-      ↓
-Safe Damping
-
-Valid CommandFrame
-      ↓
-Normal Control
-```
-
-实机安全不依赖 ROS 2 或上层状态机完成最后一次命令发送。
-
----
-
-## 12. real_backendd
-
-`real_backendd` 应尽量复用 `mujoco_backendd` 已建立的 daemon 模式。
-
-共用概念：
-
-```text
-startup_id
-session_id
-heartbeat
-RobotIOStatus
-StateFrame
-CommandFrame
-command version
-backend control request
-IPC
-```
-
-实机额外增加：
-
-```text
-hardware initialization
-motor bus lifecycle
-IMU lifecycle
-hardware watchdog
-safe shutdown
-```
-
-不要重新建立一套 real-only IPC 协议。
-
----
-
-## 13. 推荐目录结构
-
-初期推荐保持简单：
-
-```text
-quadruped_control/
-│
-├── backends/
-│   ├── mujoco/
-│   ├── replay/
-│   └── real/
-│       ├── include/quadruped/backends/real/
-│       │   ├── real_robot_io.hpp
-│       │   ├── motor_bus.hpp
-│       │   ├── actuator_codec.hpp
-│       │   ├── imu.hpp
-│       │   └── hardware_config.hpp
-│       │
-│       └── src/
-│           ├── real_robot_io.cpp
-│           ├── motor_bus.cpp
-│           ├── actuator_codec.cpp
-│           ├── imu.cpp
-│           └── hardware_config.cpp
-│
-├── apps/
-│   ├── runtime_daemons/
-│   │   ├── motiond.cpp
-│   │   ├── mujoco_backendd.cpp
-│   │   └── real_backendd.cpp
-│   │
-│   └── hardware_tools/
-│       ├── motor_zero/
-│       ├── motor_test/
-│       └── imu_monitor/
-│
-└── configs/
-    ├── robots/
-    │   ├── black.yaml
-    │   └── blackW.yaml
-    │
-    └── hardware/
-        ├── black.yaml
-        └── blackW.yaml
-```
-
-如果初期文件规模较小，不需要预先创建 `motor/`、`imu/`、`safety/` 等多层目录；等代码自然增长后再拆。
-
----
-
-## 14. 旧仓库迁移关系
-
-| 旧实现 | 新位置 | 处理 |
+| 内容 | 所需数据 | 校验规则 |
 |---|---|---|
-| `real_runner.cpp` | `RealRobotIO + real_backendd` | 拆分 |
-| `SerialPack` | `MotorBus + ActuatorCodec` | 重构 |
-| Unitree SDK | `backends/real` | 保留 |
-| serial / IOPort | `MotorBus` | 保留并整理 |
-| `motor_calibration.conf` | `configs/hardware` | 改为带关节名配置 |
-| `set_zero` | `apps/hardware_tools` | 迁移 |
-| AB5465 parser | `IMU` | 保留 |
-| VQF | `IMU` | 初期保留 |
-| IMU monitor | `apps/hardware_tools` | 迁移 |
-| `secure_protect` | `HardwareSafety` | 重构 |
-| ROS wrapper | 无 | 不迁移 |
-| `midware` | 无 | 不迁移 |
-| `_lowCmd / _lowState` | `CommandFrame / StateFrame` | 替换 |
-| 旧 MuJoCo runner | `backends/mujoco` | 不迁移 |
-| 旧 joystick / teleop | adapters/input | 不作为实机 backend 内容迁移 |
-
----
-
-## 15. 推荐实施顺序
-
-### 1. Hardware Baseline
-
-完整整理旧代码中的：
-
-- 串口设备；
-- baudrate；
-- motor ID；
-- leg / actuator 对应关系；
-- direction；
-- zero offset；
-- transmission；
-- Unitree SDK 单位；
-- IMU 协议；
-- IMU 坐标；
-- 安全逻辑；
-- 真实通信周期。
-
-输出一份明确的硬件行为基线。
-
-### 2. Real backend skeleton
-
-建立：
-
-```text
-RealRobotIO
-real_backendd
-HardwareConfig
-```
-
-先接入现有 IPC、heartbeat、session 和 RobotIO 生命周期，不控制真实电机。
-
-### 3. Motor read-only
-
-完成四路串口、电机状态读取和 actuator mapping。
-
-只产生 `StateFrame`，禁止有效力矩输出。
-
-### 4. IMU
-
-移植：
-
-```text
-AB5465
-VQF
-```
-
-完成完整实机 `StateFrame`。
-
-### 5. Safe command bring-up
-
-依次验证：
-
-```text
-单电机
-→ 单腿
-→ 全部关节
-```
-
-重点确认：
-
-```text
-direction
-zero
-q
-dq
-tau
-Kp
-Kd
-command timeout
-safe damping
-```
-
-### 6. MotionRuntime
-
-依次接入：
-
-```text
-Passive
-→ GetUp
-→ Stand
-→ GetDown
-```
-
-这一阶段原则上不修改 MotionRuntime 架构。
-
-### 7. RL 与 blackW
-
-完成：
-
-```text
-RL locomotion
-policy switching
-wheel actuator
-blackW behaviors
-```
-
-实机链路稳定后再移除旧 runtime。
-
----
-
-## 16. 设计原则
-
-### 原则 1：硬件细节止于 backend
-
-以下内容不得进入 MotionRuntime：
-
-```text
-vendor SDK
-serial device
-motor id
-motor direction
-gear ratio
-zero offset
-raw motor unit
-```
-
----
-
-### 原则 2：StateFrame / CommandFrame 是边界
-
-实机与仿真都使用统一：
-
-```text
-StateFrame
-CommandFrame
-RobotIOStatus
-```
-
-上层不得因为 backend 不同而建立特殊数据结构。
-
----
-
-### 原则 3：black / blackW 共用实现
-
-型号差异由配置和 actuator mapping 表达，避免复制：
-
-```text
-RealRobotIOBlack
-RealRobotIOBlackW
-```
-
-除非后续硬件架构发生本质变化。
-
----
-
-### 原则 4：先复现，再整理
-
-迁移初期优先保证：
-
-```text
-旧硬件行为
-      ↓
-新 backend
-```
-
-结果一致。
-
-旧代码中的方向、减速比、单位换算等关系在完全理解前不主动“简化”。
-
----
-
-### 原则 5：实机安全独立于上层
-
-backend 必须能够处理：
-
-```text
-motiond crash
-ROS 2 crash
-command timeout
-motor fault
-IMU fault
-process shutdown
-```
-
-并自行进入安全状态。
-
----
-
-### 原则 6：控制逻辑不进入硬件线程
-
-电机通信线程主要负责：
-
-```text
-send
-receive
-timestamp
-latest state
-communication status
-```
-
-运动状态机和策略执行继续留在 MotionRuntime。
-
----
-
-## 17. 当前需要进一步确认的内容
-
-进入具体实现前，还需要从旧仓库和硬件资料中确认：
-
-1. Unitree SDK 中 q / dq / tau 的实际单位和内部减速比语义；
-2. `6.33`、`9.1`、`2.5` 等历史系数分别属于电机内部减速器还是外部机械传动；
-3. black / blackW 每个电机的实际 ID；
-4. 每条腿串口与 actuator 的准确映射；
-5. wheel 指令的方向和速度单位；
-6. motor calibration 文件中两行数据各自的具体含义；
-7. IMU 安装方向与 body frame 的准确变换；
-8. VQF 输入的实际采样频率；
-9. 旧 `secure_protect` 中所有触发条件及最终电机行为；
-10. shutdown、掉线和串口异常时旧系统实际执行的安全动作。
-
-这些内容确认后，再正式确定 `HardwareConfig` 字段和 `ActuatorCodec` 数学模型。
-
----
-
-## 18. 最终目标
-
-完成迁移后，项目应能够只替换 backend 即切换运行环境：
-
-```text
-                 MotionRuntime
-                      │
-                  RobotIO
-          ┌───────────┼───────────┐
-          ▼           ▼           ▼
-       MuJoCo       Replay       Real
-```
-
-black / blackW 的运动控制、RL policy、ROS 2 控制接口和行为系统继续共用同一套上层架构。
-
-实机 backend 只负责把：
-
-```text
-CommandFrame
-```
-
-可靠、安全地转化为物理执行器命令，并把真实硬件状态重新整理成：
-
-```text
-StateFrame
-```
-
-供上层使用。
+| 身份 | 机器人名称、有序关节名 | 与 RobotModel 完全一致 |
+| 总线 | 串口设备、波特率、事务超时 | 设备映射明确，参数有效；超时不等于实际周期 |
+| 执行器 | 关节到 bus/ID 的映射、方向、传动比 | 每关节唯一映射，同 bus 内 ID 唯一，跨 bus 可重复 |
+| 腿部标定 | 每关节 straight、creep 转子位置 | 有限、完整、有明确关节名；不能静默用零代替缺失项 |
+| 固定补偿 | calf 机械修正 | 与启动多圈补偿分开，沿用已确认公式及单位 |
+| IMU | 设备、波特率、安装变换、输入单位、VQF 参数 | 机体坐标与 SI 单位明确，未经确认不填猜测值 |
+| 执行侧限制 | 反馈时限、保护阈值、阻尼参数 | 参数针对当前机器验证，不照搬旧保护关闭状态 |
+
+建议路径为 `configs/hardware/<robot>.yaml`。具体机器的标定数据不作为所有同型号机器的
+通用常量，采集或导入时保留关节名和来源。旧文件导入时显式映射 12 个腿关节，
+blackW 的轮关节不插入这 12 项标定数组。
+
+启动多圈补偿是运行时状态，不能与持久标定合并成一个不透明 `zero_offset`。
+完整换算规则以基线第 7 节为准；先用固定样例验证，再执行硬件控制。
+
+## 3. RobotIO 与通信线程
+
+`RealRobotIO::read_latest()` 返回最新完整快照；`submit()` 校验并缓存完整命令，
+不在调用线程中进行阻塞串口事务。接受命令不等于电机已执行。
+
+四路总线各自通信，每路独占串口；IMU 独立接收、解析和更新估计。初始化配置、缓冲区
+和换算数据后再启动线程。仅将有界串口等待放入设备线程，不把运动控制放进去。
+SDK 异常在设备侧转换为明确状态，不越过 RobotIO 或周期边界。
+
+沿用旧目标节拍作为测量起点：总线约 2 ms、状态汇总约 5 ms、MotionRuntime 5 ms、
+策略每四个运动周期执行一次。第一版要记录实际事务耗时、超时及抖动，不能把
+`sleep_until` 或 4 Mbps 波特率视为 500 Hz 保证。
+
+每个实际成功校验的反馈记录主机单调采样时间。汇总帧使用生成时间，并计算各关节与
+IMU 的 `age_ns`；失败读取不能更新旧数据的采样时间。完整快照不意味着所有设备同时采样。
+
+## 4. 帧和执行语义
+
+- 启动核对机器人名称、有序关节名、bus/ID 和配置，不按关节数量猜测模型。
+- 命令在缓存前校验完整帧，在实际发送前再校验会话、有效期及当前执行侧安全状态。
+- 初期只实现 `Disabled`、`Damping`、`JointImpedance`；其他合法模式明确拒绝。
+  不能用 KP/KD 推断模式，也不能把 core `Disabled` 直接等同于 SDK 的刹车模式。
+- 对腿按完整零位公式转换；对轮保留已核实的速度语义。SDK 范围与归一化关节范围都需检查。
+- `online`、`valid`、`age_ns`、`error_code` 分别表达连接、数据完整性、年龄与故障。
+  坏包保留的最后有限数值可用于诊断，但必须标记失效，不能继续作为可控制反馈。
+- 四路异步通信下，`last_accepted_command_sequence` 表示完整命令已接受。
+  `effective_command_sequence` 的全帧应用判定需在实现中明确：仅部分总线发送、
+  安全覆盖或失败时不能冒称最新命令已全量应用；SDK 未提供执行确认时不声称物理执行已确认。
+
+当前 core 校验只要求设备年龄非负，没有硬件过期上限；RemoteRobotIO 的帧检查也不能
+替代发送前按当前单调时间进行的有效期检查。第一版由实机后端判定反馈时限并更新
+valid/safety，避免持续发布新帧掩盖旧传感器数据。
+
+当前 blackW Event chain 通过轮角差计算行程，而旧实机轮角恒为零。
+在轮角连续性、跨圈和符号得到验证前，不把 Event chain 列入实机可用行为。
+
+## 5. 初始化、保护与恢复
+
+初始化只发送协议需要的零增益、零前馈查询命令。读取状态、核对身份、完成校准和 IMU
+有效性检查后，才允许正常控制。所谓无主动输出读取仍可能包含电机通信写操作。
+
+| 状况 | 第一版处理原则 |
+|---|---|
+| 配置、身份或校准不完整 | 拒绝主动控制，返回明确原因 |
+| 无新 CommandFrame / 命令过期 | 发送侧覆盖旧主动命令，执行已经验证的安全输出 |
+| 电机反馈超时、错误 ID、坏包或故障 | 标记受影响反馈，按故障策略覆盖主动输出 |
+| IMU 无效或过期、姿态超限 | 拒绝依赖该状态的主动控制，并进入执行侧保护 |
+| 上层进程失联 | 总线线程继续执行自身的命令时限检查，不等待 ROS 2 发最终命令 |
+| 正常退出 | 保持设备线程直到完成有界安全发送尝试，再关闭设备；失败需要明确报告 |
+| 故障恢复 | 回到 Passive，旧主动命令失效，不因新包到来直接恢复行为 |
+
+正常 Disabled 输出与故障阻尼覆盖分开实现，故障覆盖优先级更高。
+姿态阈值、阻尼参数、通信故障时的具体输出须以台架结果确定；旧 black calf 两层阻尼
+换算不一致、两种机器旧保护默认关闭，均不能直接成为新默认行为。
+
+软件只能在发送线程仍运行且链路可达时发送安全命令。整个 backend 被杀死或总线断开
+后的停机，依赖电机固件超时及硬件停机通道，需要独立验证。
+
+现有 `MotionRuntime::dispatch_reset_fault()` 明确拒绝请求，RobotIO 也没有复位接口。
+第一版锁存故障可先采用排障后重新初始化的流程；接入软件复位时再增加最小的执行侧
+管理操作及结果回传，不能在 motion 内伪造成功。急停解除不等同于普通故障清除。
+
+## 6. 复用 IPC 与构建入口
+
+继续使用现有 StateFrame、CommandFrame、heartbeat、session、latest slot 和 SPSC queue。
+实机 backend 创建共享内存并发布身份；重建控制会话时清空待执行命令。
+既有 IPC 语义见 [运行时与 IPC](../runtime_ipc.md)。
+
+`mujoco_backendd` 的 GUI、物理 step、暂停、keyframe reset 和仿真时钟不迁移。
+实机明确拒绝这些仿真管理请求，不赋予键盘 reset 或 pause 隐式硬件复位含义。
+为实机选择独立于仿真的共享内存名称，启动脚本将同一名称传给三个进程，避免误连。
+
+当前 `scripts/build.sh --target motion` 同时开启 MuJoCo/Torch，motiond 目标受 Torch
+开关约束，`--no-policy` 只是运行参数。实现实机时需要拆开这些构建条件，使基础动作
+链路可以不依赖 MuJoCo 和 Torch；RL 仍按需开启 Torch。SDK 二进制固定版本和校验值，
+安装在 `.deps/`，不提交到仓库；不提前复制整个旧 SDK/ROS workspace。
+
+## 7. 实施与验收顺序
+
+| 顺序 | 工作 | 可检查结果 |
+|---|---|---|
+| 1 | 执行器配置与换算 | 固定样例覆盖完整零位、方向、腿轮换算、整圈舍入与错误映射拒绝 |
+| 2 | 电机、IMU 和 RealRobotIO | 无主动输出条件下得到真实完整状态，反馈失效可以观察 |
+| 3 | real_backendd 与现有 IPC | 上层读取真实状态和诊断，身份、会话及断联语义成立 |
+| 4 | 发送侧保护与台架控制 | 验证命令过期、局部通信失败、IMU 故障、正常退出，再从单电机到单腿 |
+| 5 | 基础动作 | Passive → GetUp → Stand → GetDown，无策略依赖 |
+| 6 | RL 与轮足行为 | 观测、动作、历史和 cadence 一致，轮角验证后接 Event chain |
+
+第一个端到端交付是：真实电机/IMU 状态经现有 IPC 到达上层，主动输出禁用，数据失效
+和故障能够明确上报。随后才进入主动动作验证。
+
+复用一个实机模块测试入口，重点测试数学换算和实际故障，不为简单字段映射单独建测试。
+用伪造反馈验证部分总线失败、过期、错误 ID、坏 CRC/分片 IMU、重连与会话变化。
+硬件测试另行记录实测结果，不将离线测试通过写成实机验证完成。
