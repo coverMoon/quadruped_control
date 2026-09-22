@@ -1,0 +1,62 @@
+# 文件：configs/policies/black/mjlab_ppo.yaml
+# 作用：black 平地 RL 策略 mjlab_ppo（MjLab PPO，45 维单帧）的启动期配置。
+# 来源：alldog_mjlab@6c2b715 导出的 actor-only TorchScript
+#       logs/rsl_rl/black_velocity/2026-09-18_19-37-17/exported/black_ppo_actor.pt
+# 契约：alldog_mjlab/.ai/MIGRATION.md §19.1 / §19.3 / §19.6 / §19.7
+# 许可证：Apache-2.0
+#
+# 与历史 HIM 配置（flat.yaml / obstacle.yaml）的区别：
+#   单帧 PPO：history_frames 只取 [0]（最新一帧），inference_input_dimension = 45，
+#   不是 6 帧 history 的 270 维输入。
+
+name: mjlab_ppo
+robot_name: black
+model_path: assets/policies/black/mjlab_ppo/black_ppo_actor.pt
+
+observation_dimension: 45
+history_frames: [0]
+inference_input_dimension: 45
+action_dimension: 12
+observation_order: [commands, angular_velocity, projected_gravity,
+                    joint_position_error, joint_velocity, previous_action]
+joint_names:
+  [FL_hip_joint, FL_thigh_joint, FL_calf_joint,
+   FR_hip_joint, FR_thigh_joint, FR_calf_joint,
+   RL_hip_joint, RL_thigh_joint, RL_calf_joint,
+   RR_hip_joint, RR_thigh_joint, RR_calf_joint]
+# policy 动作槽位顺序与 RobotModel 统一关节顺序一致，因此为恒等映射。
+policy_dof_indices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+wheel_indices: []
+
+command_scale: [2.0, 2.0, 0.25]
+command_limits: [3.0, 1.0, 3.0]
+angular_velocity_scale: 0.25
+joint_position_scale: 1.0
+joint_velocity_scale: 0.05
+# 部署侧 legacy guard：rl_sar 历史配置同为 100；实测 observation 最大幅值仅 ~4.4，
+# 该 clip 不会实际生效。
+observation_clip: 100.0
+
+default_joint_positions:
+  [0.0, 0.8014, -1.527,
+   -0.0, -0.8014, 1.527,
+   0.0, 0.8014, -1.527,
+   -0.0, -0.8014, 1.527]
+
+kp: [40.0, 40.0, 40.0,
+        40.0, 40.0, 40.0,
+        40.0, 40.0, 40.0,
+        40.0, 40.0, 40.0]
+kd: [1.2, 1.2, 1.2,
+        1.2, 1.2, 1.2,
+        1.2, 1.2, 1.2,
+        1.2, 1.2, 1.2]
+
+action_scale: [0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+               0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
+# 该字段是当前 RlConfig schema 的必需项，无法关闭；策略 raw action 实测 |a|max ≈ 3.2，
+# 因此它是不会触发的 legacy safety guard，不是 policy 语义的一部分。
+action_clip: 100.0
+max_position_jump: 1.0
+leg_action_mode: position_residual
+wheel_action_mode: target_velocity
