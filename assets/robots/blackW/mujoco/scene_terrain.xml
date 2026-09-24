@@ -1,5 +1,5 @@
 <mujoco model="blackW scene rc_map">
-<include file="black_description.xml"/>
+<include file="blackW_description.xml"/>
 <statistic center="3.7 -9.0 0.4" extent="5.0"/>
 <visual>
 <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>

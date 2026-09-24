@@ -20,7 +20,6 @@
     <mesh name="RL_hip" file="RL_hip.STL" />
     <mesh name="RL_thigh" file="RL_thigh.STL" />
     <mesh name="RL_calf" file="RL_calf.STL" />
-    <material name="base_mat" rgba="0.502 0.502 0.502 1" specular="0" />
     <material name="trunk_mat" rgba="0.7529 0.7529 0.7529 1" specular="0" />
     <material name="imu_link_mat" rgba="0.8 0 0 1" specular="0" />
     <material name="d435_link_mat" rgba="0.15 0.15 0.15 1" specular="0" />
@@ -48,124 +47,121 @@
   </contact>
 
   <worldbody>
-    <body name="base" pos="0 0 0.5">
+    <body name="trunk" pos="0 0 0.5">
       <freejoint/>
-      <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="base_mat" type="box" size="0.0005 0.0005 0.0005" />
-      <body name="trunk" pos="0 0 0">
-        <inertial pos="-0.013095 -0.00005 -0.074252" mass="5.7042" fullinertia="0.0092853 0.0076386 0.012703 -0.0000026 0.0000017 -0.0000276"/>
-        <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="trunk_mat" type="mesh" mesh="trunk" />
-        <geom pos="0 0 -0.02" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.15 0.07 0.0325" />
-        <geom pos="0 0 -0.08" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.115 0.055 0.03" />
-        <geom pos="0 0 -0.125" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.105 0.06 0.02" />
-        <geom pos="0.225 0 -0.13" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.0725 0.035 0.005" />
-        <geom pos="0.225 0 0.015" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.0725 0.045 0.005" />
-        <geom pos="0.293 0 -0.055" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.005 0.045 0.07" />
-        <body name="imu_link" pos="0 0 0">
-          <inertial pos="0 0 0" mass="0.001" diaginertia="0.0001 0.0001 0.0001"/>
-          <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="imu_link_mat" type="box" size="0.0005 0.0005 0.0005" />
-          <site name="imu" pos="0 0 0" quat="1 0 0 0" />
-        </body>
-        <body name="d435_link" pos="0.225 0 0.028">
-          <inertial pos="0 0 -0.0125" mass="0.072" diaginertia="0.00002 0.00006 0.00006"/>
-          <geom pos="0.07 0 -0.08" quat="0.3155095 0.6328142 0.6328142 0.3155095" group="1" contype="0" conaffinity="0" material="d435_link_mat" type="mesh" mesh="d435" />
-        </body>
-        <body name="FL_hip" pos="0.1566 0.060001 -0.06425">
-          <joint name="FL_hip_joint" type="hinge" axis="1 0 0" limited="true" range="-0.5 0.5"/>
-          <inertial pos="0.05138 0.014784 0.0000566" mass="0.60559" fullinertia="0.0003742 0.0006493 0.0003415 -0.0000088 0.000001 -0.0000001"/>
-          <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="FL_hip_mat" type="mesh" mesh="FL_hip" />
-          <geom pos="0.058 0.055 0" quat="0.7071068 0.7071068 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.052 0.055" />
-          <body name="FL_thigh" pos="0.056 0.0336 0" quat="0.7071055 0 0 0.7071081">
-            <joint name="FL_thigh_joint" type="hinge" axis="1 0 0" limited="true" range="-1.2 1.6"/>
-            <inertial pos="0.041449 0.004453 -0.021946" mass="0.91168" fullinertia="0.0018577 0.0013983 0.0005179 0 -0.0000002 0.0000051"/>
-            <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="FL_thigh_mat" type="mesh" mesh="FL_thigh" />
-            <geom pos="0.06 0.015 -0.17" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.0175 0.025 0.1025" />
-            <body name="FL_calf" pos="0.0618 0 -0.25">
-              <joint name="FL_calf_joint" type="hinge" axis="1 0 0" limited="true" range="-2.5 -0.85"/>
-              <inertial pos="0.0000772 -0.024754 -0.14833" mass="0.24861" fullinertia="0.000929 0.0008561 0.0000889 0 0 -0.0002168"/>
-              <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="FL_calf_mat" type="mesh" mesh="FL_calf" />
-              <geom pos="0 -0.025 -0.09" quat="0.9843036 -0.1764835 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.014 0.065" />
-              <geom pos="0 -0.052 -0.178" quat="0.9998507 0.0172779 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.014 0.025" />
-              <geom pos="0 -0.038 -0.218" quat="0.9396926 0.3420201 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.02 0.02" />
-              <body name="FL_foot" pos="0 -0.013803 -0.24433">
-                <inertial pos="0 0 0" mass="0.1" diaginertia="0.000016 0.000016 0.000016"/>
-                <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="FL_foot_mat" type="sphere" size="0.02" />
-                <geom pos="0 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="sphere" size="0.02" />
-              </body>
+      <inertial pos="-0.013095 -0.00005 -0.074252" mass="5.7042" fullinertia="0.0092853 0.0076386 0.012703 -0.0000026 0.0000017 -0.0000276"/>
+      <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="trunk_mat" type="mesh" mesh="trunk" />
+      <geom pos="0 0 -0.02" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.15 0.07 0.0325" />
+      <geom pos="0 0 -0.08" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.115 0.055 0.03" />
+      <geom pos="0 0 -0.125" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.105 0.06 0.02" />
+      <geom pos="0.225 0 -0.13" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.0725 0.035 0.005" />
+      <geom pos="0.225 0 0.015" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.0725 0.045 0.005" />
+      <geom pos="0.293 0 -0.055" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.005 0.045 0.07" />
+      <body name="imu_link" pos="0 0 0">
+        <inertial pos="0 0 0" mass="0.001" diaginertia="0.0001 0.0001 0.0001"/>
+        <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="imu_link_mat" type="box" size="0.0005 0.0005 0.0005" />
+        <site name="imu" pos="0 0 0" quat="1 0 0 0" />
+      </body>
+      <body name="d435_link" pos="0.225 0 0.028">
+        <inertial pos="0 0 -0.0125" mass="0.072" diaginertia="0.00002 0.00006 0.00006"/>
+        <geom pos="0.07 0 -0.08" quat="0.3155095 0.6328142 0.6328142 0.3155095" group="1" contype="0" conaffinity="0" material="d435_link_mat" type="mesh" mesh="d435" />
+      </body>
+      <body name="FL_hip" pos="0.1566 0.060001 -0.06425">
+        <joint name="FL_hip_joint" type="hinge" axis="1 0 0" limited="true" range="-0.5 0.5"/>
+        <inertial pos="0.05138 0.014784 0.0000566" mass="0.60559" fullinertia="0.0003742 0.0006493 0.0003415 -0.0000088 0.000001 -0.0000001"/>
+        <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="FL_hip_mat" type="mesh" mesh="FL_hip" />
+        <geom pos="0.058 0.055 0" quat="0.7071068 0.7071068 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.052 0.055" />
+        <body name="FL_thigh" pos="0.056 0.0336 0" quat="0.7071055 0 0 0.7071081">
+          <joint name="FL_thigh_joint" type="hinge" axis="1 0 0" limited="true" range="-1.2 1.6"/>
+          <inertial pos="0.041449 0.004453 -0.021946" mass="0.91168" fullinertia="0.0018577 0.0013983 0.0005179 0 -0.0000002 0.0000051"/>
+          <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="FL_thigh_mat" type="mesh" mesh="FL_thigh" />
+          <geom pos="0.06 0.015 -0.17" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.0175 0.025 0.1025" />
+          <body name="FL_calf" pos="0.0618 0 -0.25">
+            <joint name="FL_calf_joint" type="hinge" axis="1 0 0" limited="true" range="-2.5 -0.85"/>
+            <inertial pos="0.0000772 -0.024754 -0.14833" mass="0.24861" fullinertia="0.000929 0.0008561 0.0000889 0 0 -0.0002168"/>
+            <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="FL_calf_mat" type="mesh" mesh="FL_calf" />
+            <geom pos="0 -0.025 -0.09" quat="0.9843036 -0.1764835 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.014 0.065" />
+            <geom pos="0 -0.052 -0.178" quat="0.9998507 0.0172779 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.014 0.025" />
+            <geom pos="0 -0.038 -0.218" quat="0.9396926 0.3420201 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.02 0.02" />
+            <body name="FL_foot" pos="0 -0.013803 -0.24433">
+              <inertial pos="0 0 0" mass="0.1" diaginertia="0.000016 0.000016 0.000016"/>
+              <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="FL_foot_mat" type="sphere" size="0.02" />
+              <geom pos="0 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="sphere" size="0.02" />
             </body>
           </body>
         </body>
-        <body name="FR_hip" pos="0.1566 -0.059999 -0.06425">
-          <joint name="FR_hip_joint" type="hinge" axis="1 0 0" limited="true" range="-0.5 0.5"/>
-          <inertial pos="0.05138 -0.014784 -0.0000566" mass="0.60559" fullinertia="0.0003742 0.0006493 0.0003415 0.0000088 -0.000001 -0.0000001"/>
-          <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="FR_hip_mat" type="mesh" mesh="FR_hip" />
-          <geom pos="0.058 -0.055 0" quat="0.7071068 0.7071068 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.052 0.055" />
-          <body name="FR_thigh" pos="0.056 -0.0336 0" quat="0.7071055 0 0 -0.7071081">
-            <joint name="FR_thigh_joint" type="hinge" axis="1 0 0" limited="true" range="-1.6 1.2"/>
-            <inertial pos="0.04152 -0.0043781 -0.022024" mass="0.91491" fullinertia="0.0018577 0.0013991 0.0005172 -0.0000001 -0.0000002 -0.0000031"/>
-            <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="FR_thigh_mat" type="mesh" mesh="FR_thigh" />
-            <geom pos="0.06 -0.015 -0.17" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.0175 0.025 0.1025" />
-            <body name="FR_calf" pos="0.0618 0 -0.25">
-              <joint name="FR_calf_joint" type="hinge" axis="1 0 0" limited="true" range="0.85 2.5"/>
-              <inertial pos="-0.0000772 0.024754 -0.14833" mass="0.24861" fullinertia="0.000929 0.0008561 0.0000889 0 0 0.0002168"/>
-              <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="FR_calf_mat" type="mesh" mesh="FR_calf" />
-              <geom pos="0 0.025 -0.09" quat="0.9843036 0.1764835 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.014 0.065" />
-              <geom pos="0 0.052 -0.178" quat="0.9998507 0.0172779 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.014 0.025" />
-              <geom pos="0 0.038 -0.218" quat="0.9396926 -0.3420201 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.02 0.02" />
-              <body name="FR_foot" pos="0 0.013803 -0.24433">
-                <inertial pos="0 0 0" mass="0.1" diaginertia="0.000016 0.000016 0.000016"/>
-                <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="FR_foot_mat" type="sphere" size="0.02" />
-                <geom pos="0 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="sphere" size="0.02" />
-              </body>
+      </body>
+      <body name="FR_hip" pos="0.1566 -0.059999 -0.06425">
+        <joint name="FR_hip_joint" type="hinge" axis="1 0 0" limited="true" range="-0.5 0.5"/>
+        <inertial pos="0.05138 -0.014784 -0.0000566" mass="0.60559" fullinertia="0.0003742 0.0006493 0.0003415 0.0000088 -0.000001 -0.0000001"/>
+        <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="FR_hip_mat" type="mesh" mesh="FR_hip" />
+        <geom pos="0.058 -0.055 0" quat="0.7071068 0.7071068 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.052 0.055" />
+        <body name="FR_thigh" pos="0.056 -0.0336 0" quat="0.7071055 0 0 -0.7071081">
+          <joint name="FR_thigh_joint" type="hinge" axis="1 0 0" limited="true" range="-1.6 1.2"/>
+          <inertial pos="0.04152 -0.0043781 -0.022024" mass="0.91491" fullinertia="0.0018577 0.0013991 0.0005172 -0.0000001 -0.0000002 -0.0000031"/>
+          <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="FR_thigh_mat" type="mesh" mesh="FR_thigh" />
+          <geom pos="0.06 -0.015 -0.17" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.0175 0.025 0.1025" />
+          <body name="FR_calf" pos="0.0618 0 -0.25">
+            <joint name="FR_calf_joint" type="hinge" axis="1 0 0" limited="true" range="0.85 2.5"/>
+            <inertial pos="-0.0000772 0.024754 -0.14833" mass="0.24861" fullinertia="0.000929 0.0008561 0.0000889 0 0 0.0002168"/>
+            <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="FR_calf_mat" type="mesh" mesh="FR_calf" />
+            <geom pos="0 0.025 -0.09" quat="0.9843036 0.1764835 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.014 0.065" />
+            <geom pos="0 0.052 -0.178" quat="0.9998507 0.0172779 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.014 0.025" />
+            <geom pos="0 0.038 -0.218" quat="0.9396926 -0.3420201 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.02 0.02" />
+            <body name="FR_foot" pos="0 0.013803 -0.24433">
+              <inertial pos="0 0 0" mass="0.1" diaginertia="0.000016 0.000016 0.000016"/>
+              <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="FR_foot_mat" type="sphere" size="0.02" />
+              <geom pos="0 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="sphere" size="0.02" />
             </body>
           </body>
         </body>
-        <body name="RR_hip" pos="-0.1566 -0.059999 -0.06425" quat="-0.0000037 0 0 -1">
-          <joint name="RR_hip_joint" type="hinge" axis="1 0 0" limited="true" range="-0.5 0.5"/>
-          <inertial pos="0.05138 0.014784 0.0000566" mass="0.60559" fullinertia="0.0003742 0.0006493 0.0003415 -0.0000088 0.000001 -0.0000001"/>
-          <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="RR_hip_mat" type="mesh" mesh="RR_hip" />
-          <geom pos="0.058 0.055 0" quat="0.7071068 0.7071068 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.052 0.055" />
-          <body name="RR_thigh" pos="0.056 0.0336 0" quat="0.7071055 0 0 0.7071081">
-            <joint name="RR_thigh_joint" type="hinge" axis="1 0 0" limited="true" range="-1.6 1.2"/>
-            <inertial pos="0.04152 -0.0043784 -0.022024" mass="0.91491" fullinertia="0.0018577 0.0013991 0.0005172 -0.0000001 -0.0000002 -0.0000031"/>
-            <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="RR_thigh_mat" type="mesh" mesh="RR_thigh" />
-            <geom pos="0.06 -0.015 -0.17" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.0175 0.025 0.1025" />
-            <body name="RR_calf" pos="0.0618 0 -0.25">
-              <joint name="RR_calf_joint" type="hinge" axis="1 0 0" limited="true" range="0.85 2.5"/>
-              <inertial pos="-0.0000772 0.024754 -0.14833" mass="0.24861" fullinertia="0.000929 0.0008561 0.0000889 0 0 0.0002168"/>
-              <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="RR_calf_mat" type="mesh" mesh="RR_calf" />
-              <geom pos="0 0.025 -0.09" quat="0.9843036 0.1764835 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.014 0.065" />
-              <geom pos="0 0.052 -0.178" quat="0.9998507 -0.0172779 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.014 0.025" />
-              <geom pos="0 0.038 -0.218" quat="0.9396926 -0.3420201 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.02 0.02" />
-              <body name="RR_foot" pos="0 0.013803 -0.24433">
-                <inertial pos="0 0 0" mass="0.1" diaginertia="0.000016 0.000016 0.000016"/>
-                <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="RR_foot_mat" type="sphere" size="0.02" />
-                <geom pos="0 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="sphere" size="0.02" />
-              </body>
+      </body>
+      <body name="RR_hip" pos="-0.1566 -0.059999 -0.06425" quat="-0.0000037 0 0 -1">
+        <joint name="RR_hip_joint" type="hinge" axis="1 0 0" limited="true" range="-0.5 0.5"/>
+        <inertial pos="0.05138 0.014784 0.0000566" mass="0.60559" fullinertia="0.0003742 0.0006493 0.0003415 -0.0000088 0.000001 -0.0000001"/>
+        <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="RR_hip_mat" type="mesh" mesh="RR_hip" />
+        <geom pos="0.058 0.055 0" quat="0.7071068 0.7071068 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.052 0.055" />
+        <body name="RR_thigh" pos="0.056 0.0336 0" quat="0.7071055 0 0 0.7071081">
+          <joint name="RR_thigh_joint" type="hinge" axis="1 0 0" limited="true" range="-1.6 1.2"/>
+          <inertial pos="0.04152 -0.0043784 -0.022024" mass="0.91491" fullinertia="0.0018577 0.0013991 0.0005172 -0.0000001 -0.0000002 -0.0000031"/>
+          <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="RR_thigh_mat" type="mesh" mesh="RR_thigh" />
+          <geom pos="0.06 -0.015 -0.17" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.0175 0.025 0.1025" />
+          <body name="RR_calf" pos="0.0618 0 -0.25">
+            <joint name="RR_calf_joint" type="hinge" axis="1 0 0" limited="true" range="0.85 2.5"/>
+            <inertial pos="-0.0000772 0.024754 -0.14833" mass="0.24861" fullinertia="0.000929 0.0008561 0.0000889 0 0 0.0002168"/>
+            <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="RR_calf_mat" type="mesh" mesh="RR_calf" />
+            <geom pos="0 0.025 -0.09" quat="0.9843036 0.1764835 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.014 0.065" />
+            <geom pos="0 0.052 -0.178" quat="0.9998507 -0.0172779 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.014 0.025" />
+            <geom pos="0 0.038 -0.218" quat="0.9396926 -0.3420201 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.02 0.02" />
+            <body name="RR_foot" pos="0 0.013803 -0.24433">
+              <inertial pos="0 0 0" mass="0.1" diaginertia="0.000016 0.000016 0.000016"/>
+              <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="RR_foot_mat" type="sphere" size="0.02" />
+              <geom pos="0 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="sphere" size="0.02" />
             </body>
           </body>
         </body>
-        <body name="RL_hip" pos="-0.1566 0.060001 -0.06425" quat="-0.0000037 0 0 -1">
-          <joint name="RL_hip_joint" type="hinge" axis="1 0 0" limited="true" range="-0.5 0.5"/>
-          <inertial pos="0.05138 -0.014784 -0.0000566" mass="0.60559" fullinertia="0.0003742 0.0006493 0.0003415 0.0000088 -0.000001 -0.0000001"/>
-          <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="RL_hip_mat" type="mesh" mesh="RL_hip" />
-          <geom pos="0.058 -0.055 0" quat="0.7071068 0.7071068 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.052 0.055" />
-          <body name="RL_thigh" pos="0.056 -0.0336 0" quat="0.7071055 0 0 -0.7071081">
-            <joint name="RL_thigh_joint" type="hinge" axis="1 0 0" limited="true" range="-1.2 1.6"/>
-            <inertial pos="0.041449 0.0044527 -0.021947" mass="0.91168" fullinertia="0.0018577 0.0013983 0.0005179 0 -0.0000002 0.0000051"/>
-            <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="RL_thigh_mat" type="mesh" mesh="RL_thigh" />
-            <geom pos="0.06 0.015 -0.17" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.0175 0.025 0.1025" />
-            <body name="RL_calf" pos="0.0618 0 -0.25">
-              <joint name="RL_calf_joint" type="hinge" axis="1 0 0" limited="true" range="-2.5 -0.85"/>
-              <inertial pos="0.0000772 -0.024754 -0.14833" mass="0.24861" fullinertia="0.000929 0.0008561 0.0000889 0 0 -0.0002168"/>
-              <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="RL_calf_mat" type="mesh" mesh="RL_calf" />
-              <geom pos="0 -0.025 -0.09" quat="0.9843036 -0.1764835 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.014 0.065" />
-              <geom pos="0 -0.052 -0.178" quat="0.9998507 0.0172779 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.014 0.025" />
-              <geom pos="0 -0.038 -0.218" quat="0.9396926 0.3420201 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.02 0.02" />
-              <body name="RL_foot" pos="0 -0.013803 -0.24433">
-                <inertial pos="0 0 0" mass="0.1" diaginertia="0.000016 0.000016 0.000016"/>
-                <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="RL_foot_mat" type="sphere" size="0.02" />
-                <geom pos="0 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="sphere" size="0.02" />
-              </body>
+      </body>
+      <body name="RL_hip" pos="-0.1566 0.060001 -0.06425" quat="-0.0000037 0 0 -1">
+        <joint name="RL_hip_joint" type="hinge" axis="1 0 0" limited="true" range="-0.5 0.5"/>
+        <inertial pos="0.05138 -0.014784 -0.0000566" mass="0.60559" fullinertia="0.0003742 0.0006493 0.0003415 0.0000088 -0.000001 -0.0000001"/>
+        <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="RL_hip_mat" type="mesh" mesh="RL_hip" />
+        <geom pos="0.058 -0.055 0" quat="0.7071068 0.7071068 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.052 0.055" />
+        <body name="RL_thigh" pos="0.056 -0.0336 0" quat="0.7071055 0 0 -0.7071081">
+          <joint name="RL_thigh_joint" type="hinge" axis="1 0 0" limited="true" range="-1.2 1.6"/>
+          <inertial pos="0.041449 0.0044527 -0.021947" mass="0.91168" fullinertia="0.0018577 0.0013983 0.0005179 0 -0.0000002 0.0000051"/>
+          <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="RL_thigh_mat" type="mesh" mesh="RL_thigh" />
+          <geom pos="0.06 0.015 -0.17" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="box" size="0.0175 0.025 0.1025" />
+          <body name="RL_calf" pos="0.0618 0 -0.25">
+            <joint name="RL_calf_joint" type="hinge" axis="1 0 0" limited="true" range="-2.5 -0.85"/>
+            <inertial pos="0.0000772 -0.024754 -0.14833" mass="0.24861" fullinertia="0.000929 0.0008561 0.0000889 0 0 -0.0002168"/>
+            <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="RL_calf_mat" type="mesh" mesh="RL_calf" />
+            <geom pos="0 -0.025 -0.09" quat="0.9843036 -0.1764835 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.014 0.065" />
+            <geom pos="0 -0.052 -0.178" quat="0.9998507 0.0172779 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.014 0.025" />
+            <geom pos="0 -0.038 -0.218" quat="0.9396926 0.3420201 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="cylinder" size="0.02 0.02" />
+            <body name="RL_foot" pos="0 -0.013803 -0.24433">
+              <inertial pos="0 0 0" mass="0.1" diaginertia="0.000016 0.000016 0.000016"/>
+              <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="RL_foot_mat" type="sphere" size="0.02" />
+              <geom pos="0 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="1" type="sphere" size="0.02" />
             </body>
           </body>
         </body>
