@@ -119,7 +119,9 @@ ModeResult 入队后通知 `gateway_event`。result thread 醒来后清空当前
 
 共享内存 owner 关闭时先将 `ready` 置为 0，再唤醒三个 event，最后解除映射。等待者醒来后检查 owner、session 和 heartbeat 状态，并进入既有断线退路。
 
-当前共享内存 wire schema 为 v2。升级后必须停止所有旧进程、同步重建三个二进制，
+已验证的三进程共享内存基线为 wire schema v2、公共 frame schema v1。
+工作树中未提交的 v3/v2 Unit 0 尝试尚未通过三进程 headless 测试，不能作为已验收版本。
+正式升级时必须停止所有旧进程、同步重建三个二进制，
 再按正常顺序启动；共享内存尺寸或 schema 不匹配时进程会明确拒绝连接。
 
 ## 4. Session
@@ -154,6 +156,10 @@ ros2 run quadruped_gateway quadruped_ipc_control \
 | action / service 等待结果 | 10 s |
 
 BaseCommand 与 CommandFrame 的超时分别作用于机体速度目标和关节命令。
+现有已验证基线只定义 CommandFrame 的帧有效期；Black 实机所需的 semantic target
+硬过期与跨 IPC 控制时钟域见
+[Black real backend v1 计划](real_migration/BLACK_REAL_BACKEND_V1_PLAN.md)。
+MuJoCo 的状态与命令校验使用仿真时间；heartbeat 使用 host monotonic 存活计时。
 
 event timeout 只用于推进 MotionRuntime 周期、更新 heartbeat 和检查停机状态，
 本身不表示 IPC 断开。连接状态仍由 owner ready 状态、session 与 heartbeat 判定。

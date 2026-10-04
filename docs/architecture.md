@@ -105,7 +105,9 @@ StateFrame 与 CommandFrame 使用共同的帧标识：
 - `sequence`
 - `timestamp_ns`
 
-CommandFrame 额外包含 `expires_at_ns`。
+CommandFrame 的现有已验证基线包含 `expires_at_ns`；Black 实机需要的 semantic
+target 时间及当前未完成状态见
+[Black real backend v1 计划](real_migration/BLACK_REAL_BACKEND_V1_PLAN.md)。
 
 ### BaseCommand
 
@@ -176,7 +178,8 @@ black 与 blackW 的观测维度、动作转换和行为差异见
 - 力矩：N·m；
 - 线速度：m/s；
 - 四元数顺序：`w,x,y,z`；
-- 时间戳：本机 monotonic nanoseconds；
+- 时间戳：同一控制连接内使用一致的单调时间域；MuJoCo 为仿真时间，
+  replay 为日志逻辑时间，未来实机为 host monotonic 时间；
 - `kMaxJoints == 16`；
 - 逻辑腿顺序：FL、FR、RL、RR。
 

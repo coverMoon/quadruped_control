@@ -6,6 +6,8 @@
 旧源码的版本、数学关系和已知缺口见
 [硬件行为基线](REAL_HARDWARE_BASELINE.md)。该基线是静态源码核查结果，不代表新后端
 已经实现，也不代表当前实体设备已经验证。以下是第一版实现约定。
+Black 当前已冻结的具体契约、Unit 0 前置时钟问题与 Unit 0–7 顺序见
+[Black real backend v1 计划](BLACK_REAL_BACKEND_V1_PLAN.md)。
 
 ## 1. 运行链路与职责
 
@@ -127,6 +129,8 @@ valid/safety，避免持续发布新帧掩盖旧传感器数据。
 ## 6. 复用 IPC 与构建入口
 
 继续使用现有 StateFrame、CommandFrame、heartbeat、session、latest slot 和 SPSC queue。
+Black v1 要求 CommandFrame 区分帧有效期与 semantic target 硬过期时间；
+该 Unit 0 契约尚未通过三进程验证，执行侧实现前须完成。
 实机 backend 创建共享内存并发布身份；重建控制会话时清空待执行命令。
 既有 IPC 语义见 [运行时与 IPC](../runtime_ipc.md)。
 
@@ -141,14 +145,10 @@ valid/safety，避免持续发布新帧掩盖旧传感器数据。
 
 ## 7. 实施与验收顺序
 
-| 顺序 | 工作 | 可检查结果 |
-|---|---|---|
-| 1 | 执行器配置与换算 | 固定样例覆盖完整零位、方向、腿轮换算、整圈舍入与错误映射拒绝 |
-| 2 | 电机、IMU 和 RealRobotIO | 无主动输出条件下得到真实完整状态，反馈失效可以观察 |
-| 3 | real_backendd 与现有 IPC | 上层读取真实状态和诊断，身份、会话及断联语义成立 |
-| 4 | 发送侧保护与台架控制 | 验证命令过期、局部通信失败、IMU 故障、正常退出，再从单电机到单腿 |
-| 5 | 基础动作 | Passive → GetUp → Stand → GetDown，无策略依赖 |
-| 6 | RL 与轮足行为 | 观测、动作、历史和 cadence 一致，轮角验证后接 Event chain |
+Black 按 [Unit 0–7 冻结顺序](BLACK_REAL_BACKEND_V1_PLAN.md#8-后续实施顺序)
+实施：先完成 CommandFrame 时间契约和跨 IPC 时钟域，再做硬件配置与换算、
+只读状态链路、执行侧保护、台架安全动作和 RL。blackW 的 wheel 行为另行决策，
+不能随 Black v1 一起放行。
 
 第一个端到端交付是：真实电机/IMU 状态经现有 IPC 到达上层，主动输出禁用，数据失效
 和故障能够明确上报。随后才进入主动动作验证。
