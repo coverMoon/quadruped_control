@@ -1,0 +1,46 @@
+name: test
+robot_name: black
+model_path: assets/policies/black/test/policy.pt
+
+observation_dimension: 45
+history_frames: [0, 1, 2, 3, 4, 5]
+inference_input_dimension: 270
+action_dimension: 12
+observation_order: [commands, angular_velocity, projected_gravity,
+                    joint_position_error, joint_velocity, previous_action]
+joint_names:
+  [FL_hip_joint, FL_thigh_joint, FL_calf_joint,
+   FR_hip_joint, FR_thigh_joint, FR_calf_joint,
+   RL_hip_joint, RL_thigh_joint, RL_calf_joint,
+   RR_hip_joint, RR_thigh_joint, RR_calf_joint]
+policy_dof_indices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+wheel_indices: []
+
+command_scale: [2.0, 2.0, 0.25]
+command_limits: [3.0, 1.0, 3.0]
+angular_velocity_scale: 0.25
+joint_position_scale: 1.0
+joint_velocity_scale: 0.05
+observation_clip: 100.0
+
+default_joint_positions:
+  [0.0, 0.8014, -1.527,
+   -0.0, -0.8014, 1.527,
+   0.0, 0.8014, -1.527,
+   -0.0, -0.8014, 1.527]
+
+kp: [40.0, 40.0, 40.0,
+        40.0, 40.0, 40.0,
+        40.0, 40.0, 40.0,
+        40.0, 40.0, 40.0]
+kd: [1.2, 1.2, 1.2,
+        1.2, 1.2, 1.2,
+        1.2, 1.2, 1.2,
+        1.2, 1.2, 1.2]
+
+action_scale: [0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+               0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
+action_clip: 100.0
+max_position_jump: 1.0
+leg_action_mode: position_residual
+wheel_action_mode: target_velocity

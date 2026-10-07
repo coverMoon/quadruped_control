@@ -6,3 +6,4 @@ black:
   policy_config_cycle:
     - flat
     - obstacle
+    - test
