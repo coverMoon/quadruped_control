@@ -4,6 +4,7 @@
 
 import argparse
 import math
+import os
 from pathlib import Path
 
 import pygame
@@ -108,6 +109,8 @@ class ControllerInput(Node):
         self.profile_name = ""
         self.profile = None
         self.last_warning_ns = 0
+        # 采集进程没有 SDL 前台窗口，仍需在 MuJoCo 窗口获得焦点时更新手柄状态。
+        os.environ["SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS"] = "1"
         pygame.init()
         pygame.joystick.init()
         self.timer = self.create_timer(0.01, self.poll)
@@ -180,7 +183,7 @@ class ControllerInput(Node):
 
     def poll(self):
         try:
-            pygame.event.pump()
+            pygame.event.get()
             if self.joystick is None:
                 self.connect()
             if self.joystick is None:
