@@ -45,6 +45,7 @@ MuJoCo 入口：
 ```text
 assets/robots/black/mujoco/scene.xml
 assets/robots/black/mujoco/scene_terrain.xml
+assets/robots/black/mujoco/scene_nwbt.xml
 ```
 
 black 提供 flat 和 obstacle 两个策略。单帧观测为 45 维，使用 6 帧历史形成 270 维输入，输出 12 个腿关节位置残差。策略顺序和默认策略由 `configs/policies/black/policy_switch.yaml` 定义。
@@ -67,6 +68,7 @@ MuJoCo 入口：
 ```text
 assets/robots/blackW/mujoco/scene.xml
 assets/robots/blackW/mujoco/scene_terrain.xml
+assets/robots/blackW/mujoco/scene_nwbt.xml
 ```
 
 轮关节使用 `JointRole::Wheel`，不带位置限制。腿和轮都显式使用 `JointImpedance`：
@@ -80,6 +82,23 @@ blackW 提供 flat、obstacle 和 stair 三个策略。单帧观测为 57 维，
 - 轮动作是目标角速度，FL/FR/RL/RR scale 为 `+10/-10/+10/-10`。
 
 策略顺序由 `configs/policies/blackW/policy_switch.yaml` 定义。策略 YAML 中的 `command_limits` 同时限制 MotionRuntime、键盘、导航和手柄输入。
+
+### 女娲补天地图（nwbt）
+
+`nwbt` 取“女娲补天”的拼音首字母。两个机器人的 `scene_nwbt.xml` 共用
+`assets/maps/nwbt/map.xml` 和其中的 29 个场地 OBJ 网格。资源来自
+`rc27/robocon_mujoco/dog_robocon.xml` 的 ROBOCON 场地，保留红蓝半场、高台、
+斜坡、阶梯、围栏、柱体与小方块的视觉和碰撞设置。
+
+场地相对来源坐标整体平移 `(4, -2, 0)` m，原红方安全出生点 `(-4, +2)`
+对应本仓库世界原点。black 和 blackW 沿用各自模型的出生高度、零位、站姿 keyframe、
+执行器和 IMU，以及 2 ms 物理步长；地图不引入来源示例的机器人或 ONNX 策略。
+场地接触采用来源的三维接触与摩擦参数。
+红蓝半场的地面碰撞体向下延伸至 `z=-1` m，顶面保持 `z=0`，
+覆盖机器人复位零姿态中低于地面的足端，使其自然落地后被地面托起。
+
+使用 `./scripts/run/backend.sh black nwbt` 或 `./scripts/run/backend.sh blackW nwbt` 启动，
+可追加 `--mode headless`。motion 和 command 的启动方式见根目录 [README](../README.md#run-simulation)。
 
 ## 5. 策略运行与切换
 

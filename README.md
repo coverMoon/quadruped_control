@@ -154,6 +154,15 @@ export ROS_SETUP=/path/to/ros/setup.bash
 ./scripts/run/backend.sh black plain
 ```
 
+女娲补天地图（`nwbt`），black 和 blackW 均可使用：
+
+```bash
+./scripts/run/backend.sh black nwbt
+./scripts/run/backend.sh blackW nwbt
+```
+
+场地与出生点说明见 [机器人模型与行为](docs/robot_models_and_behaviors.md#女娲补天地图nwbt)。
+
 headless 模式：
 
 ```bash

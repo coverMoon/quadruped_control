@@ -20,6 +20,8 @@
 #include <limits>
 #include <string>
 
+#include <mujoco/mujoco.h>
+
 namespace qc = quadruped::core;
 namespace qm = quadruped::motion;
 
@@ -230,6 +232,79 @@ void check_terrain_scene_mapping(const qc::RobotModel& model)
     expect(state.joint_count == model.joint_count,
         "terrain 场景状态关节数必须与 black RobotModel 一致");
     expect(state.imu.valid, "terrain 场景 IMU 映射输出必须有效");
+}
+
+// 场地平移后，两个型号的原点出生位置都应落在红方平地，避免被中央高台包住。
+void check_nwbt_spawn(const std::string& scene_path, const qc::RobotModel& model)
+{
+    auto created = quadruped::backends::mujoco::MujocoRobotIO::create(scene_path, model, 1);
+    expect(created.ok(), "nwbt 场景加载失败：" + created.error_message);
+    if (!created.ok())
+    {
+        return;
+    }
+    expect(created.io->reset(31).ok(), "nwbt 场景应能建立初始会话");
+
+    const auto* raw_model = created.io->raw_model();
+    const auto* data = created.io->raw_data();
+    expect_close(raw_model->opt.timestep, 0.002, 1.0e-12, "nwbt 应保留 2 ms 物理步长");
+    expect_close(data->qpos[0], 0.0, 1.0e-12, "nwbt 应保留机器人出生点 x");
+    expect_close(data->qpos[1], 0.0, 1.0e-12, "nwbt 应保留机器人出生点 y");
+
+    // mj_ray 跳过透明碰撞体；直接检查场地基础几何，排除机器人及视觉网格。
+    const mjtNum origin[3]{0.0, 0.0, 2.0};
+    const mjtNum direction[3]{0.0, 0.0, -1.0};
+    const int ground_body_id = mj_name2id(raw_model, mjOBJ_BODY, "robocon_ground");
+    expect(ground_body_id >= 0, "nwbt 应包含场地静态刚体");
+    int geom_id = -1;
+    double distance = -1.0;
+    for (int i = 0; i < raw_model->ngeom; ++i)
+    {
+        if (raw_model->geom_bodyid[i] != ground_body_id || raw_model->geom_group[i] != 3)
+        {
+            continue;
+        }
+        const double hit = mju_rayGeom(data->geom_xpos + 3 * i, data->geom_xmat + 9 * i,
+            raw_model->geom_size + 3 * i, origin, direction, raw_model->geom_type[i], nullptr);
+        if (hit >= 0.0 && (distance < 0.0 || hit < distance))
+        {
+            distance = hit;
+            geom_id = i;
+        }
+    }
+    expect_close(distance, 2.0, 1.0e-9, "nwbt 出生点下方应为 z=0 平地");
+    expect(geom_id == mj_name2id(raw_model, mjOBJ_GEOM, "robocon_ground_red"),
+        "nwbt 出生点应在红方半场");
+
+    for (int step = 0; step < 1000; ++step)
+    {
+        expect(created.io->step() == qc::RobotIOCode::Ok, "nwbt 应能正常物理步进");
+    }
+    qc::StateFrame state;
+    expect(created.io->read_latest(state) == qc::RobotIOCode::Ok && state.imu.valid,
+        "nwbt 步进后应生成有效机器人状态");
+
+    // 复位零姿态的足端可能低于地面，落地后球形足端和轮碰撞体应被托起。
+    for (int i = 0; i < raw_model->ngeom; ++i)
+    {
+        const char* body_name = mj_id2name(raw_model, mjOBJ_BODY, raw_model->geom_bodyid[i]);
+        if (body_name == nullptr || std::string(body_name).find("_foot") == std::string::npos ||
+            raw_model->geom_group[i] != 3)
+        {
+            continue;
+        }
+        const auto* size = raw_model->geom_size + 3 * i;
+        const auto* rotation = data->geom_xmat + 9 * i;
+        double vertical_extent = size[0];
+        if (raw_model->geom_type[i] == mjGEOM_CYLINDER)
+        {
+            vertical_extent = size[0] * std::hypot(rotation[6], rotation[7]) +
+                size[1] * std::abs(rotation[8]);
+        }
+        const double bottom = data->geom_xpos[3 * i + 2] - vertical_extent;
+        expect(bottom >= -0.005, "nwbt 自然落地后足端不得穿过地面：" +
+            std::string(body_name) + "，底面高度=" + std::to_string(bottom));
+    }
 }
 
 // reset 必须建立新会话、清除旧命令，并拒绝使用相同会话号重新 reset。
@@ -604,6 +679,7 @@ void check_blackw_model_and_basic_motion()
     const auto terrain = quadruped::backends::mujoco::MujocoModel::load(
         QUADRUPED_BLACKW_TERRAIN_SCENE_PATH, model.model);
     expect(terrain.ok(), "加载 blackW 地形场景失败：" + terrain.error_message);
+    check_nwbt_spawn(QUADRUPED_BLACKW_NWBT_SCENE_PATH, model.model);
 
     const auto controller = quadruped::config::load_controller_config(
         QUADRUPED_BLACKW_CONTROLLER_CONFIG_PATH, model.model);
@@ -870,6 +946,7 @@ int main()
     }
 
     check_terrain_scene_mapping(model.model);
+    check_nwbt_spawn(QUADRUPED_BLACK_NWBT_SCENE_PATH, model.model);
 
     auto reset_semantics = quadruped::backends::mujoco::MujocoRobotIO::create(
         QUADRUPED_BLACK_SCENE_PATH, model.model, 1);

@@ -1,0 +1,4 @@
+<mujoco model="blackW scene nwbt">
+  <include file="blackW_description.xml"/>
+  <include file="../../../maps/nwbt/map.xml"/>
+</mujoco>

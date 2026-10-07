@@ -19,8 +19,10 @@ target_compile_features(quadruped_mujoco_tests PRIVATE cxx_std_17)
 target_compile_definitions(quadruped_mujoco_tests PRIVATE
     QUADRUPED_BLACK_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/black/mujoco/scene.xml"
     QUADRUPED_BLACK_TERRAIN_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/black/mujoco/scene_terrain.xml"
+    QUADRUPED_BLACK_NWBT_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/black/mujoco/scene_nwbt.xml"
     QUADRUPED_BLACKW_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/blackW/mujoco/scene.xml"
     QUADRUPED_BLACKW_TERRAIN_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/blackW/mujoco/scene_terrain.xml"
+    QUADRUPED_BLACKW_NWBT_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/blackW/mujoco/scene_nwbt.xml"
     QUADRUPED_BLACKW_ROBOT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/robots/blackW.yaml"
     QUADRUPED_BLACKW_CONTROLLER_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/controllers/blackW.yaml"
     QUADRUPED_BLACKW_RETRY_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/behaviors/blackW/retry.yaml"

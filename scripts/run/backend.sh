@@ -24,7 +24,7 @@ usage() {
 
 位置参数:
   robot                 机器人名称，默认 black
-  scene                 场景变体 plain|terrain，默认 terrain
+  scene                 场景变体 plain|terrain|nwbt（女娲补天），默认 terrain
 
 选项:
   --robot NAME          覆盖机器人名称
@@ -103,8 +103,8 @@ while (($# > 0)); do
 done
 
 if [[ "${scene_from_position}" == true && "${scene_name}" != "plain" &&
-    "${scene_name}" != "terrain" ]]; then
-    echo "不支持的场景: ${scene_name}（可选 plain|terrain）" >&2
+    "${scene_name}" != "terrain" && "${scene_name}" != "nwbt" ]]; then
+    echo "不支持的场景: ${scene_name}（可选 plain|terrain|nwbt）" >&2
     exit 2
 fi
 if [[ "${backend_name}" != "mujoco" ]]; then
@@ -115,11 +115,12 @@ if [[ "${mode}" != "gui" && "${mode}" != "headless" ]]; then
     echo "不支持的运行模式: ${mode}（可选 gui|headless）" >&2
     exit 2
 fi
-if [[ "${scene_name}" == "plain" || "${scene_name}" == "terrain" ]]; then
+if [[ "${scene_name}" == "plain" || "${scene_name}" == "terrain" ||
+    "${scene_name}" == "nwbt" ]]; then
     if [[ -z "${scene_path}" ]]; then
         scene_path="${project_dir}/assets/robots/${robot_name}/mujoco/scene.xml"
-        if [[ "${scene_name}" == "terrain" ]]; then
-            scene_path="${project_dir}/assets/robots/${robot_name}/mujoco/scene_terrain.xml"
+        if [[ "${scene_name}" != "plain" ]]; then
+            scene_path="${project_dir}/assets/robots/${robot_name}/mujoco/scene_${scene_name}.xml"
         fi
     fi
 else
