@@ -63,6 +63,10 @@ public:
     // 检查关节数量与限制、会话、序号、有效期和数值范围。
     virtual RobotIOCode submit(const CommandFrame& frame) = 0;
 
+    // 当前 RobotIO 的控制时钟，单位 ns；与其 StateFrame、CommandFrame 同域。
+    // 实机使用 host monotonic，仿真和回放使用各自的逻辑时钟。
+    virtual Nanoseconds clock_now_ns() const noexcept = 0;
+
     // 返回无需阻塞即可取得的后端状态快照。
     virtual RobotIOStatus status() const noexcept = 0;
 };

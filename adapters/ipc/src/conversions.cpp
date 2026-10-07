@@ -189,6 +189,8 @@ WireCommandFrame to_wire(const core::CommandFrame& frame)
     wire.sequence = frame.header.sequence;
     wire.timestamp_ns = frame.header.timestamp_ns;
     wire.expires_at_ns = frame.expires_at_ns;
+    wire.target_generated_at_ns = frame.target_generated_at_ns;
+    wire.target_expires_at_ns = frame.target_expires_at_ns;
     wire.joint_count = static_cast<std::uint32_t>(frame.joint_count);
     for (std::size_t i = 0; i < frame.joint_count; ++i)
     {
@@ -208,7 +210,8 @@ WireCommandFrame to_wire(const core::CommandFrame& frame)
 
 bool from_wire(const WireCommandFrame& wire, core::CommandFrame& frame)
 {
-    if (wire.joint_count > core::kMaxJoints || !valid_motion_mode(wire.motion_mode) ||
+    if (wire.schema_version != core::kFrameSchemaVersion ||
+        wire.joint_count > core::kMaxJoints || !valid_motion_mode(wire.motion_mode) ||
         !valid_command_source(wire.source))
     {
         return false;
@@ -220,6 +223,8 @@ bool from_wire(const WireCommandFrame& wire, core::CommandFrame& frame)
     frame.header.sequence = wire.sequence;
     frame.header.timestamp_ns = wire.timestamp_ns;
     frame.expires_at_ns = wire.expires_at_ns;
+    frame.target_generated_at_ns = wire.target_generated_at_ns;
+    frame.target_expires_at_ns = wire.target_expires_at_ns;
     frame.joint_count = wire.joint_count;
     for (std::size_t i = 0; i < frame.joint_count; ++i)
     {

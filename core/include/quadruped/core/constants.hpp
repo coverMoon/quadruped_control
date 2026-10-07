@@ -15,7 +15,7 @@ namespace quadruped::core
 inline constexpr std::size_t kMaxJoints = 16;
 
 // 修改公共帧的字段含义或二进制传输约定时必须增加该版本。
-inline constexpr std::uint32_t kFrameSchemaVersion = 1;
+inline constexpr std::uint32_t kFrameSchemaVersion = 2;
 
 // 所有控制时间均使用同一单调时钟的纳秒值，不能填入系统日期时间。
 using Nanoseconds = std::int64_t;

@@ -34,6 +34,7 @@ public:
 
     core::RobotIOCode read_latest(core::StateFrame& frame) override;
     core::RobotIOCode submit(const core::CommandFrame& frame) override;
+    core::Nanoseconds clock_now_ns() const noexcept override;
     core::RobotIOStatus status() const noexcept override;
 
     // 推进到下一条历史状态；到达末尾返回 false。

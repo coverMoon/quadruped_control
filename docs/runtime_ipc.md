@@ -156,10 +156,13 @@ ros2 run quadruped_gateway quadruped_ipc_control \
 | action / service 等待结果 | 10 s |
 
 BaseCommand 与 CommandFrame 的超时分别作用于机体速度目标和关节命令。
-现有已验证基线只定义 CommandFrame 的帧有效期；Black 实机所需的 semantic target
-硬过期与跨 IPC 控制时钟域见
-[Black real backend v1 计划](real_migration/BLACK_REAL_BACKEND_V1_PLAN.md)。
+CommandFrame 同时记录帧有效期和关节目标的硬过期时间。RL 默认每 20 ms 更新目标，
+中间控制周期复用目标时不刷新目标生成时间，目标硬有效期为 40 ms。
+执行截止时间取帧有效期与目标硬过期时间的较早值；普通姿态命令每周期生成新目标。
+设计依据见 [Black real backend v1 计划](real_migration/BLACK_REAL_BACKEND_V1_PLAN.md)。
 MuJoCo 的状态与命令校验使用仿真时间；heartbeat 使用 host monotonic 存活计时。
+RemoteRobotIO 从后端最新状态读取控制时钟，命令时间戳和有效期沿用该时间域。
+共享状态槽忙时保守复用最近采样时间，不用 host monotonic 外推仿真时间。
 
 event timeout 只用于推进 MotionRuntime 周期、更新 heartbeat 和检查停机状态，
 本身不表示 IPC 断开。连接状态仍由 owner ready 状态、session 与 heartbeat 判定。

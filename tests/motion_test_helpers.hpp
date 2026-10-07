@@ -77,6 +77,7 @@ public:
     std::vector<qc::CommandFrame> submitted{};
     RobotIOFaultInjection injection{RobotIOFaultInjection::None};
     qc::RobotIOStatus status_snapshot{qc::RobotIOState::Ready};
+    qc::Nanoseconds clock_ns{0};
 
     void inject(const RobotIOFaultInjection fault)
     {
@@ -162,6 +163,11 @@ public:
     qc::RobotIOStatus status() const noexcept override
     {
         return status_snapshot;
+    }
+
+    qc::Nanoseconds clock_now_ns() const noexcept override
+    {
+        return clock_ns;
     }
 };
 

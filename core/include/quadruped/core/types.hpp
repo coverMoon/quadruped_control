@@ -210,6 +210,12 @@ struct CommandFrame
     // 命令失效的单调时钟时间，单位为 ns；执行侧不得使用已经过期的命令。
     Nanoseconds expires_at_ns{0};
 
+    // 当前关节目标实际生成的时间；重新包装 CommandFrame 不得改变该值。
+    Nanoseconds target_generated_at_ns{0};
+
+    // 当前关节目标的硬过期时间；不得晚于此时继续执行目标。
+    Nanoseconds target_expires_at_ns{0};
+
     // joints 数组中从下标 0 开始有效的元素数量，必须与 RobotModel 一致。
     std::size_t joint_count{0};
 

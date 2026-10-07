@@ -274,6 +274,14 @@ core::RobotIOStatus MujocoRobotIO::status() const noexcept
     return status_;
 }
 
+core::Nanoseconds MujocoRobotIO::clock_now_ns() const noexcept
+{
+    core::Nanoseconds now_ns{0};
+    return seconds_to_nanoseconds(model_.raw_data()->time, now_ns) == SimTimeError::None
+        ? now_ns
+        : -1;
+}
+
 std::string MujocoRobotIO::refresh_for_test()
 {
     // 会话未建立时拒绝，保证 reset 之前不存在任何可发布状态的路径。

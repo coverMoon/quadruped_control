@@ -17,7 +17,7 @@ namespace quadruped::ipc
 {
 
 constexpr std::uint32_t kWireMagic = 0x51435043U;
-constexpr std::uint32_t kWireSchemaVersion = 2;
+constexpr std::uint32_t kWireSchemaVersion = 3;
 constexpr std::size_t kWireNameCapacity = 64;
 constexpr std::size_t kWireMessageCapacity = 256;
 constexpr std::size_t kRequestQueueCapacity = 32;
@@ -78,6 +78,8 @@ struct WireCommandFrame
     std::uint64_t sequence{0};
     std::int64_t timestamp_ns{0};
     std::int64_t expires_at_ns{0};
+    std::int64_t target_generated_at_ns{0};
+    std::int64_t target_expires_at_ns{0};
     std::uint32_t joint_count{0};
     std::array<WireJointCommand, core::kMaxJoints> joints{};
     std::uint8_t motion_mode{0};

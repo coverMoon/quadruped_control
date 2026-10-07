@@ -103,6 +103,11 @@ core::RobotIOStatus ReplayRobotIO::status() const noexcept
     return status_;
 }
 
+core::Nanoseconds ReplayRobotIO::clock_now_ns() const noexcept
+{
+    return frames_[frame_index_].header.timestamp_ns;
+}
+
 bool ReplayRobotIO::advance() noexcept
 {
     if (frame_index_ + 1 >= frames_.size())

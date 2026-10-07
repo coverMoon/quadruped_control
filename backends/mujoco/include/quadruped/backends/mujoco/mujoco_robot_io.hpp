@@ -70,6 +70,7 @@ public:
     // RobotIO 接口实现。
     core::RobotIOCode read_latest(core::StateFrame& frame) override;
     core::RobotIOCode submit(const core::CommandFrame& frame) override;
+    core::Nanoseconds clock_now_ns() const noexcept override;
     core::RobotIOStatus status() const noexcept override;
 
     // MuJoCo 后端专用的显式单物理步接口。

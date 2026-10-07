@@ -86,6 +86,8 @@ qc::CommandFrame make_command(
     frame.header.sequence = sequence;
     frame.header.timestamp_ns = static_cast<qc::Nanoseconds>(timestamp_ns);
     frame.expires_at_ns = static_cast<qc::Nanoseconds>(expires_at_ns);
+    frame.target_generated_at_ns = frame.header.timestamp_ns;
+    frame.target_expires_at_ns = frame.expires_at_ns;
     frame.joint_count = 12;
     for (std::size_t i = 0; i < frame.joint_count; ++i)
     {

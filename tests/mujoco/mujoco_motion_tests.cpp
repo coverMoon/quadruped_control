@@ -322,6 +322,8 @@ void check_command_expiry_and_recovery(
     command.header = state.header;
     command.header.sequence = 1;
     command.expires_at_ns = state.header.timestamp_ns + 1;
+    command.target_generated_at_ns = state.header.timestamp_ns;
+    command.target_expires_at_ns = command.expires_at_ns;
     command.joint_count = model.joint_count;
     command.source = qc::CommandSource::Test;
     expect(io.submit(command) == qc::RobotIOCode::Ok,
@@ -337,6 +339,7 @@ void check_command_expiry_and_recovery(
     command.header.timestamp_ns = state.header.timestamp_ns;
     command.header.sequence = 2;
     command.expires_at_ns = state.header.timestamp_ns + 10'000'000;
+    command.target_expires_at_ns = command.expires_at_ns;
     expect(io.submit(command) == qc::RobotIOCode::Ok &&
             io.step() == qc::RobotIOCode::Ok,
         "更新序号和有效期后应允许恢复命令执行");
@@ -535,6 +538,8 @@ void check_blackw_wheel_direction(
         command.header.sequence = ++sequence;
         command.header.timestamp_ns = state.header.timestamp_ns;
         command.expires_at_ns = state.header.timestamp_ns + 10'000'000;
+        command.target_generated_at_ns = command.header.timestamp_ns;
+        command.target_expires_at_ns = command.expires_at_ns;
         command.joint_count = model.joint_count;
         command.motion_mode = qc::MotionMode::Running;
         for (std::size_t i = 0; i < model.joint_count; ++i)

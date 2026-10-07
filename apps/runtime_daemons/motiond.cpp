@@ -71,6 +71,11 @@ public:
         return remote_.submit(frame);
     }
 
+    qc::Nanoseconds clock_now_ns() const noexcept override
+    {
+        return remote_.clock_now_ns();
+    }
+
     qc::RobotIOStatus status() const noexcept override
     {
         return remote_.status();

@@ -26,6 +26,8 @@ public:
     // 状态槽忙而复用缓存时返回缓存对应的版本；失败时 version 置零。
     core::RobotIOCode read_latest(core::StateFrame& frame, std::uint64_t& version);
     core::RobotIOCode submit(const core::CommandFrame& frame) override;
+    // 使用后端最新状态的控制时钟；槽忙时复用采样时间，未采样或会话改变返回 -1。
+    core::Nanoseconds clock_now_ns() const noexcept override;
     core::RobotIOStatus status() const noexcept override;
 
     [[nodiscard]] bool backend_online() const noexcept;

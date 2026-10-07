@@ -172,6 +172,8 @@ core::ModeResult MotionRuntime::dispatch_enter_passive(const core::ModeRequest& 
     status_.error_message.clear();
     rl_control_cycle_ = 0;
     rl_command_ = {};
+    rl_target_generated_at_ns_ = 0;
+    rl_target_expires_at_ns_ = 0;
     pending_policy_index_ = kInvalidPolicyIndex;
     policy_transition_active_ = false;
     event_to_rl_transition_ = false;
@@ -304,6 +306,8 @@ core::ModeResult MotionRuntime::dispatch_start_behavior(
         }
         rl_control_cycle_ = 0;
         rl_command_ = {};
+        rl_target_generated_at_ns_ = 0;
+        rl_target_expires_at_ns_ = 0;
         pending_policy_index_ = kInvalidPolicyIndex;
         policy_transition_active_ = false;
         event_to_rl_transition_ = false;
@@ -357,6 +361,8 @@ core::ModeResult MotionRuntime::dispatch_start_behavior(
         }
         rl_control_cycle_ = 0;
         rl_command_ = {};
+        rl_target_generated_at_ns_ = 0;
+        rl_target_expires_at_ns_ = 0;
         pending_policy_index_ = kInvalidPolicyIndex;
         policy_transition_active_ = false;
         event_to_rl_transition_ = false;
@@ -431,6 +437,8 @@ core::ModeResult MotionRuntime::dispatch_start_behavior(
         }
         rl_control_cycle_ = 0;
         rl_command_ = {};
+        rl_target_generated_at_ns_ = 0;
+        rl_target_expires_at_ns_ = 0;
         pending_policy_index_ = kInvalidPolicyIndex;
         policy_transition_active_ = false;
         event_to_rl_transition_ = false;
@@ -533,6 +541,8 @@ core::ModeResult MotionRuntime::dispatch_start_behavior(
     rl_controller_->reset();
     rl_control_cycle_ = 0;
     rl_command_ = {};
+    rl_target_generated_at_ns_ = 0;
+    rl_target_expires_at_ns_ = 0;
     mode_ = core::MotionMode::Running;
     status_.behavior_name = request.behavior_name;
     status_.behavior_phase = returning_from_event_chain || returning_from_fixed_drive
@@ -594,6 +604,8 @@ core::ModeResult MotionRuntime::dispatch_switch_policy(
 
     rl_control_cycle_ = 0;
     rl_command_ = {};
+    rl_target_generated_at_ns_ = 0;
+    rl_target_expires_at_ns_ = 0;
     if (rl_controller_ != nullptr)
     {
         rl_controller_->reset();
@@ -659,6 +671,8 @@ core::ModeResult MotionRuntime::accept_getup(const std::uint64_t request_id)
     {
         rl_control_cycle_ = 0;
         rl_command_ = {};
+        rl_target_generated_at_ns_ = 0;
+        rl_target_expires_at_ns_ = 0;
         if (rl_controller_ != nullptr)
         {
             rl_controller_->reset();
@@ -709,6 +723,10 @@ core::ModeResult MotionRuntime::accept_getdown(const std::uint64_t request_id)
     {
         abort_active_request("interrupted by getdown");
     }
+    rl_control_cycle_ = 0;
+    rl_command_ = {};
+    rl_target_generated_at_ns_ = 0;
+    rl_target_expires_at_ns_ = 0;
     status_.active_source = core::CommandSource::None;
     status_.behavior_name.clear();
     status_.behavior_phase = "interpolating";

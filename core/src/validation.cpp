@@ -317,10 +317,21 @@ ValidationResult validate(const CommandFrame& frame, const RobotModel& model, Na
             ValidationError::InvalidTimestamp,
             "command expiry must be after its timestamp");
     }
+    if (frame.target_generated_at_ns < 0 ||
+        frame.target_generated_at_ns > frame.header.timestamp_ns ||
+        frame.target_expires_at_ns <= frame.target_generated_at_ns ||
+        frame.expires_at_ns > frame.target_expires_at_ns)
+    {
+        return failure(ValidationError::InvalidTimestamp, "command target timing is invalid");
+    }
     // 到达 expires_at_ns 的这一时刻仍视为有效，下一个时刻开始过期。
     if (now_ns > frame.expires_at_ns)
     {
         return failure(ValidationError::Expired, "command frame has expired");
+    }
+    if (now_ns > frame.target_expires_at_ns)
+    {
+        return failure(ValidationError::Expired, "command target has expired");
     }
     if (!is_valid(frame.motion_mode))
     {

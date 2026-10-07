@@ -159,4 +159,25 @@ core::RobotIOStatus RemoteRobotIO::status() const noexcept
     return cached_status_;
 }
 
+core::Nanoseconds RemoteRobotIO::clock_now_ns() const noexcept
+{
+    if (!has_cached_state_)
+    {
+        return -1;
+    }
+    WireStateFrame state;
+    if (!ipc::read_latest(memory_.layout().state, state))
+    {
+        // 共享槽竞争时保守使用最近采样时间，不用墙钟外推仿真时间。
+        return cached_state_.header.timestamp_ns;
+    }
+    if (state.schema_version != core::kFrameSchemaVersion || state.timestamp_ns < 0 ||
+        state.startup_id != cached_state_.header.startup_id ||
+        state.session_id != cached_state_.header.session_id)
+    {
+        return -1;
+    }
+    return state.timestamp_ns;
+}
+
 }  // 命名空间 quadruped::ipc

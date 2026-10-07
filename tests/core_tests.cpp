@@ -97,6 +97,8 @@ qc::CommandFrame make_command(const qc::RobotModel& model, qc::Nanoseconds times
     frame.header = make_header(timestamp_ns);
     // 测试命令默认在生成后的 5 ms 内有效。
     frame.expires_at_ns = timestamp_ns + 5'000'000;
+    frame.target_generated_at_ns = timestamp_ns;
+    frame.target_expires_at_ns = frame.expires_at_ns;
     frame.joint_count = model.joint_count;
     frame.motion_mode = qc::MotionMode::Stand;
     frame.source = qc::CommandSource::Test;
@@ -178,6 +180,38 @@ void test_command_frame()
     auto frame = make_command(model, 1'000);
     expect(qc::validate(frame, model, 2'000).ok(), "valid CommandFrame is accepted");
 
+    frame.header.schema_version = 1;
+    expect(qc::validate(frame, model, 2'000).error == qc::ValidationError::SchemaMismatch,
+        "frame schema 1 is rejected by schema 2 validation");
+
+    frame = make_command(model, 1'000);
+    frame.target_generated_at_ns = 1'001;
+    expect(qc::validate(frame, model, 2'000).error == qc::ValidationError::InvalidTimestamp,
+        "target generated after frame is rejected");
+
+    frame = make_command(model, 1'000);
+    frame.target_expires_at_ns = frame.target_generated_at_ns;
+    expect(qc::validate(frame, model, 2'000).error == qc::ValidationError::InvalidTimestamp,
+        "target expiry at generation is rejected");
+
+    frame = make_command(model, 1'000);
+    frame.target_expires_at_ns = frame.expires_at_ns - 1;
+    expect(qc::validate(frame, model, 2'000).error == qc::ValidationError::InvalidTimestamp,
+        "frame expiry after target expiry is rejected");
+
+    frame = make_command(model, 1'000);
+    expect(qc::validate(frame, model, frame.expires_at_ns).ok(),
+        "frame remains valid at its expiry");
+    expect(qc::validate(frame, model, frame.target_expires_at_ns).ok(),
+        "target remains valid at its expiry");
+    expect(qc::validate(frame, model, frame.expires_at_ns + 1).error ==
+            qc::ValidationError::Expired,
+        "frame expires after its boundary");
+    expect(qc::validate(frame, model, frame.target_expires_at_ns + 1).error ==
+            qc::ValidationError::Expired,
+        "target expires after its boundary");
+
+    frame = make_command(model, 1'000);
     frame.expires_at_ns = 1'500;
     expect(
         qc::validate(frame, model, 2'000).error == qc::ValidationError::Expired,
@@ -281,6 +315,11 @@ public:
     qc::RobotIOStatus status() const noexcept override
     {
         return {};
+    }
+
+    qc::Nanoseconds clock_now_ns() const noexcept override
+    {
+        return 0;
     }
 };
 

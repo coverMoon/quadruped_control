@@ -285,11 +285,12 @@ private:
     {
         const std::array<double, core::kMaxJoints>& positions;
         bool use_impedance{true};
-        core::Nanoseconds now_ns{0};
         const std::array<double, core::kMaxJoints>* velocities{nullptr};
         const std::array<double, core::kMaxJoints>* kp{nullptr};
         const std::array<double, core::kMaxJoints>* kd{nullptr};
         core::CommandSource source{core::CommandSource::None};
+        core::Nanoseconds target_generated_at_ns{0};
+        core::Nanoseconds target_expires_at_ns{0};
     };
 
     // 按当前模式填充命令的关节数组并提交；use_impedance 为 false 时提交 Disabled。
@@ -326,6 +327,8 @@ private:
     std::string policy_name_{};
     std::uint32_t rl_control_cycle_{0};
     RlController::CommandResult rl_command_{};
+    core::Nanoseconds rl_target_generated_at_ns_{0};
+    core::Nanoseconds rl_target_expires_at_ns_{0};
     core::Nanoseconds latest_inference_elapsed_ns_{0};
 
     RetryConfig retry_config_{};

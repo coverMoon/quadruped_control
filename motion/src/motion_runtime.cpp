@@ -18,6 +18,15 @@ namespace quadruped::motion
 namespace
 {
 
+constexpr std::uint32_t kAllowedMissedPolicyUpdates = 1;
+
+core::Nanoseconds saturating_add(
+    const core::Nanoseconds time_ns,
+    const core::Nanoseconds duration_ns) noexcept
+{
+    return time_ns > INT64_MAX - duration_ns ? INT64_MAX : time_ns + duration_ns;
+}
+
 // 面向错误信息的 RobotIO 结果描述；只用于日志和界面显示。
 const char* read_failure_message(core::RobotIOCode code)
 {
@@ -492,6 +501,8 @@ void MotionRuntime::activate_policy(const std::size_t policy_index)
     policy_name_ = entry.config.name;
     rl_control_cycle_ = 0;
     rl_command_ = {};
+    rl_target_generated_at_ns_ = 0;
+    rl_target_expires_at_ns_ = 0;
     latest_inference_elapsed_ns_ = 0;
     rl_controller_->reset();
     status_.policy_name = policy_name_;
@@ -576,6 +587,8 @@ bool MotionRuntime::track_session(const core::StateFrame& state)
     getup_second_phase_ = false;
     rl_control_cycle_ = 0;
     rl_command_ = {};
+    rl_target_generated_at_ns_ = 0;
+    rl_target_expires_at_ns_ = 0;
     latest_inference_elapsed_ns_ = 0;
     pending_policy_index_ = kInvalidPolicyIndex;
     policy_transition_active_ = false;
@@ -623,6 +636,8 @@ void MotionRuntime::fail_active_motion(const std::string& reason)
     retry_locked_ = false;
     rl_control_cycle_ = 0;
     rl_command_ = {};
+    rl_target_generated_at_ns_ = 0;
+    rl_target_expires_at_ns_ = 0;
     if (rl_controller_ != nullptr)
     {
         rl_controller_->reset();
@@ -642,12 +657,35 @@ core::RobotIOCode MotionRuntime::submit_command(
     command.header.schema_version = core::kFrameSchemaVersion;
     command.header.startup_id = startup_id_;
     command.header.session_id = session_id_;
+    const core::Nanoseconds frame_now = io.clock_now_ns();
+    if (frame_now < 0)
+    {
+        return core::RobotIOCode::InvalidFrame;
+    }
+    const core::Nanoseconds nominal_expiry =
+        saturating_add(frame_now, config_.command_validity_ns);
+    const bool has_rl_target = submission.target_expires_at_ns > 0;
+    if (has_rl_target &&
+        (submission.target_generated_at_ns < 0 ||
+            submission.target_generated_at_ns > frame_now ||
+            submission.target_expires_at_ns <= frame_now))
+    {
+        return core::RobotIOCode::InvalidFrame;
+    }
     command.header.sequence = ++command_sequence_;
-    command.header.timestamp_ns = submission.now_ns;
+    command.header.timestamp_ns = frame_now;
     // 单调时间加有效期在极端输入下可能溢出；溢出时按最长可表示时间处理。
-    command.expires_at_ns = (submission.now_ns > INT64_MAX - config_.command_validity_ns)
-        ? INT64_MAX
-        : submission.now_ns + config_.command_validity_ns;
+    command.expires_at_ns = has_rl_target
+        ? std::min(nominal_expiry, submission.target_expires_at_ns)
+        : nominal_expiry;
+    command.target_generated_at_ns =
+        has_rl_target ? submission.target_generated_at_ns : frame_now;
+    command.target_expires_at_ns =
+        has_rl_target ? submission.target_expires_at_ns : command.expires_at_ns;
+    if (command.expires_at_ns <= frame_now)
+    {
+        return core::RobotIOCode::InvalidFrame;
+    }
     command.joint_count = model_.joint_count;
     command.motion_mode = mode_;
     command.source = submission.source;
@@ -736,7 +774,7 @@ bool MotionRuntime::run_active_mode(
     if (std::string reason; !check_active_preconditions(reason))
     {
         fail_active_motion(reason);
-        output.submit_code = submit_command(io, {current_positions_, false, state.now_ns});
+        output.submit_code = submit_command(io, {current_positions_, false});
         output.submitted = true;
         return true;
     }
@@ -747,7 +785,7 @@ bool MotionRuntime::run_active_mode(
     }
     std::array<double, core::kMaxJoints> positions{};
     const bool use_impedance = advance_active_motion(positions);
-    output.submit_code = submit_command(io, {positions, use_impedance, state.now_ns});
+    output.submit_code = submit_command(io, {positions, use_impedance});
     output.submitted = true;
     if (output.submit_code != core::RobotIOCode::Ok &&
         mode_ != core::MotionMode::Passive)
@@ -771,7 +809,7 @@ bool MotionRuntime::run_rl_mode(
         status_.behavior_phase.clear();
         if (state.usable)
         {
-            output.submit_code = submit_command(io, {current_positions_, false, state.now_ns});
+            output.submit_code = submit_command(io, {current_positions_, false});
             output.submitted = true;
         }
         return true;
@@ -828,6 +866,21 @@ bool MotionRuntime::run_rl_mode(
         {
             return fail("RL action conversion failed: " + rl_command_.error_message);
         }
+        const core::Nanoseconds target_now = io.clock_now_ns();
+        constexpr core::Nanoseconds kLifetimePeriods =
+            static_cast<core::Nanoseconds>(kRlDecimation) *
+            (1 + kAllowedMissedPolicyUpdates);
+        const core::Nanoseconds lifetime_ns =
+            config_.control_period_ns > INT64_MAX / kLifetimePeriods
+            ? INT64_MAX
+            : config_.control_period_ns * kLifetimePeriods;
+        if (target_now < 0 || lifetime_ns <= 0 ||
+            saturating_add(target_now, lifetime_ns) <= target_now)
+        {
+            return fail("RL target timing is invalid");
+        }
+        rl_target_generated_at_ns_ = target_now;
+        rl_target_expires_at_ns_ = saturating_add(target_now, lifetime_ns);
         if (has_active_request_)
         {
             const char* message = active_request_type_ == core::ModeRequestType::SwitchPolicy
@@ -838,16 +891,21 @@ bool MotionRuntime::run_rl_mode(
     }
     ++rl_control_cycle_;
 
+    if (io.clock_now_ns() >= rl_target_expires_at_ns_)
+    {
+        return fail("RL target hard expiry reached");
+    }
     status_.active_source = rl_controller_->active_command_source();
     status_.behavior_phase = "driving";
     output.submit_code = submit_command(io,
         {rl_command_.target_positions,
             true,
-            state.now_ns,
             &rl_command_.target_velocities,
             &rl_command_.kp,
             &rl_command_.kd,
-            status_.active_source});
+            status_.active_source,
+            rl_target_generated_at_ns_,
+            rl_target_expires_at_ns_});
     output.submitted = true;
     if (output.submit_code != core::RobotIOCode::Ok)
     {
@@ -869,7 +927,7 @@ bool MotionRuntime::run_retry_mode(
     if (std::string reason; !check_active_preconditions(reason))
     {
         fail_active_motion(reason);
-        output.submit_code = submit_command(io, {current_positions_, false, state.now_ns});
+        output.submit_code = submit_command(io, {current_positions_, false});
         output.submitted = true;
         return true;
     }
@@ -902,7 +960,6 @@ bool MotionRuntime::run_retry_mode(
     output.submit_code = submit_command(io,
         {positions,
             true,
-            state.now_ns,
             &velocities,
             &retry_config_.kp,
             &retry_config_.kd,
@@ -926,7 +983,7 @@ bool MotionRuntime::run_fixed_drive_mode(
         fail_active_motion(reason);
         if (state.usable)
         {
-            output.submit_code = submit_command(io, {current_positions_, false, state.now_ns});
+            output.submit_code = submit_command(io, {current_positions_, false});
             output.submitted = true;
         }
         return true;
@@ -1011,7 +1068,6 @@ bool MotionRuntime::run_fixed_drive_mode(
     output.submit_code = submit_command(io,
         {positions,
             true,
-            state.now_ns,
             &velocities,
             &fixed.kp,
             &fixed.kd,
@@ -1033,7 +1089,7 @@ bool MotionRuntime::run_event_chain_mode(
         fail_active_motion(reason);
         if (state.usable)
         {
-            output.submit_code = submit_command(io, {current_positions_, false, state.now_ns});
+            output.submit_code = submit_command(io, {current_positions_, false});
             output.submitted = true;
         }
         return true;
@@ -1261,7 +1317,6 @@ bool MotionRuntime::run_event_chain_mode(
     output.submit_code = submit_command(io,
         {positions,
             true,
-            state.now_ns,
             &velocities,
             &event_chain_config_.kp,
             &event_chain_config_.kd,
@@ -1276,14 +1331,14 @@ bool MotionRuntime::run_event_chain_mode(
 
 bool MotionRuntime::run_policy_transition(
     core::RobotIO& io,
-    const StateRead& state,
+    const StateRead&,
     MotionUpdateOutput& output)
 {
     if (pending_policy_index_ == kInvalidPolicyIndex ||
         !policies_[pending_policy_index_].registered)
     {
         fail_active_motion("policy transition target is unavailable");
-        output.submit_code = submit_command(io, {current_positions_, false, state.now_ns});
+        output.submit_code = submit_command(io, {current_positions_, false});
         output.submitted = true;
         return true;
     }
@@ -1326,7 +1381,7 @@ bool MotionRuntime::run_policy_transition(
         kd = &fixed_drive_configs_[active_fixed_drive_index_].kd;
     }
     output.submit_code = submit_command(io,
-        {positions, true, state.now_ns, nullptr, kp, kd, core::CommandSource::None});
+        {positions, true, nullptr, kp, kd, core::CommandSource::None});
     output.submitted = true;
     if (output.submit_code != core::RobotIOCode::Ok)
     {
@@ -1366,7 +1421,7 @@ MotionUpdateOutput MotionRuntime::update(core::RobotIO& io, const MotionUpdateIn
     {
         if (state.usable)
         {
-            output.submit_code = submit_command(io, {current_positions_, false, input.now_ns});
+            output.submit_code = submit_command(io, {current_positions_, false});
             output.submitted = true;
         }
     }

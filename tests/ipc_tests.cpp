@@ -80,6 +80,8 @@ qc::CommandFrame make_command(
     frame.header.sequence = 10;
     frame.header.timestamp_ns = timestamp_ns;
     frame.expires_at_ns = timestamp_ns + 10'000'000;
+    frame.target_generated_at_ns = timestamp_ns;
+    frame.target_expires_at_ns = frame.expires_at_ns;
     frame.joint_count = model.joint_count;
     frame.motion_mode = qc::MotionMode::Stand;
     frame.source = qc::CommandSource::Test;
@@ -123,6 +125,14 @@ void test_identity_and_conversions(const qc::RobotModel& model)
         "CommandFrame roundtrip succeeds");
     expect(decoded_command.joints[2].mode == qc::ControlMode::JointImpedance,
         "CommandFrame preserves explicit control mode");
+    expect(decoded_command.target_generated_at_ns == command.target_generated_at_ns &&
+            decoded_command.target_expires_at_ns == command.target_expires_at_ns,
+        "CommandFrame preserves semantic target timing bit-exact");
+
+    auto old_frame = qi::to_wire(command);
+    old_frame.schema_version = 1;
+    expect(!qi::from_wire(old_frame, decoded_command),
+        "frame schema 1 is rejected by schema 2 conversion");
 
     auto bad_command = qi::to_wire(command);
     bad_command.joints[0].mode = 255;
@@ -276,9 +286,9 @@ void test_shared_memory_and_remote_io(const qc::RobotModel& model)
     expect(cross_mapping_result.load() == qi::EventWaitResult::Changed,
         "futex wakes a waiter through another shared mapping");
 
-    owner.memory->layout().identity.wire_schema_version = 1;
+    owner.memory->layout().identity.wire_schema_version = 2;
     const auto incompatible = qi::SharedMemory::open_existing(name);
-    expect(!incompatible.ok(), "schema v1 mapping is rejected by schema v2 client");
+    expect(!incompatible.ok(), "wire schema 2 mapping is rejected by schema 3 client");
     owner.memory->layout().identity.wire_schema_version = qi::kWireSchemaVersion;
 
     constexpr std::uint64_t startup_id = 31;
@@ -295,11 +305,20 @@ void test_shared_memory_and_remote_io(const qc::RobotModel& model)
         qi::to_wire(make_state(model, startup_id, session_id, state_time)));
 
     qi::RemoteRobotIO io(*client.memory, model);
+    expect(io.clock_now_ns() == -1, "remote clock requires a sampled backend session");
     qc::StateFrame state;
     std::uint64_t state_version = 0;
     expect(io.read_latest(state, state_version) == qc::RobotIOCode::Ok,
         "RemoteRobotIO reads matching state");
     expect(state_version == 1, "RemoteRobotIO returns the state slot version");
+    expect(io.clock_now_ns() == state_time,
+        "remote command clock uses backend simulation time, not host monotonic time");
+
+    const auto next_state = make_state(model, startup_id, session_id, state_time + 2'000'000);
+    qi::publish_latest(owner.memory->layout().state, qi::to_wire(next_state));
+    expect(io.clock_now_ns() == next_state.header.timestamp_ns,
+        "remote clock observes backend advancement during policy inference");
+    qi::publish_latest(owner.memory->layout().state, qi::to_wire(state));
 
     const auto command = make_command(model, startup_id, session_id, state_time);
     expect(io.submit(command) == qc::RobotIOCode::Ok, "RemoteRobotIO publishes matching command");
@@ -312,6 +331,8 @@ void test_shared_memory_and_remote_io(const qc::RobotModel& model)
     owner.memory->layout().backend_heartbeat.lock.store(0, std::memory_order_release);
 
     owner.memory->layout().state.lock.store(1, std::memory_order_release);
+    expect(io.clock_now_ns() == state_time,
+        "busy state slot preserves backend clock domain without wall-clock extrapolation");
     qc::StateFrame cached_state;
     expect(io.read_latest(cached_state) == qc::RobotIOCode::Ok,
         "busy state slot reuses the matching cached state");

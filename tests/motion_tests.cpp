@@ -18,6 +18,10 @@ public:
     {
         ++forward_count;
         last_input = input;
+        if (clock_on_forward != nullptr)
+        {
+            *clock_on_forward = forward_finish_ns;
+        }
         qm::RlInferenceOutput output;
         output.elapsed_ns = elapsed_ns;
         if (fail_forward)
@@ -36,6 +40,8 @@ public:
     float action{0.0F};
     std::size_t output_dimension{qm::kRlActionDim};
     qc::Nanoseconds elapsed_ns{0};
+    qc::Nanoseconds* clock_on_forward{nullptr};
+    qc::Nanoseconds forward_finish_ns{0};
     qm::RlInferenceInput last_input{};
 };
 
@@ -779,6 +785,144 @@ void test_getdown_interrupted_by_getup()
     expect_command_positions(io, rest, "重新起立后趴下仍应回到首次记录的落地姿态");
 }
 
+// 状态调度时间与策略完成/命令生成时间可以不同，复用目标不可因此延寿。
+void test_rl_target_timing_and_clock()
+{
+    auto created = make_rl_runtime();
+    if (!created.ok())
+    {
+        return;
+    }
+    const auto model = make_rl_model();
+    const auto stand_pose = config_stand_pose();
+    FakePolicy policy;
+    std::string error;
+    expect(created.runtime->attach_policy(make_rl_config("flat", stand_pose), policy, error),
+        "时钟测试应接入策略");
+
+    motion_test::FakeRobotIO io;
+    io.state = motion_test::make_state(model, motion_test::make_rest_positions());
+    motion_test::drive_getup(*created.runtime, io, 1);
+    io.state = motion_test::make_state(model, stand_pose);
+    policy.clock_on_forward = &io.clock_ns;
+    policy.forward_finish_ns = 112'000'000;
+    io.clock_ns = 100'000'000;
+
+    auto base = make_base_command();
+    base.expires_at_ns = 500'000'000;
+    auto start = motion_test::make_request(2, qc::ModeRequestType::StartBehavior);
+    start.behavior_name = "rl_locomotion";
+    const auto cycle = [&](qc::Nanoseconds state_ns, const qc::ModeRequest* request = nullptr)
+    {
+        io.state.header.timestamp_ns = state_ns;
+        qm::MotionUpdateInput input;
+        input.now_ns = state_ns;
+        input.base_command = &base;
+        input.request = request;
+        return created.runtime->update(io, input);
+    };
+    const auto first = cycle(100'000'000, &start);
+    expect(first.submitted && first.submit_code == qc::RobotIOCode::Ok,
+        "首次推理后应提交命令");
+    const auto first_frame = io.submitted.back();
+    expect(first_frame.header.timestamp_ns == 112'000'000 &&
+            first_frame.header.timestamp_ns != io.state.header.timestamp_ns,
+        "命令时间应为推理完成后的 RobotIO 时间，不是 StateFrame 时间");
+    expect(first_frame.expires_at_ns == 122'000'000 &&
+            first_frame.target_generated_at_ns == 112'000'000 &&
+            first_frame.target_expires_at_ns == 152'000'000,
+        "首次 RL target 应具有独立的 40 ms 硬寿命");
+
+    const qc::Nanoseconds reuse_clocks[3] = {117'000'000, 127'000'000, 147'000'000};
+    for (std::size_t index = 0; index < 3; ++index)
+    {
+        io.clock_ns = reuse_clocks[index];
+        const auto reused = cycle(105'000'000 + static_cast<qc::Nanoseconds>(index) * 5'000'000);
+        const auto& frame = io.submitted.back();
+        expect(reused.submit_code == qc::RobotIOCode::Ok && policy.forward_count == 1,
+            "三个复用周期不得再次推理");
+        expect(frame.header.sequence == first_frame.header.sequence + index + 1 &&
+                frame.header.timestamp_ns == reuse_clocks[index],
+            "复用周期应生成新的 frame 时间和序号");
+        expect(frame.target_generated_at_ns == first_frame.target_generated_at_ns &&
+                frame.target_expires_at_ns == first_frame.target_expires_at_ns,
+            "复用周期不得刷新 semantic target 时间");
+    }
+    expect(io.submitted.back().expires_at_ns == 152'000'000,
+        "147 ms 帧的 10 ms 有效期必须裁剪到 152 ms target 到期时间");
+
+    policy.forward_finish_ns = 160'000'000;
+    const auto next = cycle(120'000'000);
+    expect(next.submit_code == qc::RobotIOCode::Ok && policy.forward_count == 2,
+        "下一 policy 周期应成功生成新目标");
+    expect(io.submitted.back().target_generated_at_ns == 160'000'000 &&
+            io.submitted.back().target_expires_at_ns == 200'000'000,
+        "下一次成功推理应建立新的 target 时间，无需动作数值改变");
+
+    io.clock_ns = 165'000'000;
+    cycle(125'000'000);
+    io.clock_ns = 170'000'000;
+    cycle(130'000'000);
+    io.clock_ns = 175'000'000;
+    cycle(135'000'000);
+    policy.fail_forward = true;
+    policy.forward_finish_ns = 180'000'000;
+    const auto failed = cycle(140'000'000);
+    expect(failed.status.mode == qc::MotionMode::Passive &&
+            io.submitted.back().joints[0].mode == qc::ControlMode::Disabled,
+        "推理失败应走现有 Passive/Disabled 路径");
+    expect(io.submitted.back().target_generated_at_ns == 180'000'000 &&
+            io.submitted.back().target_expires_at_ns ==
+                io.submitted.back().expires_at_ns,
+        "失败后的 Disabled 应是新非 RL 目标，不得继承旧 RL target");
+
+    io.state.header.session_id = 2;
+    io.clock_ns = 190'000'000;
+    const auto session_reset = cycle(145'000'000);
+    expect(session_reset.status.mode == qc::MotionMode::Passive &&
+            io.submitted.back().target_generated_at_ns ==
+                io.submitted.back().header.timestamp_ns,
+        "会话切换后只能提交新非 RL 目标");
+}
+
+void test_rl_target_hard_expiry()
+{
+    auto created = make_rl_runtime();
+    if (!created.ok())
+    {
+        return;
+    }
+    const auto model = make_rl_model();
+    const auto stand_pose = config_stand_pose();
+    FakePolicy policy;
+    std::string error;
+    created.runtime->attach_policy(make_rl_config("flat", stand_pose), policy, error);
+    motion_test::FakeRobotIO io;
+    io.state = motion_test::make_state(model, motion_test::make_rest_positions());
+    motion_test::drive_getup(*created.runtime, io, 1);
+    io.state = motion_test::make_state(model, stand_pose);
+    const auto base = make_base_command();
+    auto start = motion_test::make_request(2, qc::ModeRequestType::StartBehavior);
+    start.behavior_name = "rl_locomotion";
+    update_with_command(*created.runtime, io, base, &start);
+    expect(io.submitted.back().target_expires_at_ns == 40'000'000,
+        "首次零时刻 RL target 应在 40 ms 硬过期");
+
+    io.clock_ns = 5'000'000;
+    update_with_command(*created.runtime, io, base);
+    io.clock_ns = 10'000'000;
+    update_with_command(*created.runtime, io, base);
+    const std::size_t count_before_expiry = io.submitted.size();
+    io.clock_ns = 41'000'000;
+    const auto expired = update_with_command(*created.runtime, io, base);
+    expect(expired.status.mode == qc::MotionMode::Passive &&
+            io.submitted.size() == count_before_expiry + 1,
+        "过期复用目标应退出 RL，不能提交新 RL frame");
+    expect(io.submitted.back().joints[0].mode == qc::ControlMode::Disabled &&
+            io.submitted.back().target_generated_at_ns == 41'000'000,
+        "过期后只能提交新生成的 Disabled 目标");
+}
+
 // rl_locomotion 必须在 Stand 且带有有效 BaseCommand 才能启动。
 void test_rl_behavior_requires_base_command()
 {
@@ -835,10 +979,15 @@ void test_rl_behavior_requires_base_command()
     restart.behavior_name = "rl_locomotion";
     update_with_command(*created.runtime, io, command, &restart);
     io.state.header.session_id = 2;
+    io.clock_ns = 2'000'000;
     const auto reset = update_with_command(*created.runtime, io, command);
     expect(reset.status.mode == qc::MotionMode::Passive &&
             reset.status.behavior_name.empty(),
         "会话变化必须终止 rl_locomotion 并清空行为状态");
+    expect(io.submitted.back().target_generated_at_ns == 2'000'000 &&
+            io.submitted.back().target_expires_at_ns ==
+                io.submitted.back().expires_at_ns,
+        "会话变化必须丢弃旧 RL target timing");
 
     io.state = motion_test::make_state(model, motion_test::make_rest_positions());
     io.state.header.session_id = 2;
@@ -949,16 +1098,21 @@ void test_direct_policy_switches()
     start.behavior_name = "rl_locomotion";
     const auto started = update_with_command(*created.runtime, io, command, &start);
     expect(flat_policy.forward_count == 1, "启动 RL 时 flat 应完成首次推理");
+    const auto old_target_expiry = io.submitted.back().target_expires_at_ns;
     expect(started.status.command_limits == std::array<double, 3>{2.0, 2.0, 2.0},
         "MotionStatus 应公开当前策略的三轴 command_limits");
 
     auto obstacle = motion_test::make_request(3, qc::ModeRequestType::SwitchPolicy);
     obstacle.policy_name = "obstacle";
+    io.clock_ns = 1'000'000;
     const auto switched = update_with_command(*created.runtime, io, command, &obstacle);
     expect(switched.result.state == qc::ModeResultState::Accepted,
         "flat → obstacle 直接 reload 应接受");
     expect(switched.status.policy_name == "obstacle", "直接 reload 后应报告 obstacle");
     expect(obstacle_policy.forward_count == 1, "obstacle 应在直接 reload 周期首次推理");
+    expect(io.submitted.back().target_generated_at_ns == 1'000'000 &&
+            io.submitted.back().target_expires_at_ns > old_target_expiry,
+        "policy switch 应丢弃旧 target timing 并由新策略重新生成");
     expect(flat_policy.forward_count == 1, "直接 reload 周期不得继续调用旧 flat 策略");
     expect(switched.status.active_source == qc::CommandSource::Test,
         "直接 reload 后同周期 BaseCommand 仍应有效");
@@ -1532,6 +1686,8 @@ int main()
     test_getdown_interrupted_by_getup();
     test_session_change_returns_to_passive();
     test_request_lifecycle_and_ordering();
+    test_rl_target_timing_and_clock();
+    test_rl_target_hard_expiry();
     test_rl_behavior_requires_base_command();
     test_rl_getup_returns_to_stand();
     test_request_interruptions_and_explicit_rejections();
