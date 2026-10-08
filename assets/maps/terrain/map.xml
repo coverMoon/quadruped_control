@@ -1,0 +1,1188 @@
+<mujoco model="terrain ability test">
+  <!--运动能力测试场：长度单位 m，角度单位 rad；原点和 x=0 走廊保持平地。-->
+  <statistic center="41 19 0.6" extent="48" />
+  <visual>
+    <headlight diffuse=".6 .6 .6" ambient=".3 .3 .3" specular="0 0 0" />
+    <global azimuth="110" elevation="-45" />
+  </visual>
+  <asset>
+    <mesh name="slope_05deg_up_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 0.17497733 0 0.7 0 2 0.7 0 2 0.7 0.17497733" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_05deg_down_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 0.17497733 0 0.7 0 2 0.7 0 2 0.7 0.17497733" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_10deg_up_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 0.35265396 0 0.7 0 2 0.7 0 2 0.7 0.35265396" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_10deg_down_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 0.35265396 0 0.7 0 2 0.7 0 2 0.7 0.35265396" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_15deg_up_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 0.53589838 0 0.7 0 2 0.7 0 2 0.7 0.53589838" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_15deg_down_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 0.53589838 0 0.7 0 2 0.7 0 2 0.7 0.53589838" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_20deg_up_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 0.72794047 0 0.7 0 2 0.7 0 2 0.7 0.72794047" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_20deg_down_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 0.72794047 0 0.7 0 2 0.7 0 2 0.7 0.72794047" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_25deg_up_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 0.93261532 0 0.7 0 2 0.7 0 2 0.7 0.93261532" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_25deg_down_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 0.93261532 0 0.7 0 2 0.7 0 2 0.7 0.93261532" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_30deg_up_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 1.1547005 0 0.7 0 2 0.7 0 2 0.7 1.1547005" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_30deg_down_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 1.1547005 0 0.7 0 2 0.7 0 2 0.7 1.1547005" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_35deg_up_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 1.4004151 0 0.7 0 2 0.7 0 2 0.7 1.4004151" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_35deg_down_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 1.4004151 0 0.7 0 2 0.7 0 2 0.7 1.4004151" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_40deg_up_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 1.6781993 0 0.7 0 2 0.7 0 2 0.7 1.6781993" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_40deg_down_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 1.6781993 0 0.7 0 2 0.7 0 2 0.7 1.6781993" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_45deg_up_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 2 0 0.7 0 2 0.7 0 2 0.7 2" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_45deg_down_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 2 0 0.7 0 2 0.7 0 2 0.7 2" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_50deg_up_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 2.3835072 0 0.7 0 2 0.7 0 2 0.7 2.3835072" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_50deg_down_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 2.3835072 0 0.7 0 2 0.7 0 2 0.7 2.3835072" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_60deg_up_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 3.4641016 0 0.7 0 2 0.7 0 2 0.7 3.4641016" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="slope_60deg_down_mesh" vertex="0 -0.7 0 2 -0.7 0 2 -0.7 3.4641016 0 0.7 0 2 0.7 0 2 0.7 3.4641016" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_10cm_entry_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_10cm_exit_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_20cm_entry_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_20cm_exit_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_30cm_entry_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_30cm_exit_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_40cm_entry_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_40cm_exit_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_50cm_entry_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_50cm_exit_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_60cm_entry_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_60cm_exit_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_80cm_entry_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_80cm_exit_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_100cm_entry_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_100cm_exit_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_120cm_entry_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_120cm_exit_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_150cm_entry_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_150cm_exit_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_180cm_entry_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="trench_180cm_exit_mesh" vertex="0 -0.7 0 1 -0.7 0 1 -0.7 0.3 0 0.7 0 1 0.7 0 1 0.7 0.3" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="plum_entry_ramp_mesh" vertex="0 -0.4 0 1.2 -0.4 0 1.2 -0.4 0.2 0 0.4 0 1.2 0.4 0 1.2 0.4 0.2" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="plum_exit_ramp_mesh" vertex="0 -0.4 0 1.2 -0.4 0 1.2 -0.4 0.2 0 0.4 0 1.2 0.4 0 1.2 0.4 0.2" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="bridge_40cm_entry_mesh" vertex="0 -0.2 0 0.5 -0.2 0 0.5 -0.2 0.1 0 0.2 0 0.5 0.2 0 0.5 0.2 0.1" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="bridge_40cm_exit_mesh" vertex="0 -0.2 0 0.5 -0.2 0 0.5 -0.2 0.1 0 0.2 0 0.5 0.2 0 0.5 0.2 0.1" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="bridge_30cm_entry_mesh" vertex="0 -0.15 0 0.5 -0.15 0 0.5 -0.15 0.1 0 0.15 0 0.5 0.15 0 0.5 0.15 0.1" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="bridge_30cm_exit_mesh" vertex="0 -0.15 0 0.5 -0.15 0 0.5 -0.15 0.1 0 0.15 0 0.5 0.15 0 0.5 0.15 0.1" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="bridge_25cm_entry_mesh" vertex="0 -0.125 0 0.5 -0.125 0 0.5 -0.125 0.1 0 0.125 0 0.5 0.125 0 0.5 0.125 0.1" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="bridge_25cm_exit_mesh" vertex="0 -0.125 0 0.5 -0.125 0 0.5 -0.125 0.1 0 0.125 0 0.5 0.125 0 0.5 0.125 0.1" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="bridge_20cm_entry_mesh" vertex="0 -0.1 0 0.5 -0.1 0 0.5 -0.1 0.1 0 0.1 0 0.5 0.1 0 0.5 0.1 0.1" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="bridge_20cm_exit_mesh" vertex="0 -0.1 0 0.5 -0.1 0 0.5 -0.1 0.1 0 0.1 0 0.5 0.1 0 0.5 0.1 0.1" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="bridge_15cm_entry_mesh" vertex="0 -0.075 0 0.5 -0.075 0 0.5 -0.075 0.1 0 0.075 0 0.5 0.075 0 0.5 0.075 0.1" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="bridge_15cm_exit_mesh" vertex="0 -0.075 0 0.5 -0.075 0 0.5 -0.075 0.1 0 0.075 0 0.5 0.075 0 0.5 0.075 0.1" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="bridge_10cm_entry_mesh" vertex="0 -0.05 0 0.5 -0.05 0 0.5 -0.05 0.1 0 0.05 0 0.5 0.05 0 0.5 0.05 0.1" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="bridge_10cm_exit_mesh" vertex="0 -0.05 0 0.5 -0.05 0 0.5 -0.05 0.1 0 0.05 0 0.5 0.05 0 0.5 0.05 0.1" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="bridge_06cm_entry_mesh" vertex="0 -0.03 0 0.5 -0.03 0 0.5 -0.03 0.1 0 0.03 0 0.5 0.03 0 0.5 0.03 0.1" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="bridge_06cm_exit_mesh" vertex="0 -0.03 0 0.5 -0.03 0 0.5 -0.03 0.1 0 0.03 0 0.5 0.03 0 0.5 0.03 0.1" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="cross_slope_10deg_mesh" vertex="0 -1.5 0 1.4 -1.5 0 1.4 -1.5 0.24685777 0 1.5 0 1.4 1.5 0 1.4 1.5 0.24685777" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="cross_slope_15deg_mesh" vertex="0 -1.5 0 1.4 -1.5 0 1.4 -1.5 0.37512887 0 1.5 0 1.4 1.5 0 1.4 1.5 0.37512887" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="cross_slope_20deg_mesh" vertex="0 -1.5 0 1.4 -1.5 0 1.4 -1.5 0.50955833 0 1.5 0 1.4 1.5 0 1.4 1.5 0.50955833" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="cross_slope_25deg_mesh" vertex="0 -1.5 0 1.4 -1.5 0 1.4 -1.5 0.65283072 0 1.5 0 1.4 1.5 0 1.4 1.5 0.65283072" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="cross_slope_30deg_mesh" vertex="0 -1.5 0 1.4 -1.5 0 1.4 -1.5 0.80829038 0 1.5 0 1.4 1.5 0 1.4 1.5 0.80829038" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="cross_slope_40deg_mesh" vertex="0 -1.5 0 1.4 -1.5 0 1.4 -1.5 1.1747395 0 1.5 0 1.4 1.5 0 1.4 1.5 1.1747395" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="cross_slope_45deg_mesh" vertex="0 -1.5 0 1.4 -1.5 0 1.4 -1.5 1.4 0 1.5 0 1.4 1.5 0 1.4 1.5 1.4" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="plum_t2_entry_ramp_mesh" vertex="0 -0.4 0 2.4 -0.4 0 2.4 -0.4 0.4 0 0.4 0 2.4 0.4 0 2.4 0.4 0.4" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="plum_t2_exit_ramp_mesh" vertex="0 -0.4 0 2.4 -0.4 0 2.4 -0.4 0.4 0 0.4 0 2.4 0.4 0 2.4 0.4 0.4" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="plum_t3_entry_ramp_mesh" vertex="0 -0.4 0 3.6 -0.4 0 3.6 -0.4 0.6 0 0.4 0 3.6 0.4 0 3.6 0.4 0.6" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="plum_t3_exit_ramp_mesh" vertex="0 -0.4 0 3.6 -0.4 0 3.6 -0.4 0.6 0 0.4 0 3.6 0.4 0 3.6 0.4 0.6" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="plum_t4_entry_ramp_mesh" vertex="0 -0.4 0 4.8 -0.4 0 4.8 -0.4 0.8 0 0.4 0 4.8 0.4 0 4.8 0.4 0.8" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="plum_t4_exit_ramp_mesh" vertex="0 -0.4 0 4.8 -0.4 0 4.8 -0.4 0.8 0 0.4 0 4.8 0.4 0 4.8 0.4 0.8" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="plum_t5_entry_ramp_mesh" vertex="0 -0.4 0 6 -0.4 0 6 -0.4 1 0 0.4 0 6 0.4 0 6 0.4 1" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <mesh name="plum_t5_exit_ramp_mesh" vertex="0 -0.4 0 6 -0.4 0 6 -0.4 1 0 0.4 0 6 0.4 0 6 0.4 1" face="1 2 0 5 4 3 4 1 0 3 4 0 5 2 1 4 5 1 3 0 2 5 3 2" />
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072" />
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="300" height="300" />
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2" />
+    <texture name="terrain_label_platform_05cm" type="2d" file="labels/platform_05cm.png" />
+    <material name="terrain_label_platform_05cm" texture="terrain_label_platform_05cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_platform_10cm" type="2d" file="labels/platform_10cm.png" />
+    <material name="terrain_label_platform_10cm" texture="terrain_label_platform_10cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_platform_15cm" type="2d" file="labels/platform_15cm.png" />
+    <material name="terrain_label_platform_15cm" texture="terrain_label_platform_15cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_platform_20cm" type="2d" file="labels/platform_20cm.png" />
+    <material name="terrain_label_platform_20cm" texture="terrain_label_platform_20cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_platform_25cm" type="2d" file="labels/platform_25cm.png" />
+    <material name="terrain_label_platform_25cm" texture="terrain_label_platform_25cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_platform_30cm" type="2d" file="labels/platform_30cm.png" />
+    <material name="terrain_label_platform_30cm" texture="terrain_label_platform_30cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_platform_40cm" type="2d" file="labels/platform_40cm.png" />
+    <material name="terrain_label_platform_40cm" texture="terrain_label_platform_40cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_platform_50cm" type="2d" file="labels/platform_50cm.png" />
+    <material name="terrain_label_platform_50cm" texture="terrain_label_platform_50cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_platform_60cm" type="2d" file="labels/platform_60cm.png" />
+    <material name="terrain_label_platform_60cm" texture="terrain_label_platform_60cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_platform_80cm" type="2d" file="labels/platform_80cm.png" />
+    <material name="terrain_label_platform_80cm" texture="terrain_label_platform_80cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_platform_100cm" type="2d" file="labels/platform_100cm.png" />
+    <material name="terrain_label_platform_100cm" texture="terrain_label_platform_100cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_platform_120cm" type="2d" file="labels/platform_120cm.png" />
+    <material name="terrain_label_platform_120cm" texture="terrain_label_platform_120cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_stairs_04cm" type="2d" file="labels/stairs_04cm.png" />
+    <material name="terrain_label_stairs_04cm" texture="terrain_label_stairs_04cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_stairs_06cm" type="2d" file="labels/stairs_06cm.png" />
+    <material name="terrain_label_stairs_06cm" texture="terrain_label_stairs_06cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_stairs_08cm" type="2d" file="labels/stairs_08cm.png" />
+    <material name="terrain_label_stairs_08cm" texture="terrain_label_stairs_08cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_stairs_10cm" type="2d" file="labels/stairs_10cm.png" />
+    <material name="terrain_label_stairs_10cm" texture="terrain_label_stairs_10cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_stairs_12cm" type="2d" file="labels/stairs_12cm.png" />
+    <material name="terrain_label_stairs_12cm" texture="terrain_label_stairs_12cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_stairs_15cm" type="2d" file="labels/stairs_15cm.png" />
+    <material name="terrain_label_stairs_15cm" texture="terrain_label_stairs_15cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_stairs_20cm" type="2d" file="labels/stairs_20cm.png" />
+    <material name="terrain_label_stairs_20cm" texture="terrain_label_stairs_20cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_stairs_25cm" type="2d" file="labels/stairs_25cm.png" />
+    <material name="terrain_label_stairs_25cm" texture="terrain_label_stairs_25cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_stairs_30cm" type="2d" file="labels/stairs_30cm.png" />
+    <material name="terrain_label_stairs_30cm" texture="terrain_label_stairs_30cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_stairs_35cm" type="2d" file="labels/stairs_35cm.png" />
+    <material name="terrain_label_stairs_35cm" texture="terrain_label_stairs_35cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_stairs_40cm" type="2d" file="labels/stairs_40cm.png" />
+    <material name="terrain_label_stairs_40cm" texture="terrain_label_stairs_40cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_slope_05deg_up" type="2d" file="labels/slope_05deg_up.png" />
+    <material name="terrain_label_slope_05deg_up" texture="terrain_label_slope_05deg_up" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_slope_10deg_up" type="2d" file="labels/slope_10deg_up.png" />
+    <material name="terrain_label_slope_10deg_up" texture="terrain_label_slope_10deg_up" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_slope_15deg_up" type="2d" file="labels/slope_15deg_up.png" />
+    <material name="terrain_label_slope_15deg_up" texture="terrain_label_slope_15deg_up" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_slope_20deg_up" type="2d" file="labels/slope_20deg_up.png" />
+    <material name="terrain_label_slope_20deg_up" texture="terrain_label_slope_20deg_up" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_slope_25deg_up" type="2d" file="labels/slope_25deg_up.png" />
+    <material name="terrain_label_slope_25deg_up" texture="terrain_label_slope_25deg_up" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_slope_30deg_up" type="2d" file="labels/slope_30deg_up.png" />
+    <material name="terrain_label_slope_30deg_up" texture="terrain_label_slope_30deg_up" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_slope_35deg_up" type="2d" file="labels/slope_35deg_up.png" />
+    <material name="terrain_label_slope_35deg_up" texture="terrain_label_slope_35deg_up" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_slope_40deg_up" type="2d" file="labels/slope_40deg_up.png" />
+    <material name="terrain_label_slope_40deg_up" texture="terrain_label_slope_40deg_up" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_slope_45deg_up" type="2d" file="labels/slope_45deg_up.png" />
+    <material name="terrain_label_slope_45deg_up" texture="terrain_label_slope_45deg_up" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_slope_50deg_up" type="2d" file="labels/slope_50deg_up.png" />
+    <material name="terrain_label_slope_50deg_up" texture="terrain_label_slope_50deg_up" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_slope_60deg_up" type="2d" file="labels/slope_60deg_up.png" />
+    <material name="terrain_label_slope_60deg_up" texture="terrain_label_slope_60deg_up" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_trench_10cm" type="2d" file="labels/trench_10cm.png" />
+    <material name="terrain_label_trench_10cm" texture="terrain_label_trench_10cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_trench_20cm" type="2d" file="labels/trench_20cm.png" />
+    <material name="terrain_label_trench_20cm" texture="terrain_label_trench_20cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_trench_30cm" type="2d" file="labels/trench_30cm.png" />
+    <material name="terrain_label_trench_30cm" texture="terrain_label_trench_30cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_trench_40cm" type="2d" file="labels/trench_40cm.png" />
+    <material name="terrain_label_trench_40cm" texture="terrain_label_trench_40cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_trench_50cm" type="2d" file="labels/trench_50cm.png" />
+    <material name="terrain_label_trench_50cm" texture="terrain_label_trench_50cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_trench_60cm" type="2d" file="labels/trench_60cm.png" />
+    <material name="terrain_label_trench_60cm" texture="terrain_label_trench_60cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_trench_80cm" type="2d" file="labels/trench_80cm.png" />
+    <material name="terrain_label_trench_80cm" texture="terrain_label_trench_80cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_trench_100cm" type="2d" file="labels/trench_100cm.png" />
+    <material name="terrain_label_trench_100cm" texture="terrain_label_trench_100cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_trench_120cm" type="2d" file="labels/trench_120cm.png" />
+    <material name="terrain_label_trench_120cm" texture="terrain_label_trench_120cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_trench_150cm" type="2d" file="labels/trench_150cm.png" />
+    <material name="terrain_label_trench_150cm" texture="terrain_label_trench_150cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_trench_180cm" type="2d" file="labels/trench_180cm.png" />
+    <material name="terrain_label_trench_180cm" texture="terrain_label_trench_180cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_plum" type="2d" file="labels/plum.png" />
+    <material name="terrain_label_plum" texture="terrain_label_plum" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_bridge_40cm" type="2d" file="labels/bridge_40cm.png" />
+    <material name="terrain_label_bridge_40cm" texture="terrain_label_bridge_40cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_bridge_30cm" type="2d" file="labels/bridge_30cm.png" />
+    <material name="terrain_label_bridge_30cm" texture="terrain_label_bridge_30cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_bridge_25cm" type="2d" file="labels/bridge_25cm.png" />
+    <material name="terrain_label_bridge_25cm" texture="terrain_label_bridge_25cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_bridge_20cm" type="2d" file="labels/bridge_20cm.png" />
+    <material name="terrain_label_bridge_20cm" texture="terrain_label_bridge_20cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_bridge_15cm" type="2d" file="labels/bridge_15cm.png" />
+    <material name="terrain_label_bridge_15cm" texture="terrain_label_bridge_15cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_bridge_10cm" type="2d" file="labels/bridge_10cm.png" />
+    <material name="terrain_label_bridge_10cm" texture="terrain_label_bridge_10cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_bridge_06cm" type="2d" file="labels/bridge_06cm.png" />
+    <material name="terrain_label_bridge_06cm" texture="terrain_label_bridge_06cm" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_cross_bar_1" type="2d" file="labels/cross_bar_1.png" />
+    <material name="terrain_label_cross_bar_1" texture="terrain_label_cross_bar_1" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_cross_bar_2" type="2d" file="labels/cross_bar_2.png" />
+    <material name="terrain_label_cross_bar_2" texture="terrain_label_cross_bar_2" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_cross_bar_3" type="2d" file="labels/cross_bar_3.png" />
+    <material name="terrain_label_cross_bar_3" texture="terrain_label_cross_bar_3" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_cross_bar_4" type="2d" file="labels/cross_bar_4.png" />
+    <material name="terrain_label_cross_bar_4" texture="terrain_label_cross_bar_4" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_cross_bar_5" type="2d" file="labels/cross_bar_5.png" />
+    <material name="terrain_label_cross_bar_5" texture="terrain_label_cross_bar_5" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_cross_bar_6" type="2d" file="labels/cross_bar_6.png" />
+    <material name="terrain_label_cross_bar_6" texture="terrain_label_cross_bar_6" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_cross_bar_7" type="2d" file="labels/cross_bar_7.png" />
+    <material name="terrain_label_cross_bar_7" texture="terrain_label_cross_bar_7" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_cross_bar_8" type="2d" file="labels/cross_bar_8.png" />
+    <material name="terrain_label_cross_bar_8" texture="terrain_label_cross_bar_8" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_cross_slope_10deg" type="2d" file="labels/cross_slope_10deg.png" />
+    <material name="terrain_label_cross_slope_10deg" texture="terrain_label_cross_slope_10deg" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_cross_slope_15deg" type="2d" file="labels/cross_slope_15deg.png" />
+    <material name="terrain_label_cross_slope_15deg" texture="terrain_label_cross_slope_15deg" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_cross_slope_20deg" type="2d" file="labels/cross_slope_20deg.png" />
+    <material name="terrain_label_cross_slope_20deg" texture="terrain_label_cross_slope_20deg" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_cross_slope_25deg" type="2d" file="labels/cross_slope_25deg.png" />
+    <material name="terrain_label_cross_slope_25deg" texture="terrain_label_cross_slope_25deg" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_cross_slope_30deg" type="2d" file="labels/cross_slope_30deg.png" />
+    <material name="terrain_label_cross_slope_30deg" texture="terrain_label_cross_slope_30deg" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_cross_slope_40deg" type="2d" file="labels/cross_slope_40deg.png" />
+    <material name="terrain_label_cross_slope_40deg" texture="terrain_label_cross_slope_40deg" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_cross_slope_45deg" type="2d" file="labels/cross_slope_45deg.png" />
+    <material name="terrain_label_cross_slope_45deg" texture="terrain_label_cross_slope_45deg" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_low_friction_50" type="2d" file="labels/low_friction_50.png" />
+    <material name="terrain_label_low_friction_50" texture="terrain_label_low_friction_50" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_low_friction_35" type="2d" file="labels/low_friction_35.png" />
+    <material name="terrain_label_low_friction_35" texture="terrain_label_low_friction_35" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_low_friction_25" type="2d" file="labels/low_friction_25.png" />
+    <material name="terrain_label_low_friction_25" texture="terrain_label_low_friction_25" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_low_friction_15" type="2d" file="labels/low_friction_15.png" />
+    <material name="terrain_label_low_friction_15" texture="terrain_label_low_friction_15" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_low_friction_08" type="2d" file="labels/low_friction_08.png" />
+    <material name="terrain_label_low_friction_08" texture="terrain_label_low_friction_08" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_low_friction_03" type="2d" file="labels/low_friction_03.png" />
+    <material name="terrain_label_low_friction_03" texture="terrain_label_low_friction_03" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_plum_t2" type="2d" file="labels/plum_t2.png" />
+    <material name="terrain_label_plum_t2" texture="terrain_label_plum_t2" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_plum_t3" type="2d" file="labels/plum_t3.png" />
+    <material name="terrain_label_plum_t3" texture="terrain_label_plum_t3" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_plum_t4" type="2d" file="labels/plum_t4.png" />
+    <material name="terrain_label_plum_t4" texture="terrain_label_plum_t4" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_plum_t5" type="2d" file="labels/plum_t5.png" />
+    <material name="terrain_label_plum_t5" texture="terrain_label_plum_t5" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_rough_t1" type="2d" file="labels/rough_t1.png" />
+    <material name="terrain_label_rough_t1" texture="terrain_label_rough_t1" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_rough_t2" type="2d" file="labels/rough_t2.png" />
+    <material name="terrain_label_rough_t2" texture="terrain_label_rough_t2" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_rough_t3" type="2d" file="labels/rough_t3.png" />
+    <material name="terrain_label_rough_t3" texture="terrain_label_rough_t3" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_rough_t4" type="2d" file="labels/rough_t4.png" />
+    <material name="terrain_label_rough_t4" texture="terrain_label_rough_t4" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_rough_t5" type="2d" file="labels/rough_t5.png" />
+    <material name="terrain_label_rough_t5" texture="terrain_label_rough_t5" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_rough_t6" type="2d" file="labels/rough_t6.png" />
+    <material name="terrain_label_rough_t6" texture="terrain_label_rough_t6" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+    <texture name="terrain_label_rough_t7" type="2d" file="labels/rough_t7.png" />
+    <material name="terrain_label_rough_t7" texture="terrain_label_rough_t7" texrepeat="1 1" texuniform="false" rgba="1 1 1 1" reflectance="0" emission=".5" />
+  </asset>
+  <worldbody>
+    <light pos="0 0 12" dir="0 0 -1" directional="true" />
+    <geom name="floor" type="plane" size="0 0 .05" material="groundplane" friction="1 .005 .0001" condim="3" />
+    <!--第 1 区 y=0：独立高台，高度 5 cm 至 120 cm，共十二档。-->
+    <geom name="platform_05cm" type="box" pos="3.75 0 0.025" size="0.75 0.8 0.025" rgba=".25 .65 .95 1" friction="1 .005 .0001" condim="3" />
+    <geom name="platform_10cm" type="box" pos="6.75 0 0.05" size="0.75 0.8 0.05" rgba=".25 .65 .95 1" friction="1 .005 .0001" condim="3" />
+    <geom name="platform_15cm" type="box" pos="9.75 0 0.075" size="0.75 0.8 0.075" rgba=".25 .65 .95 1" friction="1 .005 .0001" condim="3" />
+    <geom name="platform_20cm" type="box" pos="12.75 0 0.1" size="0.75 0.8 0.1" rgba=".25 .65 .95 1" friction="1 .005 .0001" condim="3" />
+    <geom name="platform_25cm" type="box" pos="15.75 0 0.125" size="0.75 0.8 0.125" rgba=".25 .65 .95 1" friction="1 .005 .0001" condim="3" />
+    <geom name="platform_30cm" type="box" pos="18.75 0 0.15" size="0.75 0.8 0.15" rgba=".25 .65 .95 1" friction="1 .005 .0001" condim="3" />
+    <geom name="platform_40cm" type="box" pos="21.75 0 0.2" size="0.75 0.8 0.2" rgba=".25 .65 .95 1" friction="1 .005 .0001" condim="3" />
+    <geom name="platform_50cm" type="box" pos="24.75 0 0.25" size="0.75 0.8 0.25" rgba=".25 .65 .95 1" friction="1 .005 .0001" condim="3" />
+    <geom name="platform_60cm" type="box" pos="27.75 0 0.3" size="0.75 0.8 0.3" rgba=".25 .65 .95 1" friction="1 .005 .0001" condim="3" />
+    <geom name="platform_80cm" type="box" pos="30.75 0 0.4" size="0.75 0.8 0.4" rgba=".25 .65 .95 1" friction="1 .005 .0001" condim="3" />
+    <geom name="platform_100cm" type="box" pos="33.75 0 0.5" size="0.75 0.8 0.5" rgba=".25 .65 .95 1" friction="1 .005 .0001" condim="3" />
+    <geom name="platform_120cm" type="box" pos="36.75 0 0.6" size="0.75 0.8 0.6" rgba=".25 .65 .95 1" friction="1 .005 .0001" condim="3" />
+    <!--第 2 区 y=3：每档六级上楼、顶部平台、六级下楼；踏面深度均为 30 cm。-->
+    <geom name="stairs_04cm_up_1" type="box" pos="3.15 3 0.02" size="0.15 0.7 0.02" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_04cm_up_2" type="box" pos="3.45 3 0.04" size="0.15 0.7 0.04" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_04cm_up_3" type="box" pos="3.75 3 0.06" size="0.15 0.7 0.06" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_04cm_up_4" type="box" pos="4.05 3 0.08" size="0.15 0.7 0.08" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_04cm_up_5" type="box" pos="4.35 3 0.1" size="0.15 0.7 0.1" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_04cm_up_6" type="box" pos="4.65 3 0.12" size="0.15 0.7 0.12" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_04cm_landing" type="box" pos="5.2 3 0.12" size="0.4 0.7 0.12" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_04cm_down_1" type="box" pos="5.75 3 0.12" size="0.15 0.7 0.12" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_04cm_down_2" type="box" pos="6.05 3 0.1" size="0.15 0.7 0.1" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_04cm_down_3" type="box" pos="6.35 3 0.08" size="0.15 0.7 0.08" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_04cm_down_4" type="box" pos="6.65 3 0.06" size="0.15 0.7 0.06" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_04cm_down_5" type="box" pos="6.95 3 0.04" size="0.15 0.7 0.04" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_04cm_down_6" type="box" pos="7.25 3 0.02" size="0.15 0.7 0.02" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_06cm_up_1" type="box" pos="10.65 3 0.03" size="0.15 0.7 0.03" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_06cm_up_2" type="box" pos="10.95 3 0.06" size="0.15 0.7 0.06" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_06cm_up_3" type="box" pos="11.25 3 0.09" size="0.15 0.7 0.09" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_06cm_up_4" type="box" pos="11.55 3 0.12" size="0.15 0.7 0.12" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_06cm_up_5" type="box" pos="11.85 3 0.15" size="0.15 0.7 0.15" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_06cm_up_6" type="box" pos="12.15 3 0.18" size="0.15 0.7 0.18" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_06cm_landing" type="box" pos="12.7 3 0.18" size="0.4 0.7 0.18" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_06cm_down_1" type="box" pos="13.25 3 0.18" size="0.15 0.7 0.18" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_06cm_down_2" type="box" pos="13.55 3 0.15" size="0.15 0.7 0.15" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_06cm_down_3" type="box" pos="13.85 3 0.12" size="0.15 0.7 0.12" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_06cm_down_4" type="box" pos="14.15 3 0.09" size="0.15 0.7 0.09" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_06cm_down_5" type="box" pos="14.45 3 0.06" size="0.15 0.7 0.06" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_06cm_down_6" type="box" pos="14.75 3 0.03" size="0.15 0.7 0.03" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_08cm_up_1" type="box" pos="18.15 3 0.04" size="0.15 0.7 0.04" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_08cm_up_2" type="box" pos="18.45 3 0.08" size="0.15 0.7 0.08" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_08cm_up_3" type="box" pos="18.75 3 0.12" size="0.15 0.7 0.12" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_08cm_up_4" type="box" pos="19.05 3 0.16" size="0.15 0.7 0.16" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_08cm_up_5" type="box" pos="19.35 3 0.2" size="0.15 0.7 0.2" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_08cm_up_6" type="box" pos="19.65 3 0.24" size="0.15 0.7 0.24" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_08cm_landing" type="box" pos="20.2 3 0.24" size="0.4 0.7 0.24" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_08cm_down_1" type="box" pos="20.75 3 0.24" size="0.15 0.7 0.24" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_08cm_down_2" type="box" pos="21.05 3 0.2" size="0.15 0.7 0.2" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_08cm_down_3" type="box" pos="21.35 3 0.16" size="0.15 0.7 0.16" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_08cm_down_4" type="box" pos="21.65 3 0.12" size="0.15 0.7 0.12" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_08cm_down_5" type="box" pos="21.95 3 0.08" size="0.15 0.7 0.08" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_08cm_down_6" type="box" pos="22.25 3 0.04" size="0.15 0.7 0.04" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_10cm_up_1" type="box" pos="25.65 3 0.05" size="0.15 0.7 0.05" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_10cm_up_2" type="box" pos="25.95 3 0.1" size="0.15 0.7 0.1" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_10cm_up_3" type="box" pos="26.25 3 0.15" size="0.15 0.7 0.15" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_10cm_up_4" type="box" pos="26.55 3 0.2" size="0.15 0.7 0.2" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_10cm_up_5" type="box" pos="26.85 3 0.25" size="0.15 0.7 0.25" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_10cm_up_6" type="box" pos="27.15 3 0.3" size="0.15 0.7 0.3" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_10cm_landing" type="box" pos="27.7 3 0.3" size="0.4 0.7 0.3" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_10cm_down_1" type="box" pos="28.25 3 0.3" size="0.15 0.7 0.3" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_10cm_down_2" type="box" pos="28.55 3 0.25" size="0.15 0.7 0.25" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_10cm_down_3" type="box" pos="28.85 3 0.2" size="0.15 0.7 0.2" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_10cm_down_4" type="box" pos="29.15 3 0.15" size="0.15 0.7 0.15" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_10cm_down_5" type="box" pos="29.45 3 0.1" size="0.15 0.7 0.1" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_10cm_down_6" type="box" pos="29.75 3 0.05" size="0.15 0.7 0.05" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_12cm_up_1" type="box" pos="33.15 3 0.06" size="0.15 0.7 0.06" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_12cm_up_2" type="box" pos="33.45 3 0.12" size="0.15 0.7 0.12" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_12cm_up_3" type="box" pos="33.75 3 0.18" size="0.15 0.7 0.18" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_12cm_up_4" type="box" pos="34.05 3 0.24" size="0.15 0.7 0.24" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_12cm_up_5" type="box" pos="34.35 3 0.3" size="0.15 0.7 0.3" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_12cm_up_6" type="box" pos="34.65 3 0.36" size="0.15 0.7 0.36" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_12cm_landing" type="box" pos="35.2 3 0.36" size="0.4 0.7 0.36" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_12cm_down_1" type="box" pos="35.75 3 0.36" size="0.15 0.7 0.36" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_12cm_down_2" type="box" pos="36.05 3 0.3" size="0.15 0.7 0.3" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_12cm_down_3" type="box" pos="36.35 3 0.24" size="0.15 0.7 0.24" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_12cm_down_4" type="box" pos="36.65 3 0.18" size="0.15 0.7 0.18" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_12cm_down_5" type="box" pos="36.95 3 0.12" size="0.15 0.7 0.12" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_12cm_down_6" type="box" pos="37.25 3 0.06" size="0.15 0.7 0.06" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_15cm_up_1" type="box" pos="40.65 3 0.075" size="0.15 0.7 0.075" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_15cm_up_2" type="box" pos="40.95 3 0.15" size="0.15 0.7 0.15" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_15cm_up_3" type="box" pos="41.25 3 0.225" size="0.15 0.7 0.225" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_15cm_up_4" type="box" pos="41.55 3 0.3" size="0.15 0.7 0.3" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_15cm_up_5" type="box" pos="41.85 3 0.375" size="0.15 0.7 0.375" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_15cm_up_6" type="box" pos="42.15 3 0.45" size="0.15 0.7 0.45" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_15cm_landing" type="box" pos="42.7 3 0.45" size="0.4 0.7 0.45" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_15cm_down_1" type="box" pos="43.25 3 0.45" size="0.15 0.7 0.45" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_15cm_down_2" type="box" pos="43.55 3 0.375" size="0.15 0.7 0.375" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_15cm_down_3" type="box" pos="43.85 3 0.3" size="0.15 0.7 0.3" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_15cm_down_4" type="box" pos="44.15 3 0.225" size="0.15 0.7 0.225" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_15cm_down_5" type="box" pos="44.45 3 0.15" size="0.15 0.7 0.15" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_15cm_down_6" type="box" pos="44.75 3 0.075" size="0.15 0.7 0.075" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_20cm_up_1" type="box" pos="48.15 3 0.1" size="0.15 0.7 0.1" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_20cm_up_2" type="box" pos="48.45 3 0.2" size="0.15 0.7 0.2" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_20cm_up_3" type="box" pos="48.75 3 0.3" size="0.15 0.7 0.3" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_20cm_up_4" type="box" pos="49.05 3 0.4" size="0.15 0.7 0.4" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_20cm_up_5" type="box" pos="49.35 3 0.5" size="0.15 0.7 0.5" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_20cm_up_6" type="box" pos="49.65 3 0.6" size="0.15 0.7 0.6" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_20cm_landing" type="box" pos="50.2 3 0.6" size="0.4 0.7 0.6" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_20cm_down_1" type="box" pos="50.75 3 0.6" size="0.15 0.7 0.6" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_20cm_down_2" type="box" pos="51.05 3 0.5" size="0.15 0.7 0.5" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_20cm_down_3" type="box" pos="51.35 3 0.4" size="0.15 0.7 0.4" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_20cm_down_4" type="box" pos="51.65 3 0.3" size="0.15 0.7 0.3" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_20cm_down_5" type="box" pos="51.95 3 0.2" size="0.15 0.7 0.2" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_20cm_down_6" type="box" pos="52.25 3 0.1" size="0.15 0.7 0.1" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_25cm_up_1" type="box" pos="55.65 3 0.125" size="0.15 0.7 0.125" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_25cm_up_2" type="box" pos="55.95 3 0.25" size="0.15 0.7 0.25" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_25cm_up_3" type="box" pos="56.25 3 0.375" size="0.15 0.7 0.375" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_25cm_up_4" type="box" pos="56.55 3 0.5" size="0.15 0.7 0.5" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_25cm_up_5" type="box" pos="56.85 3 0.625" size="0.15 0.7 0.625" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_25cm_up_6" type="box" pos="57.15 3 0.75" size="0.15 0.7 0.75" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_25cm_landing" type="box" pos="57.7 3 0.75" size="0.4 0.7 0.75" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_25cm_down_1" type="box" pos="58.25 3 0.75" size="0.15 0.7 0.75" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_25cm_down_2" type="box" pos="58.55 3 0.625" size="0.15 0.7 0.625" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_25cm_down_3" type="box" pos="58.85 3 0.5" size="0.15 0.7 0.5" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_25cm_down_4" type="box" pos="59.15 3 0.375" size="0.15 0.7 0.375" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_25cm_down_5" type="box" pos="59.45 3 0.25" size="0.15 0.7 0.25" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_25cm_down_6" type="box" pos="59.75 3 0.125" size="0.15 0.7 0.125" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_30cm_up_1" type="box" pos="63.15 3 0.15" size="0.15 0.7 0.15" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_30cm_up_2" type="box" pos="63.45 3 0.3" size="0.15 0.7 0.3" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_30cm_up_3" type="box" pos="63.75 3 0.45" size="0.15 0.7 0.45" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_30cm_up_4" type="box" pos="64.05 3 0.6" size="0.15 0.7 0.6" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_30cm_up_5" type="box" pos="64.35 3 0.75" size="0.15 0.7 0.75" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_30cm_up_6" type="box" pos="64.65 3 0.9" size="0.15 0.7 0.9" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_30cm_landing" type="box" pos="65.2 3 0.9" size="0.4 0.7 0.9" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_30cm_down_1" type="box" pos="65.75 3 0.9" size="0.15 0.7 0.9" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_30cm_down_2" type="box" pos="66.05 3 0.75" size="0.15 0.7 0.75" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_30cm_down_3" type="box" pos="66.35 3 0.6" size="0.15 0.7 0.6" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_30cm_down_4" type="box" pos="66.65 3 0.45" size="0.15 0.7 0.45" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_30cm_down_5" type="box" pos="66.95 3 0.3" size="0.15 0.7 0.3" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_30cm_down_6" type="box" pos="67.25 3 0.15" size="0.15 0.7 0.15" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_35cm_up_1" type="box" pos="70.65 3 0.175" size="0.15 0.7 0.175" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_35cm_up_2" type="box" pos="70.95 3 0.35" size="0.15 0.7 0.35" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_35cm_up_3" type="box" pos="71.25 3 0.525" size="0.15 0.7 0.525" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_35cm_up_4" type="box" pos="71.55 3 0.7" size="0.15 0.7 0.7" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_35cm_up_5" type="box" pos="71.85 3 0.875" size="0.15 0.7 0.875" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_35cm_up_6" type="box" pos="72.15 3 1.05" size="0.15 0.7 1.05" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_35cm_landing" type="box" pos="72.7 3 1.05" size="0.4 0.7 1.05" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_35cm_down_1" type="box" pos="73.25 3 1.05" size="0.15 0.7 1.05" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_35cm_down_2" type="box" pos="73.55 3 0.875" size="0.15 0.7 0.875" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_35cm_down_3" type="box" pos="73.85 3 0.7" size="0.15 0.7 0.7" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_35cm_down_4" type="box" pos="74.15 3 0.525" size="0.15 0.7 0.525" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_35cm_down_5" type="box" pos="74.45 3 0.35" size="0.15 0.7 0.35" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_35cm_down_6" type="box" pos="74.75 3 0.175" size="0.15 0.7 0.175" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_40cm_up_1" type="box" pos="78.15 3 0.2" size="0.15 0.7 0.2" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_40cm_up_2" type="box" pos="78.45 3 0.4" size="0.15 0.7 0.4" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_40cm_up_3" type="box" pos="78.75 3 0.6" size="0.15 0.7 0.6" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_40cm_up_4" type="box" pos="79.05 3 0.8" size="0.15 0.7 0.8" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_40cm_up_5" type="box" pos="79.35 3 1" size="0.15 0.7 1" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_40cm_up_6" type="box" pos="79.65 3 1.2" size="0.15 0.7 1.2" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_40cm_landing" type="box" pos="80.2 3 1.2" size="0.4 0.7 1.2" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_40cm_down_1" type="box" pos="80.75 3 1.2" size="0.15 0.7 1.2" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_40cm_down_2" type="box" pos="81.05 3 1" size="0.15 0.7 1" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_40cm_down_3" type="box" pos="81.35 3 0.8" size="0.15 0.7 0.8" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_40cm_down_4" type="box" pos="81.65 3 0.6" size="0.15 0.7 0.6" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_40cm_down_5" type="box" pos="81.95 3 0.4" size="0.15 0.7 0.4" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="stairs_40cm_down_6" type="box" pos="82.25 3 0.2" size="0.15 0.7 0.2" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <!--第 3 区 y=6：2 m 水平投影的上、下坡，中间 80 cm 平台。-->
+    <geom name="slope_05deg_up" type="mesh" mesh="slope_05deg_up_mesh" pos="3 6 0" euler="0 0 0" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_05deg_landing" type="box" pos="5.4 6 0.087488664" size="0.4 0.7 0.087488664" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_05deg_down" type="mesh" mesh="slope_05deg_down_mesh" pos="7.8 6 0" euler="0 0 3.1415927" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_10deg_up" type="mesh" mesh="slope_10deg_up_mesh" pos="9 6 0" euler="0 0 0" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_10deg_landing" type="box" pos="11.4 6 0.17632698" size="0.4 0.7 0.17632698" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_10deg_down" type="mesh" mesh="slope_10deg_down_mesh" pos="13.8 6 0" euler="0 0 3.1415927" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_15deg_up" type="mesh" mesh="slope_15deg_up_mesh" pos="15 6 0" euler="0 0 0" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_15deg_landing" type="box" pos="17.4 6 0.26794919" size="0.4 0.7 0.26794919" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_15deg_down" type="mesh" mesh="slope_15deg_down_mesh" pos="19.8 6 0" euler="0 0 3.1415927" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_20deg_up" type="mesh" mesh="slope_20deg_up_mesh" pos="21 6 0" euler="0 0 0" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_20deg_landing" type="box" pos="23.4 6 0.36397023" size="0.4 0.7 0.36397023" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_20deg_down" type="mesh" mesh="slope_20deg_down_mesh" pos="25.8 6 0" euler="0 0 3.1415927" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_25deg_up" type="mesh" mesh="slope_25deg_up_mesh" pos="27 6 0" euler="0 0 0" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_25deg_landing" type="box" pos="29.4 6 0.46630766" size="0.4 0.7 0.46630766" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_25deg_down" type="mesh" mesh="slope_25deg_down_mesh" pos="31.8 6 0" euler="0 0 3.1415927" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_30deg_up" type="mesh" mesh="slope_30deg_up_mesh" pos="33 6 0" euler="0 0 0" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_30deg_landing" type="box" pos="35.4 6 0.57735027" size="0.4 0.7 0.57735027" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_30deg_down" type="mesh" mesh="slope_30deg_down_mesh" pos="37.8 6 0" euler="0 0 3.1415927" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_35deg_up" type="mesh" mesh="slope_35deg_up_mesh" pos="39 6 0" euler="0 0 0" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_35deg_landing" type="box" pos="41.4 6 0.70020754" size="0.4 0.7 0.70020754" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_35deg_down" type="mesh" mesh="slope_35deg_down_mesh" pos="43.8 6 0" euler="0 0 3.1415927" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_40deg_up" type="mesh" mesh="slope_40deg_up_mesh" pos="45 6 0" euler="0 0 0" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_40deg_landing" type="box" pos="47.4 6 0.83909963" size="0.4 0.7 0.83909963" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_40deg_down" type="mesh" mesh="slope_40deg_down_mesh" pos="49.8 6 0" euler="0 0 3.1415927" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_45deg_up" type="mesh" mesh="slope_45deg_up_mesh" pos="51 6 0" euler="0 0 0" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_45deg_landing" type="box" pos="53.4 6 1" size="0.4 0.7 1" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_45deg_down" type="mesh" mesh="slope_45deg_down_mesh" pos="55.8 6 0" euler="0 0 3.1415927" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_50deg_up" type="mesh" mesh="slope_50deg_up_mesh" pos="57 6 0" euler="0 0 0" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_50deg_landing" type="box" pos="59.4 6 1.1917536" size="0.4 0.7 1.1917536" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_50deg_down" type="mesh" mesh="slope_50deg_down_mesh" pos="61.8 6 0" euler="0 0 3.1415927" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_60deg_up" type="mesh" mesh="slope_60deg_up_mesh" pos="63 6 0" euler="0 0 0" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_60deg_landing" type="box" pos="65.4 6 1.7320508" size="0.4 0.7 1.7320508" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="slope_60deg_down" type="mesh" mesh="slope_60deg_down_mesh" pos="67.8 6 0" euler="0 0 3.1415927" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <!--第 4 区 y=9：30 cm 高通道中的实际缺口，净宽 10 至 180 cm，底面为 z=0；缺口净宽递增。-->
+    <geom name="trench_10cm_entry" type="mesh" mesh="trench_10cm_entry_mesh" pos="3 9 0" euler="0 0 0" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_10cm_near" type="box" pos="4.5 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_10cm_far" type="box" pos="5.6 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_10cm_exit" type="mesh" mesh="trench_10cm_exit_mesh" pos="7.1 9 0" euler="0 0 3.1415927" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_20cm_entry" type="mesh" mesh="trench_20cm_entry_mesh" pos="9 9 0" euler="0 0 0" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_20cm_near" type="box" pos="10.5 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_20cm_far" type="box" pos="11.7 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_20cm_exit" type="mesh" mesh="trench_20cm_exit_mesh" pos="13.2 9 0" euler="0 0 3.1415927" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_30cm_entry" type="mesh" mesh="trench_30cm_entry_mesh" pos="15 9 0" euler="0 0 0" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_30cm_near" type="box" pos="16.5 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_30cm_far" type="box" pos="17.8 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_30cm_exit" type="mesh" mesh="trench_30cm_exit_mesh" pos="19.3 9 0" euler="0 0 3.1415927" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_40cm_entry" type="mesh" mesh="trench_40cm_entry_mesh" pos="21 9 0" euler="0 0 0" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_40cm_near" type="box" pos="22.5 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_40cm_far" type="box" pos="23.9 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_40cm_exit" type="mesh" mesh="trench_40cm_exit_mesh" pos="25.4 9 0" euler="0 0 3.1415927" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_50cm_entry" type="mesh" mesh="trench_50cm_entry_mesh" pos="27 9 0" euler="0 0 0" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_50cm_near" type="box" pos="28.5 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_50cm_far" type="box" pos="30 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_50cm_exit" type="mesh" mesh="trench_50cm_exit_mesh" pos="31.5 9 0" euler="0 0 3.1415927" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_60cm_entry" type="mesh" mesh="trench_60cm_entry_mesh" pos="33 9 0" euler="0 0 0" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_60cm_near" type="box" pos="34.5 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_60cm_far" type="box" pos="36.1 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_60cm_exit" type="mesh" mesh="trench_60cm_exit_mesh" pos="37.6 9 0" euler="0 0 3.1415927" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_80cm_entry" type="mesh" mesh="trench_80cm_entry_mesh" pos="39 9 0" euler="0 0 0" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_80cm_near" type="box" pos="40.5 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_80cm_far" type="box" pos="42.3 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_80cm_exit" type="mesh" mesh="trench_80cm_exit_mesh" pos="43.8 9 0" euler="0 0 3.1415927" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_100cm_entry" type="mesh" mesh="trench_100cm_entry_mesh" pos="45 9 0" euler="0 0 0" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_100cm_near" type="box" pos="46.5 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_100cm_far" type="box" pos="48.5 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_100cm_exit" type="mesh" mesh="trench_100cm_exit_mesh" pos="50 9 0" euler="0 0 3.1415927" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_120cm_entry" type="mesh" mesh="trench_120cm_entry_mesh" pos="51 9 0" euler="0 0 0" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_120cm_near" type="box" pos="52.5 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_120cm_far" type="box" pos="54.7 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_120cm_exit" type="mesh" mesh="trench_120cm_exit_mesh" pos="56.2 9 0" euler="0 0 3.1415927" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_150cm_entry" type="mesh" mesh="trench_150cm_entry_mesh" pos="57 9 0" euler="0 0 0" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_150cm_near" type="box" pos="58.5 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_150cm_far" type="box" pos="61 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_150cm_exit" type="mesh" mesh="trench_150cm_exit_mesh" pos="62.5 9 0" euler="0 0 3.1415927" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_180cm_entry" type="mesh" mesh="trench_180cm_entry_mesh" pos="63 9 0" euler="0 0 0" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_180cm_near" type="box" pos="64.5 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_180cm_far" type="box" pos="67.3 9 0.15" size="0.5 0.7 0.15" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <geom name="trench_180cm_exit" type="mesh" mesh="trench_180cm_exit_mesh" pos="68.8 9 0" euler="0 0 3.1415927" rgba=".9 .35 .35 1" friction="1 .005 .0001" condim="3" />
+    <!--第 5 区 y=12：规则 PDF 第 6 页梅花桩，24 桩；净间距而非中心距。-->
+    <geom name="plum_entry" type="box" pos="4.4 12 0.1" size="0.4 0.4 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_entry_ramp" type="mesh" mesh="plum_entry_ramp_mesh" pos="2.8 12 0" euler="0 0 0" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r1_01" type="box" pos="5 12.2 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r1_02" type="box" pos="5.6 12.2 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r1_03" type="box" pos="6.2 12.2 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r1_04" type="box" pos="6.8 12.2 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r1_05" type="box" pos="7.4 12.2 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r1_06" type="box" pos="8 12.2 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r1_07" type="box" pos="8.6 12.2 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r1_08" type="box" pos="9.2 12.2 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r1_09" type="box" pos="9.8 12.2 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r1_10" type="box" pos="10.4 12.2 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r1_11" type="box" pos="11 12.2 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r1_12" type="box" pos="11.6 12.2 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r2_01" type="box" pos="5.3 11.8 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r2_02" type="box" pos="5.9 11.8 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r2_03" type="box" pos="6.5 11.8 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r2_04" type="box" pos="7.1 11.8 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r2_05" type="box" pos="7.7 11.8 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r2_06" type="box" pos="8.3 11.8 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r2_07" type="box" pos="8.9 11.8 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r2_08" type="box" pos="9.5 11.8 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r2_09" type="box" pos="10.1 11.8 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r2_10" type="box" pos="10.7 11.8 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r2_11" type="box" pos="11.3 11.8 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_r2_12" type="box" pos="11.9 11.8 0.1" size="0.1 0.1 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_exit" type="box" pos="12.5 12 0.1" size="0.4 0.4 0.1" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_exit_ramp" type="mesh" mesh="plum_exit_ramp_mesh" pos="14.1 12 0" euler="0 0 3.1415927" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <!--第 6 区 y=15：固定种子七档崎岖地面，块高上限 4 至 50 cm。-->
+    <geom name="rough_t1_00_0" type="box" pos="3.15 14.3 0.0066249977" size="0.15 0.15 0.0066249977" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.0086275093" />
+    <geom name="rough_t1_00_1" type="box" pos="3.15 14.65 0.0052034671" size="0.15 0.15 0.0052034671" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.042604421" />
+    <geom name="rough_t1_00_2" type="box" pos="3.15 15 0.011091273" size="0.15 0.15 0.011091273" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.097043922" />
+    <geom name="rough_t1_00_3" type="box" pos="3.15 15.35 0.0077524416" size="0.15 0.15 0.0077524416" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.076784452" />
+    <geom name="rough_t1_00_4" type="box" pos="3.15 15.7 0.013930053" size="0.15 0.15 0.013930053" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.053596453" />
+    <geom name="rough_t1_01_0" type="box" pos="3.5 14.3 0.01530164" size="0.15 0.15 0.01530164" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.10161089" />
+    <geom name="rough_t1_01_1" type="box" pos="3.5 14.65 0.014903303" size="0.15 0.15 0.014903303" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.047480972" />
+    <geom name="rough_t1_01_2" type="box" pos="3.5 15 0.008820582" size="0.15 0.15 0.008820582" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.060311792" />
+    <geom name="rough_t1_01_3" type="box" pos="3.5 15.35 0.019042361" size="0.15 0.15 0.019042361" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.08578343" />
+    <geom name="rough_t1_01_4" type="box" pos="3.5 15.7 0.01137935" size="0.15 0.15 0.01137935" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.065162517" />
+    <geom name="rough_t1_02_0" type="box" pos="3.85 14.3 0.016011048" size="0.15 0.15 0.016011048" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.03897764" />
+    <geom name="rough_t1_02_1" type="box" pos="3.85 14.65 0.010191884" size="0.15 0.15 0.010191884" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.067325026" />
+    <geom name="rough_t1_02_2" type="box" pos="3.85 15 0.011807853" size="0.15 0.15 0.011807853" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.080636759" />
+    <geom name="rough_t1_02_3" type="box" pos="3.85 15.35 0.016870374" size="0.15 0.15 0.016870374" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.030271102" />
+    <geom name="rough_t1_02_4" type="box" pos="3.85 15.7 0.016050554" size="0.15 0.15 0.016050554" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.044356891" />
+    <geom name="rough_t1_03_0" type="box" pos="4.2 14.3 0.017638404" size="0.15 0.15 0.017638404" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.06470222" />
+    <geom name="rough_t1_03_1" type="box" pos="4.2 14.65 0.018229357" size="0.15 0.15 0.018229357" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.086490252" />
+    <geom name="rough_t1_03_2" type="box" pos="4.2 15 0.0059276505" size="0.15 0.15 0.0059276505" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.00579991" />
+    <geom name="rough_t1_03_3" type="box" pos="4.2 15.35 0.012877205" size="0.15 0.15 0.012877205" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.054363502" />
+    <geom name="rough_t1_03_4" type="box" pos="4.2 15.7 0.019961979" size="0.15 0.15 0.019961979" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.020533659" />
+    <geom name="rough_t1_04_0" type="box" pos="4.55 14.3 0.013520156" size="0.15 0.15 0.013520156" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.062243378" />
+    <geom name="rough_t1_04_1" type="box" pos="4.55 14.65 0.0090928073" size="0.15 0.15 0.0090928073" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.10265194" />
+    <geom name="rough_t1_04_2" type="box" pos="4.55 15 0.017045012" size="0.15 0.15 0.017045012" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.026939774" />
+    <geom name="rough_t1_04_3" type="box" pos="4.55 15.35 0.016212168" size="0.15 0.15 0.016212168" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.00066861645" />
+    <geom name="rough_t1_04_4" type="box" pos="4.55 15.7 0.0060237055" size="0.15 0.15 0.0060237055" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.064838672" />
+    <geom name="rough_t1_05_0" type="box" pos="4.9 14.3 0.0055294753" size="0.15 0.15 0.0055294753" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.047288674" />
+    <geom name="rough_t1_05_1" type="box" pos="4.9 14.65 0.014453475" size="0.15 0.15 0.014453475" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.0016778266" />
+    <geom name="rough_t1_05_2" type="box" pos="4.9 15 0.0063513503" size="0.15 0.15 0.0063513503" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.11322576" />
+    <geom name="rough_t1_05_3" type="box" pos="4.9 15.35 0.014404068" size="0.15 0.15 0.014404068" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.026406598" />
+    <geom name="rough_t1_05_4" type="box" pos="4.9 15.7 0.010054465" size="0.15 0.15 0.010054465" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.116665" />
+    <geom name="rough_t1_06_0" type="box" pos="5.25 14.3 0.0054254482" size="0.15 0.15 0.0054254482" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.030768573" />
+    <geom name="rough_t1_06_1" type="box" pos="5.25 14.65 0.014520164" size="0.15 0.15 0.014520164" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.0031575506" />
+    <geom name="rough_t1_06_2" type="box" pos="5.25 15 0.012522037" size="0.15 0.15 0.012522037" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.077224017" />
+    <geom name="rough_t1_06_3" type="box" pos="5.25 15.35 0.011937834" size="0.15 0.15 0.011937834" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.07770056" />
+    <geom name="rough_t1_06_4" type="box" pos="5.25 15.7 0.010706065" size="0.15 0.15 0.010706065" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.07546455" />
+    <geom name="rough_t1_07_0" type="box" pos="5.6 14.3 0.01216268" size="0.15 0.15 0.01216268" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.062321227" />
+    <geom name="rough_t1_07_1" type="box" pos="5.6 14.65 0.0053803295" size="0.15 0.15 0.0053803295" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.048051719" />
+    <geom name="rough_t1_07_2" type="box" pos="5.6 15 0.0088977915" size="0.15 0.15 0.0088977915" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.033419753" />
+    <geom name="rough_t1_07_3" type="box" pos="5.6 15.35 0.01382129" size="0.15 0.15 0.01382129" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.083394466" />
+    <geom name="rough_t1_07_4" type="box" pos="5.6 15.7 0.010421723" size="0.15 0.15 0.010421723" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.038540128" />
+    <geom name="rough_t1_08_0" type="box" pos="5.95 14.3 0.0084631475" size="0.15 0.15 0.0084631475" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.068206814" />
+    <geom name="rough_t1_08_1" type="box" pos="5.95 14.65 0.009683431" size="0.15 0.15 0.009683431" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.017139845" />
+    <geom name="rough_t1_08_2" type="box" pos="5.95 15 0.015016709" size="0.15 0.15 0.015016709" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.013448427" />
+    <geom name="rough_t1_08_3" type="box" pos="5.95 15.35 0.019579398" size="0.15 0.15 0.019579398" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.11685474" />
+    <geom name="rough_t1_08_4" type="box" pos="5.95 15.7 0.015657315" size="0.15 0.15 0.015657315" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.017213982" />
+    <geom name="rough_t1_09_0" type="box" pos="6.3 14.3 0.019209266" size="0.15 0.15 0.019209266" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.061989856" />
+    <geom name="rough_t1_09_1" type="box" pos="6.3 14.65 0.013607695" size="0.15 0.15 0.013607695" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.021276443" />
+    <geom name="rough_t1_09_2" type="box" pos="6.3 15 0.014801221" size="0.15 0.15 0.014801221" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.088130622" />
+    <geom name="rough_t1_09_3" type="box" pos="6.3 15.35 0.016133697" size="0.15 0.15 0.016133697" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.0084459147" />
+    <geom name="rough_t1_09_4" type="box" pos="6.3 15.7 0.014801279" size="0.15 0.15 0.014801279" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.080227554" />
+    <geom name="rough_t1_10_0" type="box" pos="6.65 14.3 0.017904928" size="0.15 0.15 0.017904928" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.083838658" />
+    <geom name="rough_t1_10_1" type="box" pos="6.65 14.65 0.013860001" size="0.15 0.15 0.013860001" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.070730654" />
+    <geom name="rough_t1_10_2" type="box" pos="6.65 15 0.010372064" size="0.15 0.15 0.010372064" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.019972294" />
+    <geom name="rough_t1_10_3" type="box" pos="6.65 15.35 0.01417621" size="0.15 0.15 0.01417621" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.058832583" />
+    <geom name="rough_t1_10_4" type="box" pos="6.65 15.7 0.0093890673" size="0.15 0.15 0.0093890673" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.055108475" />
+    <geom name="rough_t1_11_0" type="box" pos="7 14.3 0.017619899" size="0.15 0.15 0.017619899" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.095379275" />
+    <geom name="rough_t1_11_1" type="box" pos="7 14.65 0.0087833548" size="0.15 0.15 0.0087833548" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.099260123" />
+    <geom name="rough_t1_11_2" type="box" pos="7 15 0.011992872" size="0.15 0.15 0.011992872" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.062695339" />
+    <geom name="rough_t1_11_3" type="box" pos="7 15.35 0.0070880172" size="0.15 0.15 0.0070880172" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.023411122" />
+    <geom name="rough_t1_11_4" type="box" pos="7 15.7 0.013745407" size="0.15 0.15 0.013745407" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.045532139" />
+    <geom name="rough_t2_00_0" type="box" pos="9.15 14.3 0.035530568" size="0.15 0.15 0.035530568" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.0075221808" />
+    <geom name="rough_t2_00_1" type="box" pos="9.15 14.65 0.0093635479" size="0.15 0.15 0.0093635479" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.099859333" />
+    <geom name="rough_t2_00_2" type="box" pos="9.15 15 0.038686187" size="0.15 0.15 0.038686187" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.059657877" />
+    <geom name="rough_t2_00_3" type="box" pos="9.15 15.35 0.00738725" size="0.15 0.15 0.00738725" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.072393921" />
+    <geom name="rough_t2_00_4" type="box" pos="9.15 15.7 0.018512443" size="0.15 0.15 0.018512443" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.015140001" />
+    <geom name="rough_t2_01_0" type="box" pos="9.5 14.3 0.027814404" size="0.15 0.15 0.027814404" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.084977948" />
+    <geom name="rough_t2_01_1" type="box" pos="9.5 14.65 0.026543338" size="0.15 0.15 0.026543338" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.03745388" />
+    <geom name="rough_t2_01_2" type="box" pos="9.5 15 0.039012662" size="0.15 0.15 0.039012662" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.085610748" />
+    <geom name="rough_t2_01_3" type="box" pos="9.5 15.35 0.018309317" size="0.15 0.15 0.018309317" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.087187783" />
+    <geom name="rough_t2_01_4" type="box" pos="9.5 15.7 0.02950634" size="0.15 0.15 0.02950634" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.076369387" />
+    <geom name="rough_t2_02_0" type="box" pos="9.85 14.3 0.025034689" size="0.15 0.15 0.025034689" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10306789" />
+    <geom name="rough_t2_02_1" type="box" pos="9.85 14.65 0.022614589" size="0.15 0.15 0.022614589" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.072168699" />
+    <geom name="rough_t2_02_2" type="box" pos="9.85 15 0.031750326" size="0.15 0.15 0.031750326" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.097454339" />
+    <geom name="rough_t2_02_3" type="box" pos="9.85 15.35 0.021308139" size="0.15 0.15 0.021308139" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.049004111" />
+    <geom name="rough_t2_02_4" type="box" pos="9.85 15.7 0.0075392631" size="0.15 0.15 0.0075392631" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.073798055" />
+    <geom name="rough_t2_03_0" type="box" pos="10.2 14.3 0.011456706" size="0.15 0.15 0.011456706" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.016313271" />
+    <geom name="rough_t2_03_1" type="box" pos="10.2 14.65 0.032408785" size="0.15 0.15 0.032408785" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.0048554459" />
+    <geom name="rough_t2_03_2" type="box" pos="10.2 15 0.022379862" size="0.15 0.15 0.022379862" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.026882738" />
+    <geom name="rough_t2_03_3" type="box" pos="10.2 15.35 0.037753494" size="0.15 0.15 0.037753494" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.00062234337" />
+    <geom name="rough_t2_03_4" type="box" pos="10.2 15.7 0.023684171" size="0.15 0.15 0.023684171" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.10577016" />
+    <geom name="rough_t2_04_0" type="box" pos="10.55 14.3 0.033822188" size="0.15 0.15 0.033822188" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10493545" />
+    <geom name="rough_t2_04_1" type="box" pos="10.55 14.65 0.010968274" size="0.15 0.15 0.010968274" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.0041513189" />
+    <geom name="rough_t2_04_2" type="box" pos="10.55 15 0.027684494" size="0.15 0.15 0.027684494" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.097606272" />
+    <geom name="rough_t2_04_3" type="box" pos="10.55 15.35 0.029778092" size="0.15 0.15 0.029778092" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.015514166" />
+    <geom name="rough_t2_04_4" type="box" pos="10.55 15.7 0.015343833" size="0.15 0.15 0.015343833" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.0042527532" />
+    <geom name="rough_t2_05_0" type="box" pos="10.9 14.3 0.00736502" size="0.15 0.15 0.00736502" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.11244862" />
+    <geom name="rough_t2_05_1" type="box" pos="10.9 14.65 0.024852596" size="0.15 0.15 0.024852596" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.009332051" />
+    <geom name="rough_t2_05_2" type="box" pos="10.9 15 0.0055990752" size="0.15 0.15 0.0055990752" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.079530358" />
+    <geom name="rough_t2_05_3" type="box" pos="10.9 15.35 0.030502426" size="0.15 0.15 0.030502426" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.016333087" />
+    <geom name="rough_t2_05_4" type="box" pos="10.9 15.7 0.020660739" size="0.15 0.15 0.020660739" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.097460514" />
+    <geom name="rough_t2_06_0" type="box" pos="11.25 14.3 0.0067621452" size="0.15 0.15 0.0067621452" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.073533456" />
+    <geom name="rough_t2_06_1" type="box" pos="11.25 14.65 0.018575894" size="0.15 0.15 0.018575894" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.081371765" />
+    <geom name="rough_t2_06_2" type="box" pos="11.25 15 0.025381654" size="0.15 0.15 0.025381654" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.056574699" />
+    <geom name="rough_t2_06_3" type="box" pos="11.25 15.35 0.013928828" size="0.15 0.15 0.013928828" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.016657612" />
+    <geom name="rough_t2_06_4" type="box" pos="11.25 15.7 0.035022317" size="0.15 0.15 0.035022317" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.025303712" />
+    <geom name="rough_t2_07_0" type="box" pos="11.6 14.3 0.014355834" size="0.15 0.15 0.014355834" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.036223597" />
+    <geom name="rough_t2_07_1" type="box" pos="11.6 14.65 0.015312169" size="0.15 0.15 0.015312169" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.08081137" />
+    <geom name="rough_t2_07_2" type="box" pos="11.6 15 0.036043059" size="0.15 0.15 0.036043059" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.031901047" />
+    <geom name="rough_t2_07_3" type="box" pos="11.6 15.35 0.03637243" size="0.15 0.15 0.03637243" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.10616376" />
+    <geom name="rough_t2_07_4" type="box" pos="11.6 15.7 0.036639102" size="0.15 0.15 0.036639102" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.078859592" />
+    <geom name="rough_t2_08_0" type="box" pos="11.95 14.3 0.027417284" size="0.15 0.15 0.027417284" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.072805899" />
+    <geom name="rough_t2_08_1" type="box" pos="11.95 14.65 0.022987535" size="0.15 0.15 0.022987535" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.036651378" />
+    <geom name="rough_t2_08_2" type="box" pos="11.95 15 0.023495609" size="0.15 0.15 0.023495609" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.061716757" />
+    <geom name="rough_t2_08_3" type="box" pos="11.95 15.35 0.013881323" size="0.15 0.15 0.013881323" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.076513221" />
+    <geom name="rough_t2_08_4" type="box" pos="11.95 15.7 0.021728066" size="0.15 0.15 0.021728066" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.05162009" />
+    <geom name="rough_t2_09_0" type="box" pos="12.3 14.3 0.011985506" size="0.15 0.15 0.011985506" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.034386799" />
+    <geom name="rough_t2_09_1" type="box" pos="12.3 14.65 0.030969093" size="0.15 0.15 0.030969093" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.08258223" />
+    <geom name="rough_t2_09_2" type="box" pos="12.3 15 0.032023663" size="0.15 0.15 0.032023663" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.052365261" />
+    <geom name="rough_t2_09_3" type="box" pos="12.3 15.35 0.017863182" size="0.15 0.15 0.017863182" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.10341546" />
+    <geom name="rough_t2_09_4" type="box" pos="12.3 15.7 0.013897712" size="0.15 0.15 0.013897712" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.009839598" />
+    <geom name="rough_t2_10_0" type="box" pos="12.65 14.3 0.020566781" size="0.15 0.15 0.020566781" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.040127546" />
+    <geom name="rough_t2_10_1" type="box" pos="12.65 14.65 0.030550464" size="0.15 0.15 0.030550464" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.021710567" />
+    <geom name="rough_t2_10_2" type="box" pos="12.65 15 0.02254055" size="0.15 0.15 0.02254055" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10850924" />
+    <geom name="rough_t2_10_3" type="box" pos="12.65 15.35 0.020969785" size="0.15 0.15 0.020969785" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.021040749" />
+    <geom name="rough_t2_10_4" type="box" pos="12.65 15.7 0.022023467" size="0.15 0.15 0.022023467" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.054078357" />
+    <geom name="rough_t2_11_0" type="box" pos="13 14.3 0.017621827" size="0.15 0.15 0.017621827" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.021461891" />
+    <geom name="rough_t2_11_1" type="box" pos="13 14.65 0.028687221" size="0.15 0.15 0.028687221" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.11087483" />
+    <geom name="rough_t2_11_2" type="box" pos="13 15 0.036887392" size="0.15 0.15 0.036887392" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.014177061" />
+    <geom name="rough_t2_11_3" type="box" pos="13 15.35 0.020589321" size="0.15 0.15 0.020589321" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.03794275" />
+    <geom name="rough_t2_11_4" type="box" pos="13 15.7 0.012045799" size="0.15 0.15 0.012045799" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.062675054" />
+    <geom name="rough_t3_00_0" type="box" pos="15.15 14.3 0.058013233" size="0.15 0.15 0.058013233" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.11802105" />
+    <geom name="rough_t3_00_1" type="box" pos="15.15 14.65 0.009182864" size="0.15 0.15 0.009182864" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10826218" />
+    <geom name="rough_t3_00_2" type="box" pos="15.15 15 0.021648408" size="0.15 0.15 0.021648408" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.032833108" />
+    <geom name="rough_t3_00_3" type="box" pos="15.15 15.35 0.048768133" size="0.15 0.15 0.048768133" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.023339451" />
+    <geom name="rough_t3_00_4" type="box" pos="15.15 15.7 0.049006887" size="0.15 0.15 0.049006887" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.096092138" />
+    <geom name="rough_t3_01_0" type="box" pos="15.5 14.3 0.022128404" size="0.15 0.15 0.022128404" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.028831855" />
+    <geom name="rough_t3_01_1" type="box" pos="15.5 14.65 0.025177906" size="0.15 0.15 0.025177906" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.01161714" />
+    <geom name="rough_t3_01_2" type="box" pos="15.5 15 0.02875747" size="0.15 0.15 0.02875747" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.025057422" />
+    <geom name="rough_t3_01_3" type="box" pos="15.5 15.35 0.055923339" size="0.15 0.15 0.055923339" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.08292338" />
+    <geom name="rough_t3_01_4" type="box" pos="15.5 15.7 0.044044704" size="0.15 0.15 0.044044704" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.10898136" />
+    <geom name="rough_t3_02_0" type="box" pos="15.85 14.3 0.01220008" size="0.15 0.15 0.01220008" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.00047993775" />
+    <geom name="rough_t3_02_1" type="box" pos="15.85 14.65 0.041295167" size="0.15 0.15 0.041295167" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.098044571" />
+    <geom name="rough_t3_02_2" type="box" pos="15.85 15 0.025275437" size="0.15 0.15 0.025275437" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.026098316" />
+    <geom name="rough_t3_02_3" type="box" pos="15.85 15.35 0.054303644" size="0.15 0.15 0.054303644" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.072995883" />
+    <geom name="rough_t3_02_4" type="box" pos="15.85 15.7 0.03252687" size="0.15 0.15 0.03252687" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.015228554" />
+    <geom name="rough_t3_03_0" type="box" pos="16.2 14.3 0.049510208" size="0.15 0.15 0.049510208" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.096504075" />
+    <geom name="rough_t3_03_1" type="box" pos="16.2 14.65 0.010435519" size="0.15 0.15 0.010435519" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.014449877" />
+    <geom name="rough_t3_03_2" type="box" pos="16.2 15 0.01469083" size="0.15 0.15 0.01469083" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.061590606" />
+    <geom name="rough_t3_03_3" type="box" pos="16.2 15.35 0.042368577" size="0.15 0.15 0.042368577" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.091625927" />
+    <geom name="rough_t3_03_4" type="box" pos="16.2 15.7 0.03752709" size="0.15 0.15 0.03752709" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.095703745" />
+    <geom name="rough_t3_04_0" type="box" pos="16.55 14.3 0.037810639" size="0.15 0.15 0.037810639" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.028183006" />
+    <geom name="rough_t3_04_1" type="box" pos="16.55 14.65 0.059964983" size="0.15 0.15 0.059964983" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.11853103" />
+    <geom name="rough_t3_04_2" type="box" pos="16.55 15 0.031708219" size="0.15 0.15 0.031708219" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.080881568" />
+    <geom name="rough_t3_04_3" type="box" pos="16.55 15.35 0.042979285" size="0.15 0.15 0.042979285" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.071825924" />
+    <geom name="rough_t3_04_4" type="box" pos="16.55 15.7 0.047233936" size="0.15 0.15 0.047233936" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.014994075" />
+    <geom name="rough_t3_05_0" type="box" pos="16.9 14.3 0.058766336" size="0.15 0.15 0.058766336" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.093724996" />
+    <geom name="rough_t3_05_1" type="box" pos="16.9 14.65 0.05589424" size="0.15 0.15 0.05589424" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.0030547807" />
+    <geom name="rough_t3_05_2" type="box" pos="16.9 15 0.031848575" size="0.15 0.15 0.031848575" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.09271438" />
+    <geom name="rough_t3_05_3" type="box" pos="16.9 15.35 0.03509446" size="0.15 0.15 0.03509446" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.015998358" />
+    <geom name="rough_t3_05_4" type="box" pos="16.9 15.7 0.05694935" size="0.15 0.15 0.05694935" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.11927117" />
+    <geom name="rough_t3_06_0" type="box" pos="17.25 14.3 0.030494363" size="0.15 0.15 0.030494363" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.0044452169" />
+    <geom name="rough_t3_06_1" type="box" pos="17.25 14.65 0.044908318" size="0.15 0.15 0.044908318" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.04407396" />
+    <geom name="rough_t3_06_2" type="box" pos="17.25 15 0.05412039" size="0.15 0.15 0.05412039" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.078045954" />
+    <geom name="rough_t3_06_3" type="box" pos="17.25 15.35 0.055507907" size="0.15 0.15 0.055507907" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.07138045" />
+    <geom name="rough_t3_06_4" type="box" pos="17.25 15.7 0.058006408" size="0.15 0.15 0.058006408" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.073831919" />
+    <geom name="rough_t3_07_0" type="box" pos="17.6 14.3 0.036520984" size="0.15 0.15 0.036520984" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.075735656" />
+    <geom name="rough_t3_07_1" type="box" pos="17.6 14.65 0.026239828" size="0.15 0.15 0.026239828" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.00024628616" />
+    <geom name="rough_t3_07_2" type="box" pos="17.6 15 0.050673992" size="0.15 0.15 0.050673992" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.044296899" />
+    <geom name="rough_t3_07_3" type="box" pos="17.6 15.35 0.058158209" size="0.15 0.15 0.058158209" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.011890876" />
+    <geom name="rough_t3_07_4" type="box" pos="17.6 15.7 0.013650126" size="0.15 0.15 0.013650126" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.032758011" />
+    <geom name="rough_t3_08_0" type="box" pos="17.95 14.3 0.03385059" size="0.15 0.15 0.03385059" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.11750272" />
+    <geom name="rough_t3_08_1" type="box" pos="17.95 14.65 0.058893804" size="0.15 0.15 0.058893804" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.068955733" />
+    <geom name="rough_t3_08_2" type="box" pos="17.95 15 0.039096603" size="0.15 0.15 0.039096603" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.11447907" />
+    <geom name="rough_t3_08_3" type="box" pos="17.95 15.35 0.052638641" size="0.15 0.15 0.052638641" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10585715" />
+    <geom name="rough_t3_08_4" type="box" pos="17.95 15.7 0.031152765" size="0.15 0.15 0.031152765" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.057770461" />
+    <geom name="rough_t3_09_0" type="box" pos="18.3 14.3 0.026099795" size="0.15 0.15 0.026099795" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.0027371776" />
+    <geom name="rough_t3_09_1" type="box" pos="18.3 14.65 0.038403771" size="0.15 0.15 0.038403771" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.11646488" />
+    <geom name="rough_t3_09_2" type="box" pos="18.3 15 0.032115049" size="0.15 0.15 0.032115049" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.021714125" />
+    <geom name="rough_t3_09_3" type="box" pos="18.3 15.35 0.015871022" size="0.15 0.15 0.015871022" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.11282492" />
+    <geom name="rough_t3_09_4" type="box" pos="18.3 15.7 0.0053000599" size="0.15 0.15 0.0053000599" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.02719047" />
+    <geom name="rough_t3_10_0" type="box" pos="18.65 14.3 0.036858948" size="0.15 0.15 0.036858948" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.012499805" />
+    <geom name="rough_t3_10_1" type="box" pos="18.65 14.65 0.053692468" size="0.15 0.15 0.053692468" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.11424299" />
+    <geom name="rough_t3_10_2" type="box" pos="18.65 15 0.033100407" size="0.15 0.15 0.033100407" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10803584" />
+    <geom name="rough_t3_10_3" type="box" pos="18.65 15.35 0.013325033" size="0.15 0.15 0.013325033" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.070534445" />
+    <geom name="rough_t3_10_4" type="box" pos="18.65 15.7 0.019897932" size="0.15 0.15 0.019897932" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.062780846" />
+    <geom name="rough_t3_11_0" type="box" pos="19 14.3 0.020892704" size="0.15 0.15 0.020892704" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.10134265" />
+    <geom name="rough_t3_11_1" type="box" pos="19 14.65 0.051140695" size="0.15 0.15 0.051140695" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.072836124" />
+    <geom name="rough_t3_11_2" type="box" pos="19 15 0.022921839" size="0.15 0.15 0.022921839" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.11582875" />
+    <geom name="rough_t3_11_3" type="box" pos="19 15.35 0.054776048" size="0.15 0.15 0.054776048" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.022592201" />
+    <geom name="rough_t3_11_4" type="box" pos="19 15.7 0.025546542" size="0.15 0.15 0.025546542" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.0042412149" />
+    <geom name="rough_t4_00_0" type="box" pos="21.15 14.3 0.03200072" size="0.15 0.15 0.03200072" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.03164371" />
+    <geom name="rough_t4_00_1" type="box" pos="21.15 14.65 0.055622688" size="0.15 0.15 0.055622688" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.038421358" />
+    <geom name="rough_t4_00_2" type="box" pos="21.15 15 0.067033925" size="0.15 0.15 0.067033925" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.11157902" />
+    <geom name="rough_t4_00_3" type="box" pos="21.15 15.35 0.060403105" size="0.15 0.15 0.060403105" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.0059264631" />
+    <geom name="rough_t4_00_4" type="box" pos="21.15 15.7 0.049197454" size="0.15 0.15 0.049197454" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.11544295" />
+    <geom name="rough_t4_01_0" type="box" pos="21.5 14.3 0.066999727" size="0.15 0.15 0.066999727" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.031536521" />
+    <geom name="rough_t4_01_1" type="box" pos="21.5 14.65 0.062611165" size="0.15 0.15 0.062611165" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.086467796" />
+    <geom name="rough_t4_01_2" type="box" pos="21.5 15 0.061488614" size="0.15 0.15 0.061488614" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.078012329" />
+    <geom name="rough_t4_01_3" type="box" pos="21.5 15.35 0.029565914" size="0.15 0.15 0.029565914" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.0875283" />
+    <geom name="rough_t4_01_4" type="box" pos="21.5 15.7 0.034682312" size="0.15 0.15 0.034682312" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.041117846" />
+    <geom name="rough_t4_02_0" type="box" pos="21.85 14.3 0.030666327" size="0.15 0.15 0.030666327" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.070768844" />
+    <geom name="rough_t4_02_1" type="box" pos="21.85 14.65 0.0086629852" size="0.15 0.15 0.0086629852" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.049002229" />
+    <geom name="rough_t4_02_2" type="box" pos="21.85 15 0.055704706" size="0.15 0.15 0.055704706" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.061234629" />
+    <geom name="rough_t4_02_3" type="box" pos="21.85 15.35 0.065942583" size="0.15 0.15 0.065942583" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.11217635" />
+    <geom name="rough_t4_02_4" type="box" pos="21.85 15.7 0.01152386" size="0.15 0.15 0.01152386" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10733991" />
+    <geom name="rough_t4_03_0" type="box" pos="22.2 14.3 0.074296441" size="0.15 0.15 0.074296441" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.086508678" />
+    <geom name="rough_t4_03_1" type="box" pos="22.2 14.65 0.041164971" size="0.15 0.15 0.041164971" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.046392926" />
+    <geom name="rough_t4_03_2" type="box" pos="22.2 15 0.032284245" size="0.15 0.15 0.032284245" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.002222347" />
+    <geom name="rough_t4_03_3" type="box" pos="22.2 15.35 0.058072069" size="0.15 0.15 0.058072069" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.080531472" />
+    <geom name="rough_t4_03_4" type="box" pos="22.2 15.7 0.038259039" size="0.15 0.15 0.038259039" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.093936568" />
+    <geom name="rough_t4_04_0" type="box" pos="22.55 14.3 0.012053572" size="0.15 0.15 0.012053572" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.09855275" />
+    <geom name="rough_t4_04_1" type="box" pos="22.55 14.65 0.045674515" size="0.15 0.15 0.045674515" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.094128293" />
+    <geom name="rough_t4_04_2" type="box" pos="22.55 15 0.044827788" size="0.15 0.15 0.044827788" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.048487032" />
+    <geom name="rough_t4_04_3" type="box" pos="22.55 15.35 0.026718641" size="0.15 0.15 0.026718641" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.11235065" />
+    <geom name="rough_t4_04_4" type="box" pos="22.55 15.7 0.053431087" size="0.15 0.15 0.053431087" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.022842063" />
+    <geom name="rough_t4_05_0" type="box" pos="22.9 14.3 0.083592908" size="0.15 0.15 0.083592908" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.095325067" />
+    <geom name="rough_t4_05_1" type="box" pos="22.9 14.65 0.013114065" size="0.15 0.15 0.013114065" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.041640627" />
+    <geom name="rough_t4_05_2" type="box" pos="22.9 15 0.057358995" size="0.15 0.15 0.057358995" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.025794593" />
+    <geom name="rough_t4_05_3" type="box" pos="22.9 15.35 0.040589606" size="0.15 0.15 0.040589606" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.00028478192" />
+    <geom name="rough_t4_05_4" type="box" pos="22.9 15.7 0.066694245" size="0.15 0.15 0.066694245" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.0031231017" />
+    <geom name="rough_t4_06_0" type="box" pos="23.25 14.3 0.038372584" size="0.15 0.15 0.038372584" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.038036828" />
+    <geom name="rough_t4_06_1" type="box" pos="23.25 14.65 0.0075451993" size="0.15 0.15 0.0075451993" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.1178829" />
+    <geom name="rough_t4_06_2" type="box" pos="23.25 15 0.010624314" size="0.15 0.15 0.010624314" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.033605765" />
+    <geom name="rough_t4_06_3" type="box" pos="23.25 15.35 0.08815042" size="0.15 0.15 0.08815042" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.11547343" />
+    <geom name="rough_t4_06_4" type="box" pos="23.25 15.7 0.066268982" size="0.15 0.15 0.066268982" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.07537915" />
+    <geom name="rough_t4_07_0" type="box" pos="23.6 14.3 0.04863486" size="0.15 0.15 0.04863486" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.11161517" />
+    <geom name="rough_t4_07_1" type="box" pos="23.6 14.65 0.05085047" size="0.15 0.15 0.05085047" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10510157" />
+    <geom name="rough_t4_07_2" type="box" pos="23.6 15 0.0612918" size="0.15 0.15 0.0612918" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.1016251" />
+    <geom name="rough_t4_07_3" type="box" pos="23.6 15.35 0.032881367" size="0.15 0.15 0.032881367" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.067013198" />
+    <geom name="rough_t4_07_4" type="box" pos="23.6 15.7 0.04988304" size="0.15 0.15 0.04988304" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.036219845" />
+    <geom name="rough_t4_08_0" type="box" pos="23.95 14.3 0.080741243" size="0.15 0.15 0.080741243" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.00090030505" />
+    <geom name="rough_t4_08_1" type="box" pos="23.95 14.65 0.032362318" size="0.15 0.15 0.032362318" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.060391682" />
+    <geom name="rough_t4_08_2" type="box" pos="23.95 15 0.034229057" size="0.15 0.15 0.034229057" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.11680029" />
+    <geom name="rough_t4_08_3" type="box" pos="23.95 15.35 0.074958593" size="0.15 0.15 0.074958593" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.041604454" />
+    <geom name="rough_t4_08_4" type="box" pos="23.95 15.7 0.043099651" size="0.15 0.15 0.043099651" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10843128" />
+    <geom name="rough_t4_09_0" type="box" pos="24.3 14.3 0.039698192" size="0.15 0.15 0.039698192" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.047159055" />
+    <geom name="rough_t4_09_1" type="box" pos="24.3 14.65 0.075394212" size="0.15 0.15 0.075394212" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.027802509" />
+    <geom name="rough_t4_09_2" type="box" pos="24.3 15 0.026110943" size="0.15 0.15 0.026110943" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.067001677" />
+    <geom name="rough_t4_09_3" type="box" pos="24.3 15.35 0.039940771" size="0.15 0.15 0.039940771" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.091107771" />
+    <geom name="rough_t4_09_4" type="box" pos="24.3 15.7 0.08550927" size="0.15 0.15 0.08550927" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.1007214" />
+    <geom name="rough_t4_10_0" type="box" pos="24.65 14.3 0.024256575" size="0.15 0.15 0.024256575" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.04603589" />
+    <geom name="rough_t4_10_1" type="box" pos="24.65 14.65 0.061229098" size="0.15 0.15 0.061229098" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.089856807" />
+    <geom name="rough_t4_10_2" type="box" pos="24.65 15 0.030459319" size="0.15 0.15 0.030459319" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.0732746" />
+    <geom name="rough_t4_10_3" type="box" pos="24.65 15.35 0.044527792" size="0.15 0.15 0.044527792" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.07119178" />
+    <geom name="rough_t4_10_4" type="box" pos="24.65 15.7 0.068171951" size="0.15 0.15 0.068171951" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.093549102" />
+    <geom name="rough_t4_11_0" type="box" pos="25 14.3 0.045066494" size="0.15 0.15 0.045066494" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.0010428244" />
+    <geom name="rough_t4_11_1" type="box" pos="25 14.65 0.025114347" size="0.15 0.15 0.025114347" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.1016268" />
+    <geom name="rough_t4_11_2" type="box" pos="25 15 0.073059077" size="0.15 0.15 0.073059077" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.050103242" />
+    <geom name="rough_t4_11_3" type="box" pos="25 15.35 0.060631847" size="0.15 0.15 0.060631847" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.0042323446" />
+    <geom name="rough_t4_11_4" type="box" pos="25 15.7 0.072069575" size="0.15 0.15 0.072069575" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.045217651" />
+    <geom name="rough_t5_00_0" type="box" pos="27.15 14.3 0.12456303" size="0.15 0.15 0.12456303" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.04497247" />
+    <geom name="rough_t5_00_1" type="box" pos="27.15 14.65 0.050702313" size="0.15 0.15 0.050702313" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.013729071" />
+    <geom name="rough_t5_00_2" type="box" pos="27.15 15 0.070000681" size="0.15 0.15 0.070000681" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.056248468" />
+    <geom name="rough_t5_00_3" type="box" pos="27.15 15.35 0.11372718" size="0.15 0.15 0.11372718" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.012433408" />
+    <geom name="rough_t5_00_4" type="box" pos="27.15 15.7 0.081988109" size="0.15 0.15 0.081988109" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.0014314546" />
+    <geom name="rough_t5_01_0" type="box" pos="27.5 14.3 0.062492118" size="0.15 0.15 0.062492118" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.011289191" />
+    <geom name="rough_t5_01_1" type="box" pos="27.5 14.65 0.036762346" size="0.15 0.15 0.036762346" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.10974725" />
+    <geom name="rough_t5_01_2" type="box" pos="27.5 15 0.070169771" size="0.15 0.15 0.070169771" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.03095679" />
+    <geom name="rough_t5_01_3" type="box" pos="27.5 15.35 0.10754193" size="0.15 0.15 0.10754193" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.055776003" />
+    <geom name="rough_t5_01_4" type="box" pos="27.5 15.7 0.012821256" size="0.15 0.15 0.012821256" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.08556338" />
+    <geom name="rough_t5_02_0" type="box" pos="27.85 14.3 0.071694274" size="0.15 0.15 0.071694274" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10958727" />
+    <geom name="rough_t5_02_1" type="box" pos="27.85 14.65 0.026138422" size="0.15 0.15 0.026138422" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.053168429" />
+    <geom name="rough_t5_02_2" type="box" pos="27.85 15 0.043888414" size="0.15 0.15 0.043888414" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.020765405" />
+    <geom name="rough_t5_02_3" type="box" pos="27.85 15.35 0.00913747" size="0.15 0.15 0.00913747" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.068866264" />
+    <geom name="rough_t5_02_4" type="box" pos="27.85 15.7 0.043539854" size="0.15 0.15 0.043539854" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.061104143" />
+    <geom name="rough_t5_03_0" type="box" pos="28.2 14.3 0.11195414" size="0.15 0.15 0.11195414" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.074637933" />
+    <geom name="rough_t5_03_1" type="box" pos="28.2 14.65 0.053689952" size="0.15 0.15 0.053689952" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.052880205" />
+    <geom name="rough_t5_03_2" type="box" pos="28.2 15 0.058283055" size="0.15 0.15 0.058283055" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.025455594" />
+    <geom name="rough_t5_03_3" type="box" pos="28.2 15.35 0.062408989" size="0.15 0.15 0.062408989" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.062332972" />
+    <geom name="rough_t5_03_4" type="box" pos="28.2 15.7 0.084619518" size="0.15 0.15 0.084619518" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.11687526" />
+    <geom name="rough_t5_04_0" type="box" pos="28.55 14.3 0.11963981" size="0.15 0.15 0.11963981" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10244156" />
+    <geom name="rough_t5_04_1" type="box" pos="28.55 14.65 0.06835223" size="0.15 0.15 0.06835223" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.020308075" />
+    <geom name="rough_t5_04_2" type="box" pos="28.55 15 0.091471789" size="0.15 0.15 0.091471789" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.02357138" />
+    <geom name="rough_t5_04_3" type="box" pos="28.55 15.35 0.022747391" size="0.15 0.15 0.022747391" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.034035785" />
+    <geom name="rough_t5_04_4" type="box" pos="28.55 15.7 0.026642362" size="0.15 0.15 0.026642362" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.091374687" />
+    <geom name="rough_t5_05_0" type="box" pos="28.9 14.3 0.12031047" size="0.15 0.15 0.12031047" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.038426145" />
+    <geom name="rough_t5_05_1" type="box" pos="28.9 14.65 0.029455369" size="0.15 0.15 0.029455369" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.065953367" />
+    <geom name="rough_t5_05_2" type="box" pos="28.9 15 0.05398383" size="0.15 0.15 0.05398383" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.078445163" />
+    <geom name="rough_t5_05_3" type="box" pos="28.9 15.35 0.051880298" size="0.15 0.15 0.051880298" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.074396799" />
+    <geom name="rough_t5_05_4" type="box" pos="28.9 15.7 0.079625916" size="0.15 0.15 0.079625916" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.081736148" />
+    <geom name="rough_t5_06_0" type="box" pos="29.25 14.3 0.029752926" size="0.15 0.15 0.029752926" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.00071568557" />
+    <geom name="rough_t5_06_1" type="box" pos="29.25 14.65 0.035250627" size="0.15 0.15 0.035250627" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.043277181" />
+    <geom name="rough_t5_06_2" type="box" pos="29.25 15 0.020897" size="0.15 0.15 0.020897" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.061181094" />
+    <geom name="rough_t5_06_3" type="box" pos="29.25 15.35 0.052367214" size="0.15 0.15 0.052367214" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.092232843" />
+    <geom name="rough_t5_06_4" type="box" pos="29.25 15.7 0.052373819" size="0.15 0.15 0.052373819" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.060705271" />
+    <geom name="rough_t5_07_0" type="box" pos="29.6 14.3 0.083269808" size="0.15 0.15 0.083269808" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.060182692" />
+    <geom name="rough_t5_07_1" type="box" pos="29.6 14.65 0.04849368" size="0.15 0.15 0.04849368" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.093190313" />
+    <geom name="rough_t5_07_2" type="box" pos="29.6 15 0.012182456" size="0.15 0.15 0.012182456" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.018079975" />
+    <geom name="rough_t5_07_3" type="box" pos="29.6 15.35 0.095191968" size="0.15 0.15 0.095191968" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.062275026" />
+    <geom name="rough_t5_07_4" type="box" pos="29.6 15.7 0.11970183" size="0.15 0.15 0.11970183" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.016164924" />
+    <geom name="rough_t5_08_0" type="box" pos="29.95 14.3 0.0082969162" size="0.15 0.15 0.0082969162" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.040827097" />
+    <geom name="rough_t5_08_1" type="box" pos="29.95 14.65 0.077071997" size="0.15 0.15 0.077071997" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.046736712" />
+    <geom name="rough_t5_08_2" type="box" pos="29.95 15 0.035558236" size="0.15 0.15 0.035558236" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.068425181" />
+    <geom name="rough_t5_08_3" type="box" pos="29.95 15.35 0.042179516" size="0.15 0.15 0.042179516" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.054060211" />
+    <geom name="rough_t5_08_4" type="box" pos="29.95 15.7 0.046297763" size="0.15 0.15 0.046297763" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.024539691" />
+    <geom name="rough_t5_09_0" type="box" pos="30.3 14.3 0.07740898" size="0.15 0.15 0.07740898" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.081582531" />
+    <geom name="rough_t5_09_1" type="box" pos="30.3 14.65 0.094139059" size="0.15 0.15 0.094139059" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.011451623" />
+    <geom name="rough_t5_09_2" type="box" pos="30.3 15 0.025905841" size="0.15 0.15 0.025905841" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.085583386" />
+    <geom name="rough_t5_09_3" type="box" pos="30.3 15.35 0.069787349" size="0.15 0.15 0.069787349" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.10732278" />
+    <geom name="rough_t5_09_4" type="box" pos="30.3 15.7 0.11923362" size="0.15 0.15 0.11923362" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.090374836" />
+    <geom name="rough_t5_10_0" type="box" pos="30.65 14.3 0.056200003" size="0.15 0.15 0.056200003" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.0060767734" />
+    <geom name="rough_t5_10_1" type="box" pos="30.65 14.65 0.011440091" size="0.15 0.15 0.011440091" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.05726475" />
+    <geom name="rough_t5_10_2" type="box" pos="30.65 15 0.037180917" size="0.15 0.15 0.037180917" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.011582478" />
+    <geom name="rough_t5_10_3" type="box" pos="30.65 15.35 0.071246846" size="0.15 0.15 0.071246846" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.013524267" />
+    <geom name="rough_t5_10_4" type="box" pos="30.65 15.7 0.037251895" size="0.15 0.15 0.037251895" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.024094336" />
+    <geom name="rough_t5_11_0" type="box" pos="31 14.3 0.072479958" size="0.15 0.15 0.072479958" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.072994186" />
+    <geom name="rough_t5_11_1" type="box" pos="31 14.65 0.10362211" size="0.15 0.15 0.10362211" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.11288942" />
+    <geom name="rough_t5_11_2" type="box" pos="31 15 0.1065927" size="0.15 0.15 0.1065927" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.063389769" />
+    <geom name="rough_t5_11_3" type="box" pos="31 15.35 0.10239925" size="0.15 0.15 0.10239925" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.068429428" />
+    <geom name="rough_t5_11_4" type="box" pos="31 15.7 0.09096503" size="0.15 0.15 0.09096503" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.073634029" />
+    <geom name="rough_t6_00_0" type="box" pos="33.15 14.3 0.032086175" size="0.15 0.15 0.032086175" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.036460935" />
+    <geom name="rough_t6_00_1" type="box" pos="33.15 14.65 0.11788366" size="0.15 0.15 0.11788366" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.04579829" />
+    <geom name="rough_t6_00_2" type="box" pos="33.15 15 0.0070500386" size="0.15 0.15 0.0070500386" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.10561961" />
+    <geom name="rough_t6_00_3" type="box" pos="33.15 15.35 0.095111883" size="0.15 0.15 0.095111883" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.073859499" />
+    <geom name="rough_t6_00_4" type="box" pos="33.15 15.7 0.12053583" size="0.15 0.15 0.12053583" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.074569811" />
+    <geom name="rough_t6_01_0" type="box" pos="33.5 14.3 0.15841794" size="0.15 0.15 0.15841794" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.067460979" />
+    <geom name="rough_t6_01_1" type="box" pos="33.5 14.65 0.010984362" size="0.15 0.15 0.010984362" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.081590377" />
+    <geom name="rough_t6_01_2" type="box" pos="33.5 15 0.095972045" size="0.15 0.15 0.095972045" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.017280197" />
+    <geom name="rough_t6_01_3" type="box" pos="33.5 15.35 0.13893973" size="0.15 0.15 0.13893973" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.081182434" />
+    <geom name="rough_t6_01_4" type="box" pos="33.5 15.7 0.053139133" size="0.15 0.15 0.053139133" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.11282325" />
+    <geom name="rough_t6_02_0" type="box" pos="33.85 14.3 0.010574038" size="0.15 0.15 0.010574038" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.013353007" />
+    <geom name="rough_t6_02_1" type="box" pos="33.85 14.65 0.027601592" size="0.15 0.15 0.027601592" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.033456572" />
+    <geom name="rough_t6_02_2" type="box" pos="33.85 15 0.0668818" size="0.15 0.15 0.0668818" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.01239536" />
+    <geom name="rough_t6_02_3" type="box" pos="33.85 15.35 0.0070344371" size="0.15 0.15 0.0070344371" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.021937911" />
+    <geom name="rough_t6_02_4" type="box" pos="33.85 15.7 0.10826271" size="0.15 0.15 0.10826271" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.034575184" />
+    <geom name="rough_t6_03_0" type="box" pos="34.2 14.3 0.085199459" size="0.15 0.15 0.085199459" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.073952432" />
+    <geom name="rough_t6_03_1" type="box" pos="34.2 14.65 0.09929719" size="0.15 0.15 0.09929719" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10731574" />
+    <geom name="rough_t6_03_2" type="box" pos="34.2 15 0.081256598" size="0.15 0.15 0.081256598" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.079585868" />
+    <geom name="rough_t6_03_3" type="box" pos="34.2 15.35 0.052402548" size="0.15 0.15 0.052402548" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.071826197" />
+    <geom name="rough_t6_03_4" type="box" pos="34.2 15.7 0.072771744" size="0.15 0.15 0.072771744" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.095579094" />
+    <geom name="rough_t6_04_0" type="box" pos="34.55 14.3 0.017685636" size="0.15 0.15 0.017685636" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.022521475" />
+    <geom name="rough_t6_04_1" type="box" pos="34.55 14.65 0.12580528" size="0.15 0.15 0.12580528" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.096394751" />
+    <geom name="rough_t6_04_2" type="box" pos="34.55 15 0.1737547" size="0.15 0.15 0.1737547" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.070801424" />
+    <geom name="rough_t6_04_3" type="box" pos="34.55 15.35 0.051321895" size="0.15 0.15 0.051321895" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.018022009" />
+    <geom name="rough_t6_04_4" type="box" pos="34.55 15.7 0.05886716" size="0.15 0.15 0.05886716" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.063552474" />
+    <geom name="rough_t6_05_0" type="box" pos="34.9 14.3 0.15882416" size="0.15 0.15 0.15882416" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.096620675" />
+    <geom name="rough_t6_05_1" type="box" pos="34.9 14.65 0.092898483" size="0.15 0.15 0.092898483" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.058015044" />
+    <geom name="rough_t6_05_2" type="box" pos="34.9 15 0.12658616" size="0.15 0.15 0.12658616" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.096144989" />
+    <geom name="rough_t6_05_3" type="box" pos="34.9 15.35 0.0090845154" size="0.15 0.15 0.0090845154" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.073657341" />
+    <geom name="rough_t6_05_4" type="box" pos="34.9 15.7 0.15071159" size="0.15 0.15 0.15071159" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10171064" />
+    <geom name="rough_t6_06_0" type="box" pos="35.25 14.3 0.030149705" size="0.15 0.15 0.030149705" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.011597053" />
+    <geom name="rough_t6_06_1" type="box" pos="35.25 14.65 0.0065109172" size="0.15 0.15 0.0065109172" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.044693016" />
+    <geom name="rough_t6_06_2" type="box" pos="35.25 15 0.15311639" size="0.15 0.15 0.15311639" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.023878613" />
+    <geom name="rough_t6_06_3" type="box" pos="35.25 15.35 0.11892995" size="0.15 0.15 0.11892995" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.041418397" />
+    <geom name="rough_t6_06_4" type="box" pos="35.25 15.7 0.083500554" size="0.15 0.15 0.083500554" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.075075719" />
+    <geom name="rough_t6_07_0" type="box" pos="35.6 14.3 0.15470338" size="0.15 0.15 0.15470338" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.011858674" />
+    <geom name="rough_t6_07_1" type="box" pos="35.6 14.65 0.16098328" size="0.15 0.15 0.16098328" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.040479606" />
+    <geom name="rough_t6_07_2" type="box" pos="35.6 15 0.068190101" size="0.15 0.15 0.068190101" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.11029562" />
+    <geom name="rough_t6_07_3" type="box" pos="35.6 15.35 0.0098261873" size="0.15 0.15 0.0098261873" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.011064263" />
+    <geom name="rough_t6_07_4" type="box" pos="35.6 15.7 0.090189322" size="0.15 0.15 0.090189322" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.068708721" />
+    <geom name="rough_t6_08_0" type="box" pos="35.95 14.3 0.011807172" size="0.15 0.15 0.011807172" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.056476661" />
+    <geom name="rough_t6_08_1" type="box" pos="35.95 14.65 0.052984718" size="0.15 0.15 0.052984718" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.043661494" />
+    <geom name="rough_t6_08_2" type="box" pos="35.95 15 0.074250475" size="0.15 0.15 0.074250475" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.018529763" />
+    <geom name="rough_t6_08_3" type="box" pos="35.95 15.35 0.090311843" size="0.15 0.15 0.090311843" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.091536076" />
+    <geom name="rough_t6_08_4" type="box" pos="35.95 15.7 0.094957932" size="0.15 0.15 0.094957932" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10626501" />
+    <geom name="rough_t6_09_0" type="box" pos="36.3 14.3 0.13794533" size="0.15 0.15 0.13794533" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.063675257" />
+    <geom name="rough_t6_09_1" type="box" pos="36.3 14.65 0.035588809" size="0.15 0.15 0.035588809" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.091843367" />
+    <geom name="rough_t6_09_2" type="box" pos="36.3 15 0.093953403" size="0.15 0.15 0.093953403" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.11069699" />
+    <geom name="rough_t6_09_3" type="box" pos="36.3 15.35 0.17277279" size="0.15 0.15 0.17277279" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.022884453" />
+    <geom name="rough_t6_09_4" type="box" pos="36.3 15.7 0.030070519" size="0.15 0.15 0.030070519" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.064598583" />
+    <geom name="rough_t6_10_0" type="box" pos="36.65 14.3 0.059481594" size="0.15 0.15 0.059481594" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.019811086" />
+    <geom name="rough_t6_10_1" type="box" pos="36.65 14.65 0.051680065" size="0.15 0.15 0.051680065" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.085019194" />
+    <geom name="rough_t6_10_2" type="box" pos="36.65 15 0.11686383" size="0.15 0.15 0.11686383" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.038982957" />
+    <geom name="rough_t6_10_3" type="box" pos="36.65 15.35 0.071197973" size="0.15 0.15 0.071197973" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.11381994" />
+    <geom name="rough_t6_10_4" type="box" pos="36.65 15.7 0.069402998" size="0.15 0.15 0.069402998" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.084932126" />
+    <geom name="rough_t6_11_0" type="box" pos="37 14.3 0.037908982" size="0.15 0.15 0.037908982" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.068743078" />
+    <geom name="rough_t6_11_1" type="box" pos="37 14.65 0.1609951" size="0.15 0.15 0.1609951" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.10344496" />
+    <geom name="rough_t6_11_2" type="box" pos="37 15 0.017209155" size="0.15 0.15 0.017209155" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.029304715" />
+    <geom name="rough_t6_11_3" type="box" pos="37 15.35 0.15504176" size="0.15 0.15 0.15504176" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.031308074" />
+    <geom name="rough_t6_11_4" type="box" pos="37 15.7 0.085388343" size="0.15 0.15 0.085388343" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.092332669" />
+    <geom name="rough_t7_00_0" type="box" pos="39.15 14.3 0.0071945842" size="0.15 0.15 0.0071945842" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.063573002" />
+    <geom name="rough_t7_00_1" type="box" pos="39.15 14.65 0.066074915" size="0.15 0.15 0.066074915" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.061160224" />
+    <geom name="rough_t7_00_2" type="box" pos="39.15 15 0.2309121" size="0.15 0.15 0.2309121" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.020790442" />
+    <geom name="rough_t7_00_3" type="box" pos="39.15 15.35 0.082450598" size="0.15 0.15 0.082450598" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.078596259" />
+    <geom name="rough_t7_00_4" type="box" pos="39.15 15.7 0.14689618" size="0.15 0.15 0.14689618" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.07041257" />
+    <geom name="rough_t7_01_0" type="box" pos="39.5 14.3 0.18442074" size="0.15 0.15 0.18442074" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.09351351" />
+    <geom name="rough_t7_01_1" type="box" pos="39.5 14.65 0.096103346" size="0.15 0.15 0.096103346" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.0748376" />
+    <geom name="rough_t7_01_2" type="box" pos="39.5 15 0.19403077" size="0.15 0.15 0.19403077" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.068259698" />
+    <geom name="rough_t7_01_3" type="box" pos="39.5 15.35 0.20118134" size="0.15 0.15 0.20118134" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.027318295" />
+    <geom name="rough_t7_01_4" type="box" pos="39.5 15.7 0.089012361" size="0.15 0.15 0.089012361" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.030143474" />
+    <geom name="rough_t7_02_0" type="box" pos="39.85 14.3 0.010390519" size="0.15 0.15 0.010390519" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.0040012435" />
+    <geom name="rough_t7_02_1" type="box" pos="39.85 14.65 0.066945747" size="0.15 0.15 0.066945747" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.093221785" />
+    <geom name="rough_t7_02_2" type="box" pos="39.85 15 0.20667314" size="0.15 0.15 0.20667314" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.08949914" />
+    <geom name="rough_t7_02_3" type="box" pos="39.85 15.35 0.15777001" size="0.15 0.15 0.15777001" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.097305514" />
+    <geom name="rough_t7_02_4" type="box" pos="39.85 15.7 0.04441437" size="0.15 0.15 0.04441437" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10992782" />
+    <geom name="rough_t7_03_0" type="box" pos="40.2 14.3 0.094776646" size="0.15 0.15 0.094776646" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.10839294" />
+    <geom name="rough_t7_03_1" type="box" pos="40.2 14.65 0.052804399" size="0.15 0.15 0.052804399" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.025649067" />
+    <geom name="rough_t7_03_2" type="box" pos="40.2 15 0.04029013" size="0.15 0.15 0.04029013" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.031362726" />
+    <geom name="rough_t7_03_3" type="box" pos="40.2 15.35 0.075411303" size="0.15 0.15 0.075411303" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.095398676" />
+    <geom name="rough_t7_03_4" type="box" pos="40.2 15.7 0.014321037" size="0.15 0.15 0.014321037" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.0060875946" />
+    <geom name="rough_t7_04_0" type="box" pos="40.55 14.3 0.069321125" size="0.15 0.15 0.069321125" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.013273733" />
+    <geom name="rough_t7_04_1" type="box" pos="40.55 14.65 0.007129635" size="0.15 0.15 0.007129635" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.016299524" />
+    <geom name="rough_t7_04_2" type="box" pos="40.55 15 0.060312065" size="0.15 0.15 0.060312065" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.099575549" />
+    <geom name="rough_t7_04_3" type="box" pos="40.55 15.35 0.20028295" size="0.15 0.15 0.20028295" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.025882776" />
+    <geom name="rough_t7_04_4" type="box" pos="40.55 15.7 0.12837721" size="0.15 0.15 0.12837721" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.090817703" />
+    <geom name="rough_t7_05_0" type="box" pos="40.9 14.3 0.13494069" size="0.15 0.15 0.13494069" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.090266357" />
+    <geom name="rough_t7_05_1" type="box" pos="40.9 14.65 0.12323894" size="0.15 0.15 0.12323894" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.033602084" />
+    <geom name="rough_t7_05_2" type="box" pos="40.9 15 0.065265423" size="0.15 0.15 0.065265423" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.01792294" />
+    <geom name="rough_t7_05_3" type="box" pos="40.9 15.35 0.061887598" size="0.15 0.15 0.061887598" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.057727665" />
+    <geom name="rough_t7_05_4" type="box" pos="40.9 15.7 0.15724367" size="0.15 0.15 0.15724367" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.021001349" />
+    <geom name="rough_t7_06_0" type="box" pos="41.25 14.3 0.20528072" size="0.15 0.15 0.20528072" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.017034084" />
+    <geom name="rough_t7_06_1" type="box" pos="41.25 14.65 0.18331208" size="0.15 0.15 0.18331208" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.034958927" />
+    <geom name="rough_t7_06_2" type="box" pos="41.25 15 0.064935437" size="0.15 0.15 0.064935437" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.0062538033" />
+    <geom name="rough_t7_06_3" type="box" pos="41.25 15.35 0.17621457" size="0.15 0.15 0.17621457" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.077525272" />
+    <geom name="rough_t7_06_4" type="box" pos="41.25 15.7 0.08548513" size="0.15 0.15 0.08548513" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10699895" />
+    <geom name="rough_t7_07_0" type="box" pos="41.6 14.3 0.2281386" size="0.15 0.15 0.2281386" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.099962571" />
+    <geom name="rough_t7_07_1" type="box" pos="41.6 14.65 0.0053759481" size="0.15 0.15 0.0053759481" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.024236067" />
+    <geom name="rough_t7_07_2" type="box" pos="41.6 15 0.10544253" size="0.15 0.15 0.10544253" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.067966612" />
+    <geom name="rough_t7_07_3" type="box" pos="41.6 15.35 0.015847495" size="0.15 0.15 0.015847495" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.0087885636" />
+    <geom name="rough_t7_07_4" type="box" pos="41.6 15.7 0.1432419" size="0.15 0.15 0.1432419" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.025167318" />
+    <geom name="rough_t7_08_0" type="box" pos="41.95 14.3 0.16403471" size="0.15 0.15 0.16403471" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.077179204" />
+    <geom name="rough_t7_08_1" type="box" pos="41.95 14.65 0.059013792" size="0.15 0.15 0.059013792" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.08671013" />
+    <geom name="rough_t7_08_2" type="box" pos="41.95 15 0.066984486" size="0.15 0.15 0.066984486" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10854354" />
+    <geom name="rough_t7_08_3" type="box" pos="41.95 15.35 0.032676166" size="0.15 0.15 0.032676166" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.075029716" />
+    <geom name="rough_t7_08_4" type="box" pos="41.95 15.7 0.1390203" size="0.15 0.15 0.1390203" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10677683" />
+    <geom name="rough_t7_09_0" type="box" pos="42.3 14.3 0.17797993" size="0.15 0.15 0.17797993" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.040520738" />
+    <geom name="rough_t7_09_1" type="box" pos="42.3 14.65 0.20436032" size="0.15 0.15 0.20436032" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.065888783" />
+    <geom name="rough_t7_09_2" type="box" pos="42.3 15 0.1238939" size="0.15 0.15 0.1238939" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.098736702" />
+    <geom name="rough_t7_09_3" type="box" pos="42.3 15.35 0.074276997" size="0.15 0.15 0.074276997" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.019450149" />
+    <geom name="rough_t7_09_4" type="box" pos="42.3 15.7 0.0067371779" size="0.15 0.15 0.0067371779" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.1152498" />
+    <geom name="rough_t7_10_0" type="box" pos="42.65 14.3 0.060435475" size="0.15 0.15 0.060435475" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.018510149" />
+    <geom name="rough_t7_10_1" type="box" pos="42.65 14.65 0.015851959" size="0.15 0.15 0.015851959" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.059388367" />
+    <geom name="rough_t7_10_2" type="box" pos="42.65 15 0.031264426" size="0.15 0.15 0.031264426" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.047499264" />
+    <geom name="rough_t7_10_3" type="box" pos="42.65 15.35 0.20613782" size="0.15 0.15 0.20613782" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.022752214" />
+    <geom name="rough_t7_10_4" type="box" pos="42.65 15.7 0.24648362" size="0.15 0.15 0.24648362" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.1179726" />
+    <geom name="rough_t7_11_0" type="box" pos="43 14.3 0.0057707894" size="0.15 0.15 0.0057707894" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.076210329" />
+    <geom name="rough_t7_11_1" type="box" pos="43 14.65 0.078218345" size="0.15 0.15 0.078218345" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.04515726" />
+    <geom name="rough_t7_11_2" type="box" pos="43 15 0.13448799" size="0.15 0.15 0.13448799" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.096542961" />
+    <geom name="rough_t7_11_3" type="box" pos="43 15.35 0.1830154" size="0.15 0.15 0.1830154" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 0.10451558" />
+    <geom name="rough_t7_11_4" type="box" pos="43 15.7 0.029508008" size="0.15 0.15 0.029508008" rgba=".65 .55 .4 1" friction="1 .005 .0001" condim="3" euler="0 0 -0.080378131" />
+    <!--第 7 区 y=18：窄桥；横杆、侧倾坡与减摩通道分别位于 y=21/24/27。-->
+    <geom name="bridge_40cm_entry" type="mesh" mesh="bridge_40cm_entry_mesh" pos="3 18 0" euler="0 0 0" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_40cm" type="box" pos="5 18 0.05" size="1.5 0.2 0.05" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_40cm_exit" type="mesh" mesh="bridge_40cm_exit_mesh" pos="7 18 0" euler="0 0 3.1415927" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_30cm_entry" type="mesh" mesh="bridge_30cm_entry_mesh" pos="8 18 0" euler="0 0 0" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_30cm" type="box" pos="10 18 0.05" size="1.5 0.15 0.05" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_30cm_exit" type="mesh" mesh="bridge_30cm_exit_mesh" pos="12 18 0" euler="0 0 3.1415927" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_25cm_entry" type="mesh" mesh="bridge_25cm_entry_mesh" pos="13 18 0" euler="0 0 0" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_25cm" type="box" pos="15 18 0.05" size="1.5 0.125 0.05" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_25cm_exit" type="mesh" mesh="bridge_25cm_exit_mesh" pos="17 18 0" euler="0 0 3.1415927" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_20cm_entry" type="mesh" mesh="bridge_20cm_entry_mesh" pos="18 18 0" euler="0 0 0" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_20cm" type="box" pos="20 18 0.05" size="1.5 0.1 0.05" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_20cm_exit" type="mesh" mesh="bridge_20cm_exit_mesh" pos="22 18 0" euler="0 0 3.1415927" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_15cm_entry" type="mesh" mesh="bridge_15cm_entry_mesh" pos="23 18 0" euler="0 0 0" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_15cm" type="box" pos="25 18 0.05" size="1.5 0.075 0.05" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_15cm_exit" type="mesh" mesh="bridge_15cm_exit_mesh" pos="27 18 0" euler="0 0 3.1415927" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_10cm_entry" type="mesh" mesh="bridge_10cm_entry_mesh" pos="28 18 0" euler="0 0 0" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_10cm" type="box" pos="30 18 0.05" size="1.5 0.05 0.05" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_10cm_exit" type="mesh" mesh="bridge_10cm_exit_mesh" pos="32 18 0" euler="0 0 3.1415927" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_06cm_entry" type="mesh" mesh="bridge_06cm_entry_mesh" pos="33 18 0" euler="0 0 0" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_06cm" type="box" pos="35 18 0.05" size="1.5 0.03 0.05" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="bridge_06cm_exit" type="mesh" mesh="bridge_06cm_exit_mesh" pos="37 18 0" euler="0 0 3.1415927" rgba=".3 .75 .75 1" friction="1 .005 .0001" condim="3" />
+    <geom name="cross_bar_1" type="box" pos="3 21 0.02" size="0.06 0.7 0.02" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="cross_bar_2" type="box" pos="4.2 21 0.04" size="0.06 0.7 0.04" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="cross_bar_3" type="box" pos="5.4 21 0.06" size="0.06 0.7 0.06" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="cross_bar_4" type="box" pos="6.6 21 0.08" size="0.06 0.7 0.08" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="cross_bar_5" type="box" pos="7.8 21 0.1" size="0.06 0.7 0.1" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="cross_bar_6" type="box" pos="9 21 0.15" size="0.06 0.7 0.15" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="cross_bar_7" type="box" pos="10.2 21 0.2" size="0.06 0.7 0.2" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="cross_bar_8" type="box" pos="11.4 21 0.25" size="0.06 0.7 0.25" rgba=".95 .65 .2 1" friction="1 .005 .0001" condim="3" />
+    <geom name="cross_slope_10deg" type="mesh" mesh="cross_slope_10deg_mesh" pos="4.5 23.3 0" euler="0 0 1.5707963" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="cross_slope_15deg" type="mesh" mesh="cross_slope_15deg_mesh" pos="9.5 23.3 0" euler="0 0 1.5707963" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="cross_slope_20deg" type="mesh" mesh="cross_slope_20deg_mesh" pos="14.5 23.3 0" euler="0 0 1.5707963" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="cross_slope_25deg" type="mesh" mesh="cross_slope_25deg_mesh" pos="19.5 23.3 0" euler="0 0 1.5707963" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="cross_slope_30deg" type="mesh" mesh="cross_slope_30deg_mesh" pos="24.5 23.3 0" euler="0 0 1.5707963" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="cross_slope_40deg" type="mesh" mesh="cross_slope_40deg_mesh" pos="29.5 23.3 0" euler="0 0 1.5707963" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="cross_slope_45deg" type="mesh" mesh="cross_slope_45deg_mesh" pos="34.5 23.3 0" euler="0 0 1.5707963" rgba=".7 .45 .85 1" friction="1 .005 .0001" condim="3" />
+    <geom name="low_friction_50" type="box" pos="4.5 27 0.01" size="1.5 0.7 0.01" rgba=".55 .7 .8 1" friction="0.5 .005 .0001" condim="3" />
+    <geom name="low_friction_35" type="box" pos="9.5 27 0.01" size="1.5 0.7 0.01" rgba=".55 .7 .8 1" friction="0.35 .005 .0001" condim="3" />
+    <geom name="low_friction_25" type="box" pos="14.5 27 0.01" size="1.5 0.7 0.01" rgba=".55 .7 .8 1" friction="0.25 .005 .0001" condim="3" />
+    <geom name="low_friction_15" type="box" pos="19.5 27 0.01" size="1.5 0.7 0.01" rgba=".55 .7 .8 1" friction="0.15 .005 .0001" condim="3" />
+    <geom name="low_friction_08" type="box" pos="24.5 27 0.01" size="1.5 0.7 0.01" rgba=".55 .7 .8 1" friction="0.08 .005 .0001" condim="3" />
+    <geom name="low_friction_03" type="box" pos="29.5 27 0.01" size="1.5 0.7 0.01" rgba=".55 .7 .8 1" friction="0.03 .005 .0001" condim="3" />
+    <geom name="plum_t2_entry" type="box" pos="8.4 30 0.2" size="0.4 0.4 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_entry_ramp" type="mesh" mesh="plum_t2_entry_ramp_mesh" pos="5.6 30 0" euler="0 0 0" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r1_01" type="box" pos="9 30.2 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r1_02" type="box" pos="9.6 30.2 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r1_03" type="box" pos="10.2 30.2 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r1_04" type="box" pos="10.8 30.2 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r1_05" type="box" pos="11.4 30.2 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r1_06" type="box" pos="12 30.2 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r1_07" type="box" pos="12.6 30.2 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r1_08" type="box" pos="13.2 30.2 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r1_09" type="box" pos="13.8 30.2 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r1_10" type="box" pos="14.4 30.2 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r1_11" type="box" pos="15 30.2 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r1_12" type="box" pos="15.6 30.2 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r2_01" type="box" pos="9.3 29.8 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r2_02" type="box" pos="9.9 29.8 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r2_03" type="box" pos="10.5 29.8 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r2_04" type="box" pos="11.1 29.8 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r2_05" type="box" pos="11.7 29.8 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r2_06" type="box" pos="12.3 29.8 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r2_07" type="box" pos="12.9 29.8 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r2_08" type="box" pos="13.5 29.8 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r2_09" type="box" pos="14.1 29.8 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r2_10" type="box" pos="14.7 29.8 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r2_11" type="box" pos="15.3 29.8 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_r2_12" type="box" pos="15.9 29.8 0.2" size="0.1 0.1 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_exit" type="box" pos="16.5 30 0.2" size="0.4 0.4 0.2" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t2_exit_ramp" type="mesh" mesh="plum_t2_exit_ramp_mesh" pos="19.3 30 0" euler="0 0 3.1415927" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_entry" type="box" pos="8.4 33 0.3" size="0.4 0.4 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_entry_ramp" type="mesh" mesh="plum_t3_entry_ramp_mesh" pos="4.4 33 0" euler="0 0 0" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r1_01" type="box" pos="9 33.2 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r1_02" type="box" pos="9.6 33.2 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r1_03" type="box" pos="10.2 33.2 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r1_04" type="box" pos="10.8 33.2 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r1_05" type="box" pos="11.4 33.2 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r1_06" type="box" pos="12 33.2 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r1_07" type="box" pos="12.6 33.2 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r1_08" type="box" pos="13.2 33.2 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r1_09" type="box" pos="13.8 33.2 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r1_10" type="box" pos="14.4 33.2 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r1_11" type="box" pos="15 33.2 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r1_12" type="box" pos="15.6 33.2 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r2_01" type="box" pos="9.3 32.8 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r2_02" type="box" pos="9.9 32.8 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r2_03" type="box" pos="10.5 32.8 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r2_04" type="box" pos="11.1 32.8 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r2_05" type="box" pos="11.7 32.8 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r2_06" type="box" pos="12.3 32.8 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r2_07" type="box" pos="12.9 32.8 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r2_08" type="box" pos="13.5 32.8 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r2_09" type="box" pos="14.1 32.8 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r2_10" type="box" pos="14.7 32.8 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r2_11" type="box" pos="15.3 32.8 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_r2_12" type="box" pos="15.9 32.8 0.3" size="0.1 0.1 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_exit" type="box" pos="16.5 33 0.3" size="0.4 0.4 0.3" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t3_exit_ramp" type="mesh" mesh="plum_t3_exit_ramp_mesh" pos="20.5 33 0" euler="0 0 3.1415927" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_entry" type="box" pos="8.4 36 0.4" size="0.4 0.4 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_entry_ramp" type="mesh" mesh="plum_t4_entry_ramp_mesh" pos="3.2 36 0" euler="0 0 0" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r1_01" type="box" pos="9 36.2 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r1_02" type="box" pos="9.6 36.2 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r1_03" type="box" pos="10.2 36.2 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r1_04" type="box" pos="10.8 36.2 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r1_05" type="box" pos="11.4 36.2 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r1_06" type="box" pos="12 36.2 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r1_07" type="box" pos="12.6 36.2 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r1_08" type="box" pos="13.2 36.2 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r1_09" type="box" pos="13.8 36.2 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r1_10" type="box" pos="14.4 36.2 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r1_11" type="box" pos="15 36.2 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r1_12" type="box" pos="15.6 36.2 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r2_01" type="box" pos="9.3 35.8 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r2_02" type="box" pos="9.9 35.8 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r2_03" type="box" pos="10.5 35.8 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r2_04" type="box" pos="11.1 35.8 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r2_05" type="box" pos="11.7 35.8 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r2_06" type="box" pos="12.3 35.8 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r2_07" type="box" pos="12.9 35.8 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r2_08" type="box" pos="13.5 35.8 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r2_09" type="box" pos="14.1 35.8 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r2_10" type="box" pos="14.7 35.8 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r2_11" type="box" pos="15.3 35.8 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_r2_12" type="box" pos="15.9 35.8 0.4" size="0.1 0.1 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_exit" type="box" pos="16.5 36 0.4" size="0.4 0.4 0.4" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t4_exit_ramp" type="mesh" mesh="plum_t4_exit_ramp_mesh" pos="21.7 36 0" euler="0 0 3.1415927" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_entry" type="box" pos="8.4 39 0.5" size="0.4 0.4 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_entry_ramp" type="mesh" mesh="plum_t5_entry_ramp_mesh" pos="2 39 0" euler="0 0 0" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r1_01" type="box" pos="9 39.2 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r1_02" type="box" pos="9.6 39.2 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r1_03" type="box" pos="10.2 39.2 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r1_04" type="box" pos="10.8 39.2 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r1_05" type="box" pos="11.4 39.2 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r1_06" type="box" pos="12 39.2 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r1_07" type="box" pos="12.6 39.2 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r1_08" type="box" pos="13.2 39.2 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r1_09" type="box" pos="13.8 39.2 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r1_10" type="box" pos="14.4 39.2 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r1_11" type="box" pos="15 39.2 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r1_12" type="box" pos="15.6 39.2 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r2_01" type="box" pos="9.3 38.8 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r2_02" type="box" pos="9.9 38.8 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r2_03" type="box" pos="10.5 38.8 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r2_04" type="box" pos="11.1 38.8 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r2_05" type="box" pos="11.7 38.8 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r2_06" type="box" pos="12.3 38.8 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r2_07" type="box" pos="12.9 38.8 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r2_08" type="box" pos="13.5 38.8 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r2_09" type="box" pos="14.1 38.8 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r2_10" type="box" pos="14.7 38.8 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r2_11" type="box" pos="15.3 38.8 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_r2_12" type="box" pos="15.9 38.8 0.5" size="0.1 0.1 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_exit" type="box" pos="16.5 39 0.5" size="0.4 0.4 0.5" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="plum_t5_exit_ramp" type="mesh" mesh="plum_t5_exit_ramp_mesh" pos="22.9 39 0" euler="0 0 3.1415927" rgba=".3 .75 .4 1" friction="1 .005 .0001" condim="3" />
+    <geom name="terrain_label_platform_05cm" type="box" pos="3.75 -1.25 .012" size="1.2 .375 .006" material="terrain_label_platform_05cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_platform_10cm" type="box" pos="6.75 -1.25 .012" size="1.2 .375 .006" material="terrain_label_platform_10cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_platform_15cm" type="box" pos="9.75 -1.25 .012" size="1.2 .375 .006" material="terrain_label_platform_15cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_platform_20cm" type="box" pos="12.75 -1.25 .012" size="1.2 .375 .006" material="terrain_label_platform_20cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_platform_25cm" type="box" pos="15.75 -1.25 .012" size="1.2 .375 .006" material="terrain_label_platform_25cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_platform_30cm" type="box" pos="18.75 -1.25 .012" size="1.2 .375 .006" material="terrain_label_platform_30cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_platform_40cm" type="box" pos="21.75 -1.25 .012" size="1.2 .375 .006" material="terrain_label_platform_40cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_platform_50cm" type="box" pos="24.75 -1.25 .012" size="1.2 .375 .006" material="terrain_label_platform_50cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_platform_60cm" type="box" pos="27.75 -1.25 .012" size="1.2 .375 .006" material="terrain_label_platform_60cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_platform_80cm" type="box" pos="30.75 -1.25 .012" size="1.2 .375 .006" material="terrain_label_platform_80cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_platform_100cm" type="box" pos="33.75 -1.25 .012" size="1.2 .375 .006" material="terrain_label_platform_100cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_platform_120cm" type="box" pos="36.75 -1.25 .012" size="1.2 .375 .006" material="terrain_label_platform_120cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_stairs_04cm" type="box" pos="4.5 1.8 .012" size="1.2 .375 .006" material="terrain_label_stairs_04cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_stairs_06cm" type="box" pos="12 1.8 .012" size="1.2 .375 .006" material="terrain_label_stairs_06cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_stairs_08cm" type="box" pos="19.5 1.8 .012" size="1.2 .375 .006" material="terrain_label_stairs_08cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_stairs_10cm" type="box" pos="27 1.8 .012" size="1.2 .375 .006" material="terrain_label_stairs_10cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_stairs_12cm" type="box" pos="34.5 1.8 .012" size="1.2 .375 .006" material="terrain_label_stairs_12cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_stairs_15cm" type="box" pos="42 1.8 .012" size="1.2 .375 .006" material="terrain_label_stairs_15cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_stairs_20cm" type="box" pos="49.5 1.8 .012" size="1.2 .375 .006" material="terrain_label_stairs_20cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_stairs_25cm" type="box" pos="57 1.8 .012" size="1.2 .375 .006" material="terrain_label_stairs_25cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_stairs_30cm" type="box" pos="64.5 1.8 .012" size="1.2 .375 .006" material="terrain_label_stairs_30cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_stairs_35cm" type="box" pos="72 1.8 .012" size="1.2 .375 .006" material="terrain_label_stairs_35cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_stairs_40cm" type="box" pos="79.5 1.8 .012" size="1.2 .375 .006" material="terrain_label_stairs_40cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_slope_05deg_up" type="box" pos="4.4 4.8 .012" size="1.2 .375 .006" material="terrain_label_slope_05deg_up" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_slope_10deg_up" type="box" pos="10.4 4.8 .012" size="1.2 .375 .006" material="terrain_label_slope_10deg_up" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_slope_15deg_up" type="box" pos="16.4 4.8 .012" size="1.2 .375 .006" material="terrain_label_slope_15deg_up" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_slope_20deg_up" type="box" pos="22.4 4.8 .012" size="1.2 .375 .006" material="terrain_label_slope_20deg_up" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_slope_25deg_up" type="box" pos="28.4 4.8 .012" size="1.2 .375 .006" material="terrain_label_slope_25deg_up" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_slope_30deg_up" type="box" pos="34.4 4.8 .012" size="1.2 .375 .006" material="terrain_label_slope_30deg_up" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_slope_35deg_up" type="box" pos="40.4 4.8 .012" size="1.2 .375 .006" material="terrain_label_slope_35deg_up" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_slope_40deg_up" type="box" pos="46.4 4.8 .012" size="1.2 .375 .006" material="terrain_label_slope_40deg_up" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_slope_45deg_up" type="box" pos="52.4 4.8 .012" size="1.2 .375 .006" material="terrain_label_slope_45deg_up" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_slope_50deg_up" type="box" pos="58.4 4.8 .012" size="1.2 .375 .006" material="terrain_label_slope_50deg_up" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_slope_60deg_up" type="box" pos="64.4 4.8 .012" size="1.2 .375 .006" material="terrain_label_slope_60deg_up" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_trench_10cm" type="box" pos="4.5 7.8 .012" size="1.2 .375 .006" material="terrain_label_trench_10cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_trench_20cm" type="box" pos="10.5 7.8 .012" size="1.2 .375 .006" material="terrain_label_trench_20cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_trench_30cm" type="box" pos="16.5 7.8 .012" size="1.2 .375 .006" material="terrain_label_trench_30cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_trench_40cm" type="box" pos="22.5 7.8 .012" size="1.2 .375 .006" material="terrain_label_trench_40cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_trench_50cm" type="box" pos="28.5 7.8 .012" size="1.2 .375 .006" material="terrain_label_trench_50cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_trench_60cm" type="box" pos="34.5 7.8 .012" size="1.2 .375 .006" material="terrain_label_trench_60cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_trench_80cm" type="box" pos="40.5 7.8 .012" size="1.2 .375 .006" material="terrain_label_trench_80cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_trench_100cm" type="box" pos="46.5 7.8 .012" size="1.2 .375 .006" material="terrain_label_trench_100cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_trench_120cm" type="box" pos="52.5 7.8 .012" size="1.2 .375 .006" material="terrain_label_trench_120cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_trench_150cm" type="box" pos="58.5 7.8 .012" size="1.2 .375 .006" material="terrain_label_trench_150cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_trench_180cm" type="box" pos="64.5 7.8 .012" size="1.2 .375 .006" material="terrain_label_trench_180cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_plum" type="box" pos="5.4 10.8 .012" size="1.6 .375 .006" material="terrain_label_plum" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_bridge_40cm" type="box" pos="5 16.8 .012" size="1.2 .375 .006" material="terrain_label_bridge_40cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_bridge_30cm" type="box" pos="10 16.8 .012" size="1.2 .375 .006" material="terrain_label_bridge_30cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_bridge_25cm" type="box" pos="15 16.8 .012" size="1.2 .375 .006" material="terrain_label_bridge_25cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_bridge_20cm" type="box" pos="20 16.8 .012" size="1.2 .375 .006" material="terrain_label_bridge_20cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_bridge_15cm" type="box" pos="25 16.8 .012" size="1.2 .375 .006" material="terrain_label_bridge_15cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_bridge_10cm" type="box" pos="30 16.8 .012" size="1.2 .375 .006" material="terrain_label_bridge_10cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_bridge_06cm" type="box" pos="35 16.8 .012" size="1.2 .375 .006" material="terrain_label_bridge_06cm" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_cross_bar_1" type="box" pos="3 19.8 .012" size="0.525 .375 .006" material="terrain_label_cross_bar_1" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_cross_bar_2" type="box" pos="4.2 19.8 .012" size="0.525 .375 .006" material="terrain_label_cross_bar_2" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_cross_bar_3" type="box" pos="5.4 19.8 .012" size="0.525 .375 .006" material="terrain_label_cross_bar_3" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_cross_bar_4" type="box" pos="6.6 19.8 .012" size="0.525 .375 .006" material="terrain_label_cross_bar_4" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_cross_bar_5" type="box" pos="7.8 19.8 .012" size="0.525 .375 .006" material="terrain_label_cross_bar_5" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_cross_bar_6" type="box" pos="9 19.8 .012" size="0.525 .375 .006" material="terrain_label_cross_bar_6" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_cross_bar_7" type="box" pos="10.2 19.8 .012" size="0.525 .375 .006" material="terrain_label_cross_bar_7" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_cross_bar_8" type="box" pos="11.4 19.8 .012" size="0.525 .375 .006" material="terrain_label_cross_bar_8" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_cross_slope_10deg" type="box" pos="4.5 22.8 .012" size="1.2 .375 .006" material="terrain_label_cross_slope_10deg" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_cross_slope_15deg" type="box" pos="9.5 22.8 .012" size="1.2 .375 .006" material="terrain_label_cross_slope_15deg" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_cross_slope_20deg" type="box" pos="14.5 22.8 .012" size="1.2 .375 .006" material="terrain_label_cross_slope_20deg" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_cross_slope_25deg" type="box" pos="19.5 22.8 .012" size="1.2 .375 .006" material="terrain_label_cross_slope_25deg" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_cross_slope_30deg" type="box" pos="24.5 22.8 .012" size="1.2 .375 .006" material="terrain_label_cross_slope_30deg" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_cross_slope_40deg" type="box" pos="29.5 22.8 .012" size="1.2 .375 .006" material="terrain_label_cross_slope_40deg" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_cross_slope_45deg" type="box" pos="34.5 22.8 .012" size="1.2 .375 .006" material="terrain_label_cross_slope_45deg" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_low_friction_50" type="box" pos="4.5 25.8 .012" size="1.2 .375 .006" material="terrain_label_low_friction_50" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_low_friction_35" type="box" pos="9.5 25.8 .012" size="1.2 .375 .006" material="terrain_label_low_friction_35" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_low_friction_25" type="box" pos="14.5 25.8 .012" size="1.2 .375 .006" material="terrain_label_low_friction_25" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_low_friction_15" type="box" pos="19.5 25.8 .012" size="1.2 .375 .006" material="terrain_label_low_friction_15" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_low_friction_08" type="box" pos="24.5 25.8 .012" size="1.2 .375 .006" material="terrain_label_low_friction_08" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_low_friction_03" type="box" pos="29.5 25.8 .012" size="1.2 .375 .006" material="terrain_label_low_friction_03" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_plum_t2" type="box" pos="9.4 28.8 .012" size="1.6 .375 .006" material="terrain_label_plum_t2" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_plum_t3" type="box" pos="9.4 31.8 .012" size="1.6 .375 .006" material="terrain_label_plum_t3" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_plum_t4" type="box" pos="9.4 34.8 .012" size="1.6 .375 .006" material="terrain_label_plum_t4" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_plum_t5" type="box" pos="9.4 37.8 .012" size="1.6 .375 .006" material="terrain_label_plum_t5" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_rough_t1" type="box" pos="4.65 13.75 .012" size="1.2 .375 .006" material="terrain_label_rough_t1" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_rough_t2" type="box" pos="10.65 13.75 .012" size="1.2 .375 .006" material="terrain_label_rough_t2" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_rough_t3" type="box" pos="16.65 13.75 .012" size="1.2 .375 .006" material="terrain_label_rough_t3" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_rough_t4" type="box" pos="22.65 13.75 .012" size="1.2 .375 .006" material="terrain_label_rough_t4" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_rough_t5" type="box" pos="28.65 13.75 .012" size="1.2 .375 .006" material="terrain_label_rough_t5" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_rough_t6" type="box" pos="34.65 13.75 .012" size="1.2 .375 .006" material="terrain_label_rough_t6" group="1" contype="0" conaffinity="0" />
+    <geom name="terrain_label_rough_t7" type="box" pos="40.65 13.75 .012" size="1.2 .375 .006" material="terrain_label_rough_t7" group="1" contype="0" conaffinity="0" />
+  </worldbody>
+</mujoco>

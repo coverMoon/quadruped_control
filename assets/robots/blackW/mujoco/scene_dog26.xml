@@ -1,0 +1,4 @@
+<mujoco model="blackW scene dog26">
+  <include file="blackW_description.xml"/>
+  <include file="../../../maps/dog26/map.xml"/>
+</mujoco>

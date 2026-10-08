@@ -208,6 +208,53 @@ void check_reset_pose(const MotionContext& ctx)
     }
 }
 
+// 射线测量地形顶面，验证踏面深度、真实沟壑和交错桩阵。
+void check_terrain_geometry(const mjModel* model, const mjData* data)
+{
+    const auto height_at = [model, data](const double x, const double y)
+    {
+        const mjtNum origin[3]{x, y, 6.0};
+        const mjtNum direction[3]{0.0, 0.0, -1.0};
+        const mjtByte groups[6]{1, 0, 0, 0, 0, 0};
+        int geom_id = -1;
+        return 6.0 - mj_ray(model, data, origin, direction, groups, 1, -1, &geom_id, nullptr);
+    };
+
+    for (int step = 0; step < 6; ++step)
+    {
+        expect_close(height_at(25.5 + 0.3 * step + 0.15, 3.0),
+            0.1 * (step + 1), 1.0e-8, "楼梯上行踏面应每 30 cm 升高 10 cm");
+        expect_close(height_at(28.1 + 0.3 * step + 0.15, 3.0),
+            0.1 * (6 - step), 1.0e-8, "楼梯下行踏面应每 30 cm 降低 10 cm");
+    }
+    expect_close(height_at(31.45, 3.0), 0.0, 1.0e-8, "楼梯档位之间应保留平地通道");
+    expect_close(height_at(22.5, 9.0), 0.3, 1.0e-8, "沟壑入口应高于坑底 30 cm");
+    expect_close(height_at(23.2, 9.0), 0.0, 1.0e-8, "40 cm 沟壑中央应存在真实缺口");
+    expect_close(height_at(23.5, 9.0), 0.3, 1.0e-8, "沟壑出口应与入口等高");
+    expect_close(height_at(10.0, 6.0), std::tan(10.0 * std::acos(-1.0) / 180.0),
+        1.0e-7, "10 度斜坡中点应具有正确高度");
+    expect_close(height_at(36.75, 0.0), 1.2, 1.0e-8, "最高高台应为 120 cm");
+    expect_close(height_at(79.65, 3.0), 2.4, 1.0e-8, "最高楼梯应六级升至 240 cm");
+    expect_close(height_at(64.0, 6.0), std::tan(std::acos(-1.0) / 3.0),
+        1.0e-6, "最高纵坡应为 60 度");
+    expect_close(height_at(65.9, 9.0), 0.0, 1.0e-8, "最宽沟壑应保留 180 cm 缺口");
+    expect_close(height_at(8.4, 39.0), 1.0, 1.0e-8, "最高梅花桩平台应为 100 cm");
+    expect_close(height_at(1000.0, 1000.0), 0.0, 1.0e-8, "远处也应存在无限地面");
+    expect_close(height_at(3.4, 12.0), 0.1, 1.0e-7, "梅花桩上桩斜坡应连续衔接平台");
+    expect_close(height_at(4.4, 12.0), 0.2, 1.0e-8, "梅花桩入口平台应高 20 cm");
+    for (int row = 0; row < 2; ++row)
+    {
+        for (int index = 0; index < 12; ++index)
+        {
+            const double x = 5.0 + 0.3 * row + 0.6 * index;
+            const double y = row == 0 ? 12.2 : 11.8;
+            expect_close(height_at(x, y), 0.2, 1.0e-8, "全部 24 个梅花桩应高 20 cm");
+            expect_close(height_at(x + 0.15, y), 0.0, 1.0e-8,
+                "梅花桩之间应保留规则要求的净空");
+        }
+    }
+}
+
 // terrain 场景必须沿用 black 的关节、执行器和 IMU 映射，并可建立首个会话。
 void check_terrain_scene_mapping(const qc::RobotModel& model)
 {
@@ -232,57 +279,70 @@ void check_terrain_scene_mapping(const qc::RobotModel& model)
     expect(state.joint_count == model.joint_count,
         "terrain 场景状态关节数必须与 black RobotModel 一致");
     expect(state.imu.valid, "terrain 场景 IMU 映射输出必须有效");
+    check_terrain_geometry(created.io->raw_model(), created.io->raw_data());
 }
 
-// 场地平移后，两个型号的原点出生位置都应落在红方平地，避免被中央高台包住。
-void check_nwbt_spawn(const std::string& scene_path, const qc::RobotModel& model)
+// 共用场景应保留原点平地出生，并能托起复位零姿态中低于地面的足端。
+void check_map_spawn(
+    const std::string& scene_path,
+    const qc::RobotModel& model,
+    const char* const ground_name)
 {
     auto created = quadruped::backends::mujoco::MujocoRobotIO::create(scene_path, model, 1);
-    expect(created.ok(), "nwbt 场景加载失败：" + created.error_message);
+    expect(created.ok(), "地图场景加载失败：" + created.error_message);
     if (!created.ok())
     {
         return;
     }
-    expect(created.io->reset(31).ok(), "nwbt 场景应能建立初始会话");
+    expect(created.io->reset(31).ok(), "地图场景应能建立初始会话");
 
     const auto* raw_model = created.io->raw_model();
     const auto* data = created.io->raw_data();
-    expect_close(raw_model->opt.timestep, 0.002, 1.0e-12, "nwbt 应保留 2 ms 物理步长");
-    expect_close(data->qpos[0], 0.0, 1.0e-12, "nwbt 应保留机器人出生点 x");
-    expect_close(data->qpos[1], 0.0, 1.0e-12, "nwbt 应保留机器人出生点 y");
+    expect_close(raw_model->opt.timestep, 0.002, 1.0e-12, "地图应保留 2 ms 物理步长");
+    expect_close(data->qpos[0], 0.0, 1.0e-12, "地图应保留机器人出生点 x");
+    expect_close(data->qpos[1], 0.0, 1.0e-12, "地图应保留机器人出生点 y");
 
     // mj_ray 跳过透明碰撞体；直接检查场地基础几何，排除机器人及视觉网格。
     const mjtNum origin[3]{0.0, 0.0, 2.0};
     const mjtNum direction[3]{0.0, 0.0, -1.0};
-    const int ground_body_id = mj_name2id(raw_model, mjOBJ_BODY, "robocon_ground");
-    expect(ground_body_id >= 0, "nwbt 应包含场地静态刚体");
+    const int ground_geom_id = mj_name2id(raw_model, mjOBJ_GEOM, ground_name);
+    expect(ground_geom_id >= 0, "地图应包含出生地面碰撞体");
+    if (ground_geom_id < 0)
+    {
+        return;
+    }
+    const int ground_body_id = raw_model->geom_bodyid[ground_geom_id];
+    const int ground_group = raw_model->geom_group[ground_geom_id];
     int geom_id = -1;
     double distance = -1.0;
     for (int i = 0; i < raw_model->ngeom; ++i)
     {
-        if (raw_model->geom_bodyid[i] != ground_body_id || raw_model->geom_group[i] != 3)
+        if (raw_model->geom_bodyid[i] != ground_body_id ||
+            raw_model->geom_group[i] != ground_group)
         {
             continue;
         }
-        const double hit = mju_rayGeom(data->geom_xpos + 3 * i, data->geom_xmat + 9 * i,
-            raw_model->geom_size + 3 * i, origin, direction, raw_model->geom_type[i], nullptr);
+        const double hit = raw_model->geom_type[i] == mjGEOM_MESH
+            ? mj_rayMesh(raw_model, data, i, origin, direction, nullptr)
+            : mju_rayGeom(data->geom_xpos + 3 * i, data->geom_xmat + 9 * i,
+                  raw_model->geom_size + 3 * i, origin, direction, raw_model->geom_type[i],
+                  nullptr);
         if (hit >= 0.0 && (distance < 0.0 || hit < distance))
         {
             distance = hit;
             geom_id = i;
         }
     }
-    expect_close(distance, 2.0, 1.0e-9, "nwbt 出生点下方应为 z=0 平地");
-    expect(geom_id == mj_name2id(raw_model, mjOBJ_GEOM, "robocon_ground_red"),
-        "nwbt 出生点应在红方半场");
+    expect_close(distance, 2.0, 1.0e-9, "地图出生点下方应为 z=0 平地");
+    expect(geom_id == ground_geom_id, "地图出生点应在指定平地上");
 
     for (int step = 0; step < 1000; ++step)
     {
-        expect(created.io->step() == qc::RobotIOCode::Ok, "nwbt 应能正常物理步进");
+        expect(created.io->step() == qc::RobotIOCode::Ok, "地图应能正常物理步进");
     }
     qc::StateFrame state;
     expect(created.io->read_latest(state) == qc::RobotIOCode::Ok && state.imu.valid,
-        "nwbt 步进后应生成有效机器人状态");
+        "地图步进后应生成有效机器人状态");
 
     // 复位零姿态的足端可能低于地面，落地后球形足端和轮碰撞体应被托起。
     for (int i = 0; i < raw_model->ngeom; ++i)
@@ -302,7 +362,7 @@ void check_nwbt_spawn(const std::string& scene_path, const qc::RobotModel& model
                 size[1] * std::abs(rotation[8]);
         }
         const double bottom = data->geom_xpos[3 * i + 2] - vertical_extent;
-        expect(bottom >= -0.005, "nwbt 自然落地后足端不得穿过地面：" +
+        expect(bottom >= -0.005, "地图自然落地后足端不得穿过地面：" +
             std::string(body_name) + "，底面高度=" + std::to_string(bottom));
     }
 }
@@ -679,7 +739,10 @@ void check_blackw_model_and_basic_motion()
     const auto terrain = quadruped::backends::mujoco::MujocoModel::load(
         QUADRUPED_BLACKW_TERRAIN_SCENE_PATH, model.model);
     expect(terrain.ok(), "加载 blackW 地形场景失败：" + terrain.error_message);
-    check_nwbt_spawn(QUADRUPED_BLACKW_NWBT_SCENE_PATH, model.model);
+    check_map_spawn(QUADRUPED_BLACKW_NWBT_SCENE_PATH, model.model, "robocon_ground_red");
+    check_map_spawn(QUADRUPED_BLACKW_DOG27_SCENE_PATH, model.model, "ground");
+    check_map_spawn(QUADRUPED_BLACKW_DOG26_SCENE_PATH, model.model, "floor");
+    check_map_spawn(QUADRUPED_BLACKW_TERRAIN_SCENE_PATH, model.model, "floor");
 
     const auto controller = quadruped::config::load_controller_config(
         QUADRUPED_BLACKW_CONTROLLER_CONFIG_PATH, model.model);
@@ -946,7 +1009,10 @@ int main()
     }
 
     check_terrain_scene_mapping(model.model);
-    check_nwbt_spawn(QUADRUPED_BLACK_NWBT_SCENE_PATH, model.model);
+    check_map_spawn(QUADRUPED_BLACK_NWBT_SCENE_PATH, model.model, "robocon_ground_red");
+    check_map_spawn(QUADRUPED_BLACK_DOG27_SCENE_PATH, model.model, "ground");
+    check_map_spawn(QUADRUPED_BLACK_DOG26_SCENE_PATH, model.model, "floor");
+    check_map_spawn(QUADRUPED_BLACK_TERRAIN_SCENE_PATH, model.model, "floor");
 
     auto reset_semantics = quadruped::backends::mujoco::MujocoRobotIO::create(
         QUADRUPED_BLACK_SCENE_PATH, model.model, 1);
