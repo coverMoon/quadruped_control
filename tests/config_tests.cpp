@@ -145,12 +145,17 @@ int main()
     expect(policy_switch.ok(), "策略循环配置应加载成功：" + policy_switch.error_message);
     if (policy_switch.ok())
     {
-        expect(policy_switch.config.policy_names.size() == 2,
-            "black 策略循环应包含两个策略");
+        expect(policy_switch.config.policy_names.size() == 3,
+            "black 策略循环应包含 flat、obstacle 和 test");
         expect(policy_switch.config.policy_names[0] == "flat",
             "策略循环第一项应为 flat");
         expect(policy_switch.config.policy_names[1] == "obstacle",
             "策略循环第二项应为 obstacle");
+        if (policy_switch.config.policy_names.size() >= 3)
+        {
+            expect(policy_switch.config.policy_names[2] == "test",
+                "策略循环第三项应为 test");
+        }
         expect(policy_switch.config.posture_transition_cycles == 150,
             "策略姿态过渡周期应从 policy_switch.yaml 加载");
     }
