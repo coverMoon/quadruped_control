@@ -9,3 +9,6 @@ __pycache__/
 /.ai/
 /.build/
 /.runtime/
+
+# 私有资产
+assets/robots/wolf/
