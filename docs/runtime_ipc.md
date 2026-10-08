@@ -220,7 +220,7 @@ blackW：
 ./scripts/run/command.sh blackW keyboard
 ```
 
-backend 支持 `plain|terrain|nwbt`、`gui|headless` 等运行参数。详细命令见根目录 [README](../README.md)。
+backend 支持 `plain|terrain|dog26|nwbt|dog27`、`gui|headless` 等运行参数。详细命令见根目录 [README](../README.md)。
 
 ## 9. 测试
 

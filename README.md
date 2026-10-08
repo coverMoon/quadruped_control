@@ -163,6 +163,23 @@ export ROS_SETUP=/path/to/ros/setup.bash
 
 场地与出生点说明见 [机器人模型与行为](docs/robot_models_and_behaviors.md#女娲补天地图nwbt)。
 
+原 `terrain` 场地已保留为 `dog26`；`terrain` 现在是分档运动能力测试场。两种机器人均可使用：
+
+```bash
+./scripts/run/backend.sh black dog26
+./scripts/run/backend.sh black terrain
+# blackW 使用相同的地图名称
+```
+
+障碍尺寸和分区位置见 [运动能力测试地形](docs/robot_models_and_behaviors.md#运动能力测试地形terrain)。
+
+ROBOCON2027 地形（`dog27`）：
+
+```bash
+./scripts/run/backend.sh black dog27
+./scripts/run/backend.sh blackW dog27
+```
+
 headless 模式：
 
 ```bash
