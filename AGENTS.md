@@ -16,11 +16,10 @@ Torch policy adapter, configuration loaders, and runnable simulation application
 - Keep the smallest implementation that satisfies the current request. Do not add a
   framework, abstraction layer, extension point, or configuration field for an
   unrequested future use case.
-- Prefer modifying an existing source, test, or document. Add a file only when it has
+- Prefer modifying an existing source or document. Add a file only when it has
   an independent responsibility; do not split code merely to satisfy a line-count goal.
-- Keep one implementation for black and blackW differences, one primary test entry per
-  module, and one current document per topic. Do not create milestone documents or test
-  files for every small behavior.
+- Keep one implementation for black and blackW differences and one current document per
+  topic. Do not create milestone documents for every small behavior.
 - User requirements and the actual repository take precedence over stale plans or
   collaboration documents.
 
@@ -124,18 +123,33 @@ Torch policy adapter, configuration loaders, and runnable simulation application
 - Return explicit status or validation results across module boundaries. Do not
   let exceptions cross `RobotIO` or periodic-control boundaries.
 
-## Build and test
+## Build and verification
 
 - Run the smallest affected build profile before handing off: `./scripts/build.sh` for
   shared core changes, `./scripts/build.sh --mujoco` for MuJoCo changes, and the RL
   profile when Torch behavior changes. Do not run every profile by default.
 - Use `--clean` only when dependency discovery, profile options, generated configuration,
   or a suspected stale cache is part of the change.
-- Prefer extending an existing integration test. Add focused tests for core state-machine
-  behavior, numerical conversion, known bugs, and realistic safety failures that are not
-  already covered. Simple field mapping, configuration wiring, and thin adapters do not
-  require separate tests.
-- Tests in M0 must not require network access or a third-party test framework.
+- Do not write, maintain, extend, or run the regular test programs by default. This covers
+  unit, integration, end-to-end, and regression tests under `tests/`, including CTest and
+  the project test scripts. Do not add tests, do not update `tests/` to match production
+  changes, and do not require historical tests to pass as a delivery step. Do not build a
+  test framework, test project, test matrix, or test file for a new feature.
+- Functional verification scripts that are required to implement the current feature are
+  not part of that restriction. Examples: a short Python or Shell script that checks a
+  control output, model loading, joint mapping, or actuator response; a minimal
+  reproduction or diagnostic script for a real bug; or a brief real run or simulation
+  that confirms the new feature works. Keep them small and specific to the current task,
+  do not commit temporary scripts, and place a script in `scripts/` only when it has
+  lasting value. Do not use “functional verification” to build a new regular test system.
+- Choose verification from the actual risk of the change: static checks, build checks,
+  configuration loading, code review of data flow and interface contracts, necessary
+  functional runs, and lightweight Git checks such as `git diff --check`. Not every task
+  needs all of them.
+- Report compilation, configuration loading, and functional runs as separate results. Do
+  not present a successful build, a loaded configuration, or a short run as proof of full
+  correctness. Do not run long MuJoCo simulations, large validation matrices, or full RL
+  training by default.
 - Do not commit `build/`, generated binaries, or `compile_commands.json`.
 
 ## Documentation style
