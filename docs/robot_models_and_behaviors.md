@@ -7,7 +7,7 @@ black、blackW 和 wolf 共用 MotionRuntime、RobotIO 边界和行为实现。�
 | 项目 | black | blackW | wolf |
 | --- | --- | --- | --- |
 | 结构 | 12 关节四足 | 16 关节轮足 | 16 关节轮足 |
-| RL 策略 | flat、obstacle | flat、obstacle、stair | flat、flat_him |
+| RL 策略 | flat、obstacle | flat、obstacle、stair | test |
 | Retry | ✓ | ✓ | ✓ |
 | Event chain | 空事件列表 | 10 段事件链 | — |
 | 固定姿态轮驱 | — | Bridge、Low-bar、Car | — |
@@ -182,11 +182,14 @@ RR_hip, RR_thigh, RR_calf, RR_foot
 
 `FL_foot` 等为驱动轮，使用 `JointRole::Wheel` 且无位置限制。位置范围来自 Wolf MJCF；腿部力矩上限 `60 N·m`、轮部 `17 N·m` 来自训练侧 PD 契约。
 
-MuJoCo 入口：
+MuJoCo 入口（与 black / blackW 相同，thin include 复用 `assets/maps` 下的共享地图）：
 
 ```text
-assets/robots/wolf/mujoco/scene.xml
-assets/robots/wolf/mujoco/scene_terrain.xml
+assets/robots/wolf/mujoco/scene.xml             出生平地
+assets/robots/wolf/mujoco/scene_terrain.xml     运动能力测试地形
+assets/robots/wolf/mujoco/scene_dog26.xml       dog26 历史场地
+assets/robots/wolf/mujoco/scene_nwbt.xml        女娲补天地图
+assets/robots/wolf/mujoco/scene_dog27.xml       ROBOCON2027 地形
 ```
 
 Wolf 模型为本地私有资产（不纳入 Git），并显式提供 `imu_quat`、`imu_gyro`、`imu_acc`（绑定 `imu_site`）、`default_pose` keyframe 和 5 ms 物理步长。`backend.sh wolf` 默认以 `default_pose`（root z=0.4432 m、默认关节姿态）启动；black/blackW 仍保持 MJCF 零位启动语义。
@@ -200,7 +203,7 @@ Wolf 策略使用腿轮分离观测布局 `leg_wheel_split_v1`：
 
 动作 16 维：腿 `q_target = q_default + 0.20 × raw`；轮 `dq_target = sign × 10.0 × raw`。腿使用 `Kp=80`、`Kd=3.0`，轮使用 `Kp=0`、`Kd=1.0`，均以 `JointImpedance` 单层 PD 执行。
 
-策略列表由 `configs/policies/wolf/policy_switch.yaml` 定义：`flat`（PPO，53 维单帧）和 `flat_him`（HIM，6 帧展平为 318 维）。命令上限为 `vx=4.0`、`vy=1.0`、`wz=3.14`。训练导出的 TorchScript 需放在 `assets/policies/wolf/<policy>/policy.pt`。
+策略列表由 `configs/policies/wolf/policy_switch.yaml` 定义，当前为 `test`（HIM，6 帧展平为 318 维）。命令上限为 `vx=4.0`、`vy=1.0`、`wz=3.14`。训练导出的 TorchScript 需放在 `assets/policies/wolf/<policy>/policy.pt`。
 
 ## 6. 策略运行与切换
 

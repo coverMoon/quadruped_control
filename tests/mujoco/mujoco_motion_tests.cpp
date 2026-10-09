@@ -7,11 +7,11 @@
 
 #include "quadruped/backends/mujoco/mujoco_model.hpp"
 #include "quadruped/config/behavior_config_loader.hpp"
+#include "quadruped/config/rl_config_loader.hpp"
 #include "quadruped/config/robot_config.hpp"
 #include "quadruped/motion/motion_runtime.hpp"
 
 #if defined(QUADRUPED_WITH_TORCH)
-#include "quadruped/config/rl_config_loader.hpp"
 #include "quadruped/policy/torch_policy.hpp"
 #endif
 
@@ -992,6 +992,39 @@ void check_blackw_model_and_basic_motion()
         "blackW GetDown 完成后应进入 Passive");
 }
 
+// Wolf 复用 assets/maps 共享地图：验证可加载、5 ms 步长、出生点与 IMU 映射。
+void check_wolf_map_scene(const std::string& scene_path, const qc::RobotModel& model)
+{
+    if (!std::filesystem::exists(scene_path))
+    {
+        return;
+    }
+    const auto loaded = quadruped::backends::mujoco::MujocoModel::load(scene_path, model);
+    expect(loaded.ok(), "Wolf 地图场景加载失败：" + scene_path + "：" + loaded.error_message);
+    if (!loaded.ok())
+    {
+        return;
+    }
+    expect_close(loaded.model->info().timestep, 0.005, 1.0e-12,
+        "Wolf 地图应保留 5 ms 物理步长");
+    auto created = quadruped::backends::mujoco::MujocoRobotIO::create(scene_path, model, 1);
+    expect(created.ok(), "Wolf 地图场景创建 RobotIO 失败：" + created.error_message);
+    if (!created.ok())
+    {
+        return;
+    }
+    expect(created.io->reset(31).ok(), "Wolf 地图场景应能建立初始会话");
+    expect_close(created.io->raw_data()->qpos[0], 0.0, 1.0e-12, "Wolf 地图应保留出生点 x");
+    expect_close(created.io->raw_data()->qpos[1], 0.0, 1.0e-12, "Wolf 地图应保留出生点 y");
+    for (int step = 0; step < 200; ++step)
+    {
+        expect(created.io->step() == qc::RobotIOCode::Ok, "Wolf 地图应能正常物理步进");
+    }
+    qc::StateFrame state;
+    expect(created.io->read_latest(state) == qc::RobotIOCode::Ok && state.imu.valid,
+        "Wolf 地图步进后应生成有效机器人状态");
+}
+
 // Wolf 私有资产的最小闭环：模型映射、IMU、5 ms 步长、默认姿态、轮方向和力矩限幅。
 // 本地缺失 Wolf 私有资产时跳过，不在缺少资产的环境下失败。
 void check_wolf_model_and_basic_motion()
@@ -1027,18 +1060,24 @@ void check_wolf_model_and_basic_motion()
     expect(loaded.model->imu_mapping().gyro.sensor_id >= 0, "wolf 应映射 imu_gyro");
     expect(loaded.model->imu_mapping().acc.sensor_id >= 0, "wolf 应映射 imu_acc");
 
+    // Wolf 与 black / blackW 一样复用 assets/maps 下的共享地图，不在机器人目录内维护副本。
+    check_wolf_map_scene(QUADRUPED_WOLF_TERRAIN_SCENE_PATH, model.model);
+    check_wolf_map_scene(QUADRUPED_WOLF_DOG26_SCENE_PATH, model.model);
+    check_wolf_map_scene(QUADRUPED_WOLF_NWBT_SCENE_PATH, model.model);
+    check_wolf_map_scene(QUADRUPED_WOLF_DOG27_SCENE_PATH, model.model);
+
     const auto controller = quadruped::config::load_controller_config(
         QUADRUPED_WOLF_CONTROLLER_CONFIG_PATH, model.model);
     const auto retry = quadruped::config::load_retry_config(
         QUADRUPED_WOLF_RETRY_CONFIG_PATH, model.model);
-    const auto flat = quadruped::config::load_rl_config(
-        QUADRUPED_WOLF_POLICY_FLAT_CONFIG_PATH,
+    const auto wolf_policy = quadruped::config::load_rl_config(
+        QUADRUPED_WOLF_POLICY_TEST_CONFIG_PATH,
         QUADRUPED_PROJECT_SOURCE_DIR,
         model.model);
     expect(controller.ok(), "加载 wolf 控制器失败：" + controller.error_message);
     expect(retry.ok(), "加载 wolf Retry 失败：" + retry.error_message);
-    expect(flat.ok(), "加载 wolf flat 配置失败：" + flat.error_message);
-    if (!controller.ok() || !retry.ok() || !flat.ok())
+    expect(wolf_policy.ok(), "加载 wolf test 配置失败：" + wolf_policy.error_message);
+    if (!controller.ok() || !retry.ok() || !wolf_policy.ok())
     {
         return;
     }
@@ -1114,16 +1153,16 @@ void check_wolf_model_and_basic_motion()
             joint.target_velocity = 0.0;
         }
         for (std::size_t action_index = 0;
-             action_index < flat.config.action_dimension;
+             action_index < wolf_policy.config.action_dimension;
              ++action_index)
         {
-            const std::size_t joint_index = flat.config.policy_dof_indices[action_index];
+            const std::size_t joint_index = wolf_policy.config.policy_dof_indices[action_index];
             if (model.model.joints[joint_index].role != qc::JointRole::Wheel)
             {
                 continue;
             }
             command.joints[joint_index].target_velocity =
-                flat.config.action_scale[action_index] * static_cast<double>(kRawAction);
+                wolf_policy.config.action_scale[action_index] * static_cast<double>(kRawAction);
         }
         expect(io.submit(command) == qc::RobotIOCode::Ok, "wolf 轮速命令应被接受");
         expect(io.step() == qc::RobotIOCode::Ok, "wolf 轮速测试应能步进");
@@ -1134,17 +1173,17 @@ void check_wolf_model_and_basic_motion()
     expect(forward > 0.02,
         "正 policy 轮速动作应产生 +x 前向位移（位移 " + std::to_string(forward) + " m）");
     for (std::size_t action_index = 0;
-         action_index < flat.config.action_dimension;
+         action_index < wolf_policy.config.action_dimension;
          ++action_index)
     {
-        const std::size_t joint_index = flat.config.policy_dof_indices[action_index];
+        const std::size_t joint_index = wolf_policy.config.policy_dof_indices[action_index];
         if (model.model.joints[joint_index].role != qc::JointRole::Wheel)
         {
             continue;
         }
         const double delta = wheel_end[joint_index] - wheel_start[joint_index];
         const double expected_sign =
-            flat.config.action_scale[action_index] > 0.0 ? 1.0 : -1.0;
+            wolf_policy.config.action_scale[action_index] > 0.0 ? 1.0 : -1.0;
         expect(delta * expected_sign > 0.0,
             "wolf 轮关节应按 forward sign 转动（关节 " +
                 std::to_string(joint_index) + "）");
@@ -1228,6 +1267,40 @@ void check_wolf_model_and_basic_motion()
     const double stand_height = io.raw_data()->qpos[2];
     std::cout << "Wolf Stand：躯干高度=" << stand_height << " m\n";
     expect(stand_height > 0.30, "wolf Stand 期间躯干不应倒地");
+
+#if defined(QUADRUPED_WITH_TORCH)
+    // 真实 Wolf HIM 策略（318 → 16）在 MuJoCo 中短程闭环；缺少 .pt 时跳过。
+    if (std::filesystem::exists(wolf_policy.config.model_path))
+    {
+        auto policy = quadruped::policy::TorchPolicy::create(wolf_policy.config);
+        expect(policy.ok(), "加载 wolf test TorchScript 失败：" + policy.error_message);
+        if (policy.ok())
+        {
+            std::string attach_error;
+            expect(runtime.runtime->attach_policy(
+                       wolf_policy.config, *policy.policy, attach_error),
+                "接入 wolf test 策略失败：" + attach_error);
+            sim.set_base_command(0.6, 0.0, 0.0);
+            qc::ModeRequest start;
+            start.request_id = 202;
+            start.type = qc::ModeRequestType::StartBehavior;
+            start.behavior_name = "rl_locomotion";
+            expect(sim.run_until_completed(1.5, start),
+                "wolf HIM RL 应在首次 318→16 推理后启动（错误：" +
+                    sim.last_output().status.error_message + "）");
+            const double start_x = io.raw_data()->qpos[0];
+            sim.run_seconds(2.0);
+            const double displacement = io.raw_data()->qpos[0] - start_x;
+            const double height = io.raw_data()->qpos[2];
+            std::cout << "Wolf HIM 闭环：2 秒位移=" << displacement
+                      << " m，躯干高度=" << height << " m\n";
+            expect(sim.last_output().status.mode == qc::MotionMode::Running &&
+                    sim.last_output().status.error_message.empty(),
+                "wolf HIM 闭环应保持 Running");
+            expect(height > 0.20, "wolf HIM 闭环期间躯干不应倒地");
+        }
+    }
+#endif
 }
 
 }  // namespace

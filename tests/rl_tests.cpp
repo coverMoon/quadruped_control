@@ -63,35 +63,27 @@ void check_wolf_rl()
     {
         return;
     }
-    const auto wolf_flat = quadruped::config::load_rl_config(
-        QUADRUPED_WOLF_POLICY_FLAT_CONFIG_PATH,
+    const auto wolf = quadruped::config::load_rl_config(
+        QUADRUPED_WOLF_POLICY_TEST_CONFIG_PATH,
         QUADRUPED_PROJECT_SOURCE_DIR,
         wolf_model.model);
-    const auto wolf_him = quadruped::config::load_rl_config(
-        QUADRUPED_WOLF_POLICY_FLAT_HIM_CONFIG_PATH,
-        QUADRUPED_PROJECT_SOURCE_DIR,
-        wolf_model.model);
-    expect(wolf_flat.ok(), "wolf flat 配置应加载成功：" + wolf_flat.error_message);
-    expect(wolf_him.ok(), "wolf flat_him 配置应加载成功：" + wolf_him.error_message);
-    if (!wolf_flat.ok() || !wolf_him.ok())
+    expect(wolf.ok(), "wolf test 配置应加载成功：" + wolf.error_message);
+    if (!wolf.ok())
     {
         return;
     }
-    expect(wolf_flat.config.observation_dimension == 53 &&
-            wolf_flat.config.action_dimension == 16 &&
-            wolf_flat.config.inference_input_dimension == 53,
-        "wolf flat 应为 53-D 单帧输入和 16-D 输出");
-    expect(wolf_him.config.observation_dimension == 53 &&
-            wolf_him.config.history_frame_count == 6 &&
-            wolf_him.config.inference_input_dimension == 318,
-        "wolf HIM 应为 6 帧 53-D 输入和 318-D 展平输入");
+    expect(wolf.config.observation_dimension == 53 &&
+            wolf.config.action_dimension == 16 &&
+            wolf.config.history_frame_count == 6 &&
+            wolf.config.inference_input_dimension == 318,
+        "wolf test 应为 6 帧 53-D HIM 输入和 16-D 输出");
 
     // 固定非零状态：默认姿态上的已知偏差、已知 IMU 角速度和已知四轮速度。
-    auto state = make_state(wolf_model.model, wolf_flat.config);
+    auto state = make_state(wolf_model.model, wolf.config);
     state.imu.angular_velocity = {0.1, 0.2, 0.3};
-    state.joints[0].position = wolf_flat.config.default_joint_positions[0] + 0.1;
+    state.joints[0].position = wolf.config.default_joint_positions[0] + 0.1;
     state.joints[0].velocity = 0.5;
-    state.joints[1].position = wolf_flat.config.default_joint_positions[1] - 0.2;
+    state.joints[1].position = wolf.config.default_joint_positions[1] - 0.2;
     state.joints[1].velocity = -0.4;
     state.joints[3].velocity = 3.0;
     state.joints[7].velocity = -4.0;
@@ -107,7 +99,7 @@ void check_wolf_rl()
     command.wz = 2.0;
 
     auto created = quadruped::motion::RlController::create(
-        wolf_model.model, wolf_flat.config);
+        wolf_model.model, wolf.config);
     expect(created.ok(), "wolf RlController 应创建成功：" + created.error_message);
     if (!created.ok())
     {
@@ -155,7 +147,7 @@ void check_wolf_rl()
     const auto output = created.controller->convert_actions(inference, positions);
     expect(output.ok, "wolf 动作换算应成功：" + output.error_message);
     expect_close(output.target_positions[0],
-        wolf_flat.config.default_joint_positions[0] + 0.2 * 0.20,
+        wolf.config.default_joint_positions[0] + 0.2 * 0.20,
         "wolf 腿动作应为 default + 0.20 × raw");
     expect_close(output.target_velocities[3], 2.0, "wolf FL 轮动作应为 +10 × raw");
     expect_close(output.target_velocities[7], -2.0, "wolf FR 轮动作应为 -10 × raw");
@@ -167,7 +159,7 @@ void check_wolf_rl()
         "wolf 腿应使用 Kp=80 / Kd=3.0 的位置 PD");
 
     // 安全裁剪（action_clip）只作用于控制目标；previous raw action 保留原始输出。
-    auto trimmed = wolf_flat.config;
+    auto trimmed = wolf.config;
     trimmed.action_clip = 1.0;
     auto trimmed_controller = quadruped::motion::RlController::create(
         wolf_model.model, trimmed);
@@ -193,7 +185,7 @@ void check_wolf_rl()
 
     // HIM history：newest → oldest 按 frame-major 展平，每次插入的 command 不同。
     auto him_created = quadruped::motion::RlController::create(
-        wolf_model.model, wolf_him.config);
+        wolf_model.model, wolf.config);
     expect(him_created.ok(), "wolf HIM RlController 应创建成功：" + him_created.error_message);
     if (him_created.ok())
     {

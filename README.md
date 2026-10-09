@@ -17,7 +17,7 @@
 - LibTorch 加载 TorchScript 强化学习策略；
 - black 的 flat / obstacle 策略；
 - blackW 的 flat / obstacle / stair 策略；
-- wolf 的 flat PPO 与 flat_him HIM 策略；
+- wolf 的 test HIM 策略；
 - 运行时策略切换；
 - black/blackW/wolf Retry，以及 blackW Event chain 和固定姿态轮驱行为；
 - 键盘、手柄和 ROS 2 `/cmd_vel` 控制；
@@ -230,11 +230,11 @@ headless 模式：
 ./scripts/run/command.sh blackW keyboard
 ```
 
-运行 wolf 时，Plain 场景使用 `plain`，策略名称为 `flat` 或 `flat_him`：
+运行 wolf 时，Plain 场景使用 `plain`，初始策略为 `test`：
 
 ```bash
 ./scripts/run/backend.sh wolf plain
-./scripts/run/motion.sh wolf flat
+./scripts/run/motion.sh wolf test
 ./scripts/run/command.sh wolf keyboard
 ```
 

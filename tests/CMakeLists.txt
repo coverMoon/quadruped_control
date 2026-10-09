@@ -38,8 +38,7 @@ target_compile_definitions(quadruped_config_tests PRIVATE
     QUADRUPED_WOLF_CONTROLLER_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/controllers/wolf.yaml"
     QUADRUPED_WOLF_RETRY_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/behaviors/wolf/retry.yaml"
     QUADRUPED_WOLF_POLICY_SWITCH_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/wolf/policy_switch.yaml"
-    QUADRUPED_WOLF_POLICY_FLAT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/wolf/flat.yaml"
-    QUADRUPED_WOLF_POLICY_FLAT_HIM_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/wolf/flat_him.yaml"
+    QUADRUPED_WOLF_POLICY_TEST_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/wolf/test.yaml"
 )
 
 quadruped_add_test(quadruped_motion_tests motion_tests.cpp)
@@ -66,8 +65,7 @@ target_compile_definitions(quadruped_rl_tests PRIVATE
     QUADRUPED_BLACKW_POLICY_OBSTACLE_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/blackW/obstacle.yaml"
     QUADRUPED_BLACKW_POLICY_STAIR_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/blackW/stair.yaml"
     QUADRUPED_WOLF_ROBOT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/robots/wolf.yaml"
-    QUADRUPED_WOLF_POLICY_FLAT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/wolf/flat.yaml"
-    QUADRUPED_WOLF_POLICY_FLAT_HIM_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/wolf/flat_him.yaml"
+    QUADRUPED_WOLF_POLICY_TEST_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/wolf/test.yaml"
 )
 
 if(QUADRUPED_ENABLE_MUJOCO)

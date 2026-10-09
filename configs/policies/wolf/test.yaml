@@ -1,12 +1,7 @@
-# 文件：flat_him.yaml
-# 作用：记录 wolf 平地 HIM 策略的输入、输出和动作映射规格。
-#
-# 契约来自 alldog_mjlab tasks/velocity/wolf：actor 历史 6×53，展平为 318-D；
-# estimator 与 actor 均已包含在导出的 TorchScript 内部，部署侧只做一次 forward。
-name: flat_him
+name: test
 robot_name: wolf
 # 训练导出的 TorchScript 需放在此路径；本地缺失时仅配置可加载，推理不可运行。
-model_path: assets/policies/wolf/flat_him/policy.pt
+model_path: assets/policies/wolf/test/policy.pt
 
 observation_dimension: 53
 # 部署 HIM 历史为 newest → oldest，按 frame-major 顺序展平为 318-D。

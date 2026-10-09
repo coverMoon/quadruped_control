@@ -4,5 +4,4 @@
 wolf:
   posture_transition_cycles: 200
   policy_config_cycle:
-    - flat
-    - flat_him
+    - test

@@ -38,10 +38,14 @@ target_compile_definitions(quadruped_mujoco_tests PRIVATE
     QUADRUPED_CONTROLLER_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/controllers/black.yaml"
     QUADRUPED_PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
     QUADRUPED_WOLF_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/wolf/mujoco/scene.xml"
+    QUADRUPED_WOLF_TERRAIN_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/wolf/mujoco/scene_terrain.xml"
+    QUADRUPED_WOLF_DOG26_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/wolf/mujoco/scene_dog26.xml"
+    QUADRUPED_WOLF_NWBT_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/wolf/mujoco/scene_nwbt.xml"
+    QUADRUPED_WOLF_DOG27_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/wolf/mujoco/scene_dog27.xml"
     QUADRUPED_WOLF_ROBOT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/robots/wolf.yaml"
     QUADRUPED_WOLF_CONTROLLER_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/controllers/wolf.yaml"
     QUADRUPED_WOLF_RETRY_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/behaviors/wolf/retry.yaml"
-    QUADRUPED_WOLF_POLICY_FLAT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/wolf/flat.yaml"
+    QUADRUPED_WOLF_POLICY_TEST_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/wolf/test.yaml"
 )
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(quadruped_mujoco_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)

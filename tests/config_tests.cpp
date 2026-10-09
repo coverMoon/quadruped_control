@@ -188,30 +188,26 @@ int main()
             QUADRUPED_WOLF_RETRY_CONFIG_PATH, wolf.model);
         expect(wolf_retry.ok(), "wolf Retry 配置应加载成功：" + wolf_retry.error_message);
 
-        const auto wolf_flat = quadruped::config::load_rl_config(
-            QUADRUPED_WOLF_POLICY_FLAT_CONFIG_PATH,
+        const auto wolf_test = quadruped::config::load_rl_config(
+            QUADRUPED_WOLF_POLICY_TEST_CONFIG_PATH,
             QUADRUPED_PROJECT_SOURCE_DIR,
             wolf.model);
-        const auto wolf_him = quadruped::config::load_rl_config(
-            QUADRUPED_WOLF_POLICY_FLAT_HIM_CONFIG_PATH,
-            QUADRUPED_PROJECT_SOURCE_DIR,
-            wolf.model);
-        expect(wolf_flat.ok(), "wolf flat 配置应加载成功：" + wolf_flat.error_message);
-        expect(wolf_him.ok(), "wolf flat_him 配置应加载成功：" + wolf_him.error_message);
-        if (wolf_flat.ok())
+        expect(wolf_test.ok(), "wolf test 配置应加载成功：" + wolf_test.error_message);
+        if (wolf_test.ok())
         {
-            expect(wolf_flat.config.observation_layout ==
+            expect(wolf_test.config.observation_layout ==
                     quadruped::motion::RlObservationLayout::LegWheelSplit,
                 "wolf 应使用 leg_wheel_split_v1 观测布局");
-            expect(wolf_flat.config.observation_dimension == 53 &&
-                    wolf_flat.config.history_frame_count == 1,
-                "wolf flat 应为 53-D 单帧观测");
-            expect(wolf_flat.config.wheel_velocity_scale == 0.05,
+            expect(wolf_test.config.observation_dimension == 53 &&
+                    wolf_test.config.history_frame_count == 6 &&
+                    wolf_test.config.inference_input_dimension == 318,
+                "wolf test 应为 6 帧 53-D HIM 输入");
+            expect(wolf_test.config.wheel_velocity_scale == 0.05,
                 "wolf 轮速观测比例应为 0.05");
             for (std::size_t i = 0; i < 4; ++i)
             {
                 const double expected_sign = (i % 2 == 0) ? 1.0 : -1.0;
-                expect(wolf_flat.config.wheel_velocity_signs[i] == expected_sign,
+                expect(wolf_test.config.wheel_velocity_signs[i] == expected_sign,
                     "wolf 轮速 forward sign 应为 FL/RL 正、FR/RR 负");
             }
         }
@@ -264,8 +260,10 @@ int main()
         "wolf 策略循环配置应加载成功：" + wolf_policy_switch.error_message);
     if (wolf_policy_switch.ok())
     {
-        expect(wolf_policy_switch.config.policy_names.size() == 2,
-            "wolf 策略循环应包含 flat 和 flat_him");
+        expect(wolf_policy_switch.config.policy_names.size() == 1,
+            "wolf 策略循环应包含 test");
+        expect(wolf_policy_switch.config.policy_names[0] == "test",
+            "wolf 策略循环首个策略应为 test");
         expect(wolf_policy_switch.config.posture_transition_cycles == 200,
             "wolf 策略姿态过渡应为 200 周期");
     }
