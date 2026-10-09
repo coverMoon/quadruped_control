@@ -81,6 +81,9 @@ if [[ "${robot_name}" == "blackW" ]]; then
         "${fixed_drive_config_dir}/low_bar_drive.yaml"
         "${fixed_drive_config_dir}/car_drive.yaml"
     )
+elif [[ "${robot_name}" == "wolf" ]]; then
+    # Wolf 当前只提供 car_drive，不得强制要求 bridge/low-bar 配置同时存在。
+    required_paths+=("${fixed_drive_config_dir}/car_drive.yaml")
 fi
 for required in "${required_paths[@]}"; do
     if [[ ! -e "${required}" ]]; then
@@ -100,6 +103,8 @@ args=(
 if [[ "${robot_name}" == "blackW" ]]; then
     args+=("--event-chain-config" "${event_chain_config}")
     args+=("--fixed-drive-config-dir" "${fixed_drive_config_dir}")
+elif [[ "${robot_name}" == "wolf" ]]; then
+    args+=("--fixed-drive-config" "${fixed_drive_config_dir}/car_drive.yaml")
 fi
 if [[ "${load_policy}" == true ]]; then
     args+=("--policy-switch-config" "${policy_switch_config}")

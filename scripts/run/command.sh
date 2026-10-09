@@ -156,7 +156,7 @@ if [[ "${start_controller}" != true ]]; then
     joy_require_connection_frame=false
 fi
 fixed_drive_keys_enabled=false
-if [[ "${robot_name}" == "blackW" ]]; then
+if [[ "${robot_name}" == "blackW" || "${robot_name}" == "wolf" ]]; then
     fixed_drive_keys_enabled=true
 fi
 "${gateway}" \

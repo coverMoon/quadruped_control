@@ -1,0 +1,32 @@
+# 文件：car_drive.yaml
+# 作用：配置 wolf 的低姿态车辆式差速轮行为，逻辑对照 blackW car_drive。
+behavior_name: car_drive
+robot_name: wolf
+joint_names:
+  [FL_hip, FL_thigh, FL_calf, FL_foot,
+   FR_hip, FR_thigh, FR_calf, FR_foot,
+   RL_hip, RL_thigh, RL_calf, RL_foot,
+   RR_hip, RR_thigh, RR_calf, RR_foot]
+prepare_cycles: 150
+exit_to_rl_cycles: 150
+max_x: 2.0
+max_yaw: 3.0
+wheel_velocity_scale: 10.0
+yaw_to_wheel_velocity: 5.0
+wheel_velocity_sign: [1.0, -1.0, 1.0, -1.0]
+wheel_sides: [left, right, left, right]
+# 目标姿态暂用 Wolf 默认站姿占位，待用户按实际车辆姿态填写。
+target_joint_positions:
+  [0.0, 0.82, 1.43, 0.0,
+   0.0, -0.82, -1.43, 0.0,
+   0.0, -0.82, -1.43, 0.0,
+   0.0, 0.82, 1.43, 0.0]
+# 固定姿态轮驱 PD 独立于 Wolf RL 策略 PD；轮子保持 Kp=0 的速度控制语义。
+kp: [120.0, 120.0, 120.0, 0.0,
+     120.0, 120.0, 120.0, 0.0,
+     120.0, 120.0, 120.0, 0.0,
+     120.0, 120.0, 120.0, 0.0]
+kd: [5.0, 5.0, 5.0, 2.0,
+     5.0, 5.0, 5.0, 2.0,
+     5.0, 5.0, 5.0, 2.0,
+     5.0, 5.0, 5.0, 2.0]

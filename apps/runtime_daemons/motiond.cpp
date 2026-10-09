@@ -96,6 +96,8 @@ struct Options
     std::string retry_config_path{kDefaultRetryConfigPath};
     std::string event_chain_config_path{};
     std::string fixed_drive_config_dir{};
+    // 单文件固定姿态轮驱配置，可重复指定；与 --fixed-drive-config-dir 互补。
+    std::vector<std::string> fixed_drive_config_paths{};
     std::string initial_policy{};
     bool load_policy{true};
 };
@@ -129,6 +131,7 @@ bool parse_args(int argc, char** argv, Options& options)
                       << " [--retry-config <路径>] [--initial-policy <策略名>]"
                       << " [--event-chain-config <路径>]"
                       << " [--fixed-drive-config-dir <目录>]"
+                      << " [--fixed-drive-config <路径>]"
                       << " [--no-policy]\n";
             std::exit(0);
         }
@@ -173,6 +176,10 @@ bool parse_args(int argc, char** argv, Options& options)
         else if (arg == "--fixed-drive-config-dir")
         {
             options.fixed_drive_config_dir = value;
+        }
+        else if (arg == "--fixed-drive-config")
+        {
+            options.fixed_drive_config_paths.push_back(value);
         }
         else
         {
@@ -404,6 +411,18 @@ int run(const Options& options)
                 std::cerr << "配置固定姿态轮驱失败: " << reason << '\n';
                 return 1;
             }
+        }
+    }
+    for (const std::string& path : options.fixed_drive_config_paths)
+    {
+        const auto fixed =
+            quadruped::config::load_fixed_drive_config(path, model.model);
+        if (!fixed.ok() ||
+            !runtime.runtime->configure_fixed_drive(fixed.config, behavior_error))
+        {
+            const std::string reason = fixed.ok() ? behavior_error : fixed.error_message;
+            std::cerr << "配置固定姿态轮驱失败: " << reason << '\n';
+            return 1;
         }
     }
     Policies policies;
