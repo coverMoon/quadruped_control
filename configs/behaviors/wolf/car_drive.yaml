@@ -12,15 +12,15 @@ exit_to_rl_cycles: 150
 max_x: 2.0
 max_yaw: 3.0
 wheel_velocity_scale: 10.0
-yaw_to_wheel_velocity: 10.0
+yaw_to_wheel_velocity: 20.0
 wheel_velocity_sign: [1.0, -1.0, 1.0, -1.0]
 wheel_sides: [left, right, left, right]
 # 目标姿态暂用 Wolf 默认站姿占位，待用户按实际车辆姿态填写。
 target_joint_positions:
-  [0.0, 1.27, 2.72, 0.0,
-   0.0, -1.27, -2.72, 0.0,
-   0.0, -1.27, -2.72, 0.0,
-   0.0, 1.27, 2.72, 0.0]
+  [0.0, 2.0, 2.0, 0.0,
+   0.0, -2.0, -2.0, 0.0,
+   0.0, -2.0, -2.0, 0.0,
+   0.0, 2.0, 2.0, 0.0]
 # 固定姿态轮驱 PD 独立于 Wolf RL 策略 PD；轮子保持 Kp=0 的速度控制语义。
 kp: [120.0, 120.0, 120.0, 0.0,
      120.0, 120.0, 120.0, 0.0,

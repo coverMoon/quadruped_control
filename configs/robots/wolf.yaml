@@ -11,21 +11,21 @@ joints:
   # max_kp / max_kd 是软件配置上限，不是电机物理额定值：腿部 160/8.0、轮部 0/4.0，
   # 覆盖 Wolf RL 策略 PD（腿 80/3.0、轮 0/1.0）与固定姿态轮驱 PD（腿 120/5.0、轮 0/2.0）。
   # max_velocity 训练侧未冻结：腿部 30.0 为 simulation-only 候选值，腿部位置控制
-  # target velocity 恒为 0，正常运行不会触发裁剪；轮部 50.0 由最大指令 vx=4.0 m/s
-  # 除以轮半径 0.08 m 得到，仅作仿真安全包络。
+  # target velocity 恒为 0，正常运行不会触发裁剪；轮部 80.0 为 car_drive 差速轮
+  # 预算（前进 10×2.0 + 偏航 20×3.0 = 80 rad/s），仅作仿真安全包络。
   - {name: FL_hip,   role: leg,   position_limited: true,  min_position: -0.6,     max_position: 0.8,      max_velocity: 30.0, max_effort: 60.0, max_kp: 160.0, max_kd: 8.0}
   - {name: FL_thigh, role: leg,   position_limited: true,  min_position: -3.14159, max_position: 3.14159,  max_velocity: 30.0, max_effort: 60.0, max_kp: 160.0, max_kd: 8.0}
   - {name: FL_calf,  role: leg,   position_limited: true,  min_position: -2.72,    max_position: 2.72,     max_velocity: 30.0, max_effort: 60.0, max_kp: 160.0, max_kd: 8.0}
-  - {name: FL_foot,  role: wheel, position_limited: false, min_position: 0.0,      max_position: 0.0,      max_velocity: 50.0, max_effort: 17.0, max_kp: 0.0,   max_kd: 4.0}
+  - {name: FL_foot,  role: wheel, position_limited: false, min_position: 0.0,      max_position: 0.0,      max_velocity: 80.0, max_effort: 17.0, max_kp: 0.0,   max_kd: 4.0}
   - {name: FR_hip,   role: leg,   position_limited: true,  min_position: -0.8,     max_position: 0.6,      max_velocity: 30.0, max_effort: 60.0, max_kp: 160.0, max_kd: 8.0}
   - {name: FR_thigh, role: leg,   position_limited: true,  min_position: -3.14159, max_position: 3.14159,  max_velocity: 30.0, max_effort: 60.0, max_kp: 160.0, max_kd: 8.0}
   - {name: FR_calf,  role: leg,   position_limited: true,  min_position: -2.72,    max_position: 2.72,     max_velocity: 30.0, max_effort: 60.0, max_kp: 160.0, max_kd: 8.0}
-  - {name: FR_foot,  role: wheel, position_limited: false, min_position: 0.0,      max_position: 0.0,      max_velocity: 50.0, max_effort: 17.0, max_kp: 0.0,   max_kd: 4.0}
+  - {name: FR_foot,  role: wheel, position_limited: false, min_position: 0.0,      max_position: 0.0,      max_velocity: 80.0, max_effort: 17.0, max_kp: 0.0,   max_kd: 4.0}
   - {name: RL_hip,   role: leg,   position_limited: true,  min_position: -0.8,     max_position: 0.6,      max_velocity: 30.0, max_effort: 60.0, max_kp: 160.0, max_kd: 8.0}
   - {name: RL_thigh, role: leg,   position_limited: true,  min_position: -3.14159, max_position: 3.14159,  max_velocity: 30.0, max_effort: 60.0, max_kp: 160.0, max_kd: 8.0}
   - {name: RL_calf,  role: leg,   position_limited: true,  min_position: -2.72,    max_position: 2.72,     max_velocity: 30.0, max_effort: 60.0, max_kp: 160.0, max_kd: 8.0}
-  - {name: RL_foot,  role: wheel, position_limited: false, min_position: 0.0,      max_position: 0.0,      max_velocity: 50.0, max_effort: 17.0, max_kp: 0.0,   max_kd: 4.0}
+  - {name: RL_foot,  role: wheel, position_limited: false, min_position: 0.0,      max_position: 0.0,      max_velocity: 80.0, max_effort: 17.0, max_kp: 0.0,   max_kd: 4.0}
   - {name: RR_hip,   role: leg,   position_limited: true,  min_position: -0.6,     max_position: 0.8,      max_velocity: 30.0, max_effort: 60.0, max_kp: 160.0, max_kd: 8.0}
   - {name: RR_thigh, role: leg,   position_limited: true,  min_position: -3.14159, max_position: 3.14159,  max_velocity: 30.0, max_effort: 60.0, max_kp: 160.0, max_kd: 8.0}
   - {name: RR_calf,  role: leg,   position_limited: true,  min_position: -2.72,    max_position: 2.72,     max_velocity: 30.0, max_effort: 60.0, max_kp: 160.0, max_kd: 8.0}
-  - {name: RR_foot,  role: wheel, position_limited: false, min_position: 0.0,      max_position: 0.0,      max_velocity: 50.0, max_effort: 17.0, max_kp: 0.0,   max_kd: 4.0}
+  - {name: RR_foot,  role: wheel, position_limited: false, min_position: 0.0,      max_position: 0.0,      max_velocity: 80.0, max_effort: 17.0, max_kp: 0.0,   max_kd: 4.0}
