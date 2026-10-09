@@ -99,20 +99,66 @@ bool read_joint_names(
     return true;
 }
 
-bool read_observation_order(const YAML::Node& root, std::string& error)
+bool read_observation_layout(
+    const YAML::Node& root,
+    motion::RlObservationLayout& layout,
+    std::string& error)
 {
-    constexpr const char* expected[6] = {
+    const YAML::Node value = root["observation_layout"];
+    if (!value)
+    {
+        // 缺省保持 black / blackW 原有布局，旧 YAML 无需新增字段。
+        layout = motion::RlObservationLayout::AllJoints;
+        return true;
+    }
+    std::string text;
+    try
+    {
+        text = value.as<std::string>();
+    }
+    catch (const YAML::Exception& exception)
+    {
+        error = "invalid observation_layout: " + std::string(exception.what());
+        return false;
+    }
+    if (text == "all_joints")
+    {
+        layout = motion::RlObservationLayout::AllJoints;
+        return true;
+    }
+    if (text == "leg_wheel_split_v1")
+    {
+        layout = motion::RlObservationLayout::LegWheelSplit;
+        return true;
+    }
+    error = "unsupported observation_layout: " + text;
+    return false;
+}
+
+bool read_observation_order(
+    const YAML::Node& root,
+    const motion::RlObservationLayout layout,
+    std::string& error)
+{
+    constexpr const char* kAllJoints[6] = {
         "commands", "angular_velocity", "projected_gravity",
         "joint_position_error", "joint_velocity", "previous_action"};
+    constexpr const char* kLegWheelSplit[7] = {
+        "commands", "angular_velocity", "projected_gravity",
+        "joint_position_error", "joint_velocity", "wheel_velocity", "previous_action"};
+    const bool split = layout == motion::RlObservationLayout::LegWheelSplit;
+    const char* const* expected = split ? kLegWheelSplit : kAllJoints;
+    const std::size_t expected_size = split ? 7U : 6U;
     const YAML::Node values = root["observation_order"];
-    if (!values || !values.IsSequence() || values.size() != 6)
+    if (!values || !values.IsSequence() || values.size() != expected_size)
     {
-        error = "observation_order must contain the six supported fields";
+        error = std::string("observation_order must contain the ") +
+            std::to_string(expected_size) + " fields of the configured layout";
         return false;
     }
     try
     {
-        for (std::size_t i = 0; i < 6; ++i)
+        for (std::size_t i = 0; i < expected_size; ++i)
         {
             if (values[i].as<std::string>() != expected[i])
             {
@@ -127,6 +173,20 @@ bool read_observation_order(const YAML::Node& root, std::string& error)
         return false;
     }
     return true;
+}
+
+// 腿轮分离布局额外的轮速比例和 forward sign；其他布局不读取这两个字段。
+bool read_split_layout_fields(
+    detail::FieldReader& reader,
+    motion::RlConfig& config)
+{
+    if (config.observation_layout != motion::RlObservationLayout::LegWheelSplit)
+    {
+        return true;
+    }
+    return reader.required("wheel_velocity_scale", config.wheel_velocity_scale) &&
+        reader.double_array(
+            "wheel_velocity_signs", config.wheel_velocity_signs.data(), config.wheel_count);
 }
 
 bool read_action_modes(detail::FieldReader& reader, motion::RlConfig& config)
@@ -182,15 +242,17 @@ bool read_config(
         model_wheel_count += model.joints[i].role == core::JointRole::Wheel ? 1U : 0U;
     }
     config.wheel_count = model_wheel_count;
-    if (!read_index_sequence(root, "history_frames", config.history_frames.data(),
+    if (!read_observation_layout(root, config.observation_layout, reader.error_message()) ||
+        !read_index_sequence(root, "history_frames", config.history_frames.data(),
             config.history_frame_count, reader.error_message()) ||
         !read_joint_names(root, model, config, reader.error_message()) ||
         !read_index_sequence(root, "policy_dof_indices", config.policy_dof_indices.data(),
             config.action_dimension, reader.error_message()) ||
         !read_index_sequence(root, "wheel_indices", config.wheel_indices.data(),
             config.wheel_count, reader.error_message()) ||
-        !read_observation_order(root, reader.error_message()) ||
-        !read_action_modes(reader, config))
+        !read_observation_order(root, config.observation_layout, reader.error_message()) ||
+        !read_action_modes(reader, config) ||
+        !read_split_layout_fields(reader, config))
     {
         return false;
     }

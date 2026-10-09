@@ -1,0 +1,40 @@
+# 文件：wolf.yaml
+# 作用：定义 wolf 基础动作的周期、统一关节顺序、姿态和固定增益。
+name: wolf
+control_period_ms: 5
+command_validity_ms: 10
+
+# 首版运行方案：预起立以 200 周期插值到 Wolf 默认站姿，第二段只用 1 周期确认同一
+# 目标，趴下使用 500 周期。
+getup_pre_cycles: 200
+getup_cycles: 1
+getdown_cycles: 500
+
+joint_names:
+  [FL_hip, FL_thigh, FL_calf, FL_foot,
+   FR_hip, FR_thigh, FR_calf, FR_foot,
+   RL_hip, RL_thigh, RL_calf, RL_foot,
+   RR_hip, RR_thigh, RR_calf, RR_foot]
+
+# 预起立与站立均使用 Wolf 默认关节姿态（策略 default pose），轮子目标速度为 0。
+pre_getup_position:
+  [0.0, 0.82, 1.43, 0.0,
+   0.0, -0.82, -1.43, 0.0,
+   0.0, -0.82, -1.43, 0.0,
+   0.0, 0.82, 1.43, 0.0]
+stand_position:
+  [0.0, 0.82, 1.43, 0.0,
+   0.0, -0.82, -1.43, 0.0,
+   0.0, -0.82, -1.43, 0.0,
+   0.0, 0.82, 1.43, 0.0]
+# 固定增益沿用 Wolf PD 参数：腿 80/3.0，轮 0/1.0（轮子只做阻尼保持）。
+fixed_kp:
+  [80.0, 80.0, 80.0, 0.0,
+   80.0, 80.0, 80.0, 0.0,
+   80.0, 80.0, 80.0, 0.0,
+   80.0, 80.0, 80.0, 0.0]
+fixed_kd:
+  [3.0, 3.0, 3.0, 1.0,
+   3.0, 3.0, 3.0, 1.0,
+   3.0, 3.0, 3.0, 1.0,
+   3.0, 3.0, 3.0, 1.0]

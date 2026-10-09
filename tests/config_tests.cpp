@@ -5,6 +5,7 @@
 
 #include "quadruped/config/behavior_config_loader.hpp"
 #include "quadruped/config/policy_switch_loader.hpp"
+#include "quadruped/config/rl_config_loader.hpp"
 #include "quadruped/config/robot_config.hpp"
 #include "quadruped/config/simulation_config.hpp"
 
@@ -139,6 +140,83 @@ int main()
         }
     }
 
+    const auto wolf = quadruped::config::load_robot_model(QUADRUPED_WOLF_ROBOT_CONFIG_PATH);
+    expect(wolf.ok(), "wolf RobotModel 应加载成功：" + wolf.error_message);
+    if (wolf.ok())
+    {
+        expect(wolf.model.name == "wolf", "机器人名称应为 wolf");
+        expect(wolf.model.joint_count == 16, "wolf 应有 16 个有序关节");
+        expect(wolf.model.joints[0].name == "FL_hip" &&
+                wolf.model.joints[3].name == "FL_foot",
+            "wolf 应使用原生关节名并按 hip → thigh → calf → foot 排列");
+        expect(wolf.model.joints[8].name == "RL_hip",
+            "wolf 逻辑顺序必须使用 RL 在 RR 前");
+        for (const std::size_t index : {3U, 7U, 11U, 15U})
+        {
+            expect(wolf.model.joints[index].role == quadruped::core::JointRole::Wheel,
+                "wolf 轮关节必须显式标记 Wheel role");
+            expect(!wolf.model.joints[index].limits.position_limited,
+                "wolf 轮关节必须显式声明无位置限制");
+            expect(wolf.model.joints[index].limits.max_effort == 17.0,
+                "wolf 轮关节力矩上限应为训练侧 17 N·m");
+        }
+        expect(wolf.model.joints[0].limits.min_position == -0.6 &&
+                wolf.model.joints[0].limits.max_position == 0.8 &&
+                wolf.model.joints[0].limits.max_effort == 60.0,
+            "wolf 腿部位置范围和力矩上限应来自 MJCF 与训练侧 PD 契约");
+
+        const auto wolf_controller = quadruped::config::load_controller_config(
+            QUADRUPED_WOLF_CONTROLLER_CONFIG_PATH, wolf.model);
+        expect(wolf_controller.ok(),
+            "wolf ControllerConfig 应加载成功：" + wolf_controller.error_message);
+        if (wolf_controller.ok())
+        {
+            expect(wolf_controller.config.control_period_ns == 5'000'000,
+                "wolf 控制周期应为 5 ms");
+            expect(wolf_controller.config.getup_pre_cycles == 200 &&
+                    wolf_controller.config.getup_cycles == 1 &&
+                    wolf_controller.config.getdown_cycles == 500,
+                "wolf 起立与趴下周期应与首版方案一致");
+            expect(wolf_controller.config.fixed_kp[0] == 80.0 &&
+                    wolf_controller.config.fixed_kd[0] == 3.0,
+                "wolf 腿固定增益应为 80/3.0");
+            expect(wolf_controller.config.fixed_kp[3] == 0.0 &&
+                    wolf_controller.config.fixed_kd[3] == 1.0,
+                "wolf 轮固定增益应为 0/1.0");
+        }
+        const auto wolf_retry = quadruped::config::load_retry_config(
+            QUADRUPED_WOLF_RETRY_CONFIG_PATH, wolf.model);
+        expect(wolf_retry.ok(), "wolf Retry 配置应加载成功：" + wolf_retry.error_message);
+
+        const auto wolf_flat = quadruped::config::load_rl_config(
+            QUADRUPED_WOLF_POLICY_FLAT_CONFIG_PATH,
+            QUADRUPED_PROJECT_SOURCE_DIR,
+            wolf.model);
+        const auto wolf_him = quadruped::config::load_rl_config(
+            QUADRUPED_WOLF_POLICY_FLAT_HIM_CONFIG_PATH,
+            QUADRUPED_PROJECT_SOURCE_DIR,
+            wolf.model);
+        expect(wolf_flat.ok(), "wolf flat 配置应加载成功：" + wolf_flat.error_message);
+        expect(wolf_him.ok(), "wolf flat_him 配置应加载成功：" + wolf_him.error_message);
+        if (wolf_flat.ok())
+        {
+            expect(wolf_flat.config.observation_layout ==
+                    quadruped::motion::RlObservationLayout::LegWheelSplit,
+                "wolf 应使用 leg_wheel_split_v1 观测布局");
+            expect(wolf_flat.config.observation_dimension == 53 &&
+                    wolf_flat.config.history_frame_count == 1,
+                "wolf flat 应为 53-D 单帧观测");
+            expect(wolf_flat.config.wheel_velocity_scale == 0.05,
+                "wolf 轮速观测比例应为 0.05");
+            for (std::size_t i = 0; i < 4; ++i)
+            {
+                const double expected_sign = (i % 2 == 0) ? 1.0 : -1.0;
+                expect(wolf_flat.config.wheel_velocity_signs[i] == expected_sign,
+                    "wolf 轮速 forward sign 应为 FL/RL 正、FR/RR 负");
+            }
+        }
+    }
+
     const std::filesystem::path policy_switch_path(QUADRUPED_POLICY_SWITCH_CONFIG_PATH);
     const auto policy_switch = quadruped::config::load_policy_switch_config(
         policy_switch_path.string(), "black", policy_switch_path.parent_path().string());
@@ -174,6 +252,22 @@ int main()
             "blackW 策略循环应包含 flat、obstacle 和 stair");
         expect(blackw_policy_switch.config.posture_transition_cycles == 200,
             "blackW 策略姿态过渡应为 200 周期");
+    }
+
+    const std::filesystem::path wolf_policy_switch_path(
+        QUADRUPED_WOLF_POLICY_SWITCH_CONFIG_PATH);
+    const auto wolf_policy_switch = quadruped::config::load_policy_switch_config(
+        wolf_policy_switch_path.string(),
+        "wolf",
+        wolf_policy_switch_path.parent_path().string());
+    expect(wolf_policy_switch.ok(),
+        "wolf 策略循环配置应加载成功：" + wolf_policy_switch.error_message);
+    if (wolf_policy_switch.ok())
+    {
+        expect(wolf_policy_switch.config.policy_names.size() == 2,
+            "wolf 策略循环应包含 flat 和 flat_him");
+        expect(wolf_policy_switch.config.posture_transition_cycles == 200,
+            "wolf 策略姿态过渡应为 200 周期");
     }
 
     const auto simulation =

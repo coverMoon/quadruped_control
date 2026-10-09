@@ -37,6 +37,20 @@ enum class RlJointActionMode : std::uint8_t
     TargetVelocity = 1,
 };
 
+// 单帧观测布局。布局决定观测中关节位置、关节速度和轮速的分块方式，不能按机器人
+// 名称或动作维度推断。
+//
+// AllJoints：black / blackW 的旧契约，关节位置误差和关节速度都按动作槽位覆盖全部
+// 关节（轮子位置误差固定为零，轮速直接使用未加符号的关节速度）。
+//
+// LegWheelSplit：Wolf 契约，腿位置、腿速度和带符号轮速分成三个独立块；腿块只包含
+// 非轮关节，轮速块按 forward sign 变换，顺序仍为动作槽位顺序。
+enum class RlObservationLayout : std::uint8_t
+{
+    AllJoints = 0,
+    LegWheelSplit = 1,
+};
+
 // 启动期 RL 配置。关节参数数组按策略动作槽位排列，policy_dof_indices 将槽位映射到
 // RobotModel 统一关节下标；当前要求映射覆盖全部关节且不重复。
 struct RlConfig
@@ -59,6 +73,11 @@ struct RlConfig
     double angular_velocity_scale{0.0};
     double joint_position_scale{0.0};
     double joint_velocity_scale{0.0};
+    // RlObservationLayout::AllJoints 不使用后三个字段。
+    RlObservationLayout observation_layout{RlObservationLayout::AllJoints};
+    double wheel_velocity_scale{0.0};
+    // 轮速观测的 forward sign，按策略动作槽位中的轮顺序排列（有效项数为 wheel_count）。
+    std::array<double, core::kMaxJoints> wheel_velocity_signs{};
     double observation_clip{0.0};
     std::array<double, kMaxRlActionDim> default_joint_positions{};
     std::array<double, kMaxRlActionDim> kp{};

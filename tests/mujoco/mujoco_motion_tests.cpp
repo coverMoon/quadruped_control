@@ -17,6 +17,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
 #include <limits>
 #include <string>
 
@@ -991,10 +992,250 @@ void check_blackw_model_and_basic_motion()
         "blackW GetDown 完成后应进入 Passive");
 }
 
+// Wolf 私有资产的最小闭环：模型映射、IMU、5 ms 步长、默认姿态、轮方向和力矩限幅。
+// 本地缺失 Wolf 私有资产时跳过，不在缺少资产的环境下失败。
+void check_wolf_model_and_basic_motion()
+{
+    if (!std::filesystem::exists(QUADRUPED_WOLF_SCENE_PATH))
+    {
+        std::cout << "跳过 Wolf MuJoCo 集成检查：未找到本地私有 Wolf 资产\n";
+        return;
+    }
+    const auto model = quadruped::config::load_robot_model(QUADRUPED_WOLF_ROBOT_CONFIG_PATH);
+    expect(model.ok(), "加载 wolf RobotModel 失败：" + model.error_message);
+    if (!model.ok())
+    {
+        return;
+    }
+    const auto loaded = quadruped::backends::mujoco::MujocoModel::load(
+        QUADRUPED_WOLF_SCENE_PATH, model.model);
+    expect(loaded.ok(), "加载 wolf MuJoCo 模型失败：" + loaded.error_message);
+    if (!loaded.ok())
+    {
+        return;
+    }
+    expect(loaded.model->joint_count() == 16, "wolf MuJoCo 映射应包含 16 个关节");
+    expect(loaded.model->info().nu == 16, "wolf MuJoCo 模型应包含 16 个执行器");
+    expect_close(loaded.model->info().timestep, 0.005, 1.0e-12,
+        "wolf 物理步长应匹配训练的 5 ms");
+    for (std::size_t i = 0; i < model.model.joint_count; ++i)
+    {
+        expect(loaded.model->joint_mappings()[i].actuator_id >= 0,
+            "wolf 每个逻辑关节都应映射到唯一执行器");
+    }
+    expect(loaded.model->imu_mapping().quat.sensor_id >= 0, "wolf 应映射 imu_quat");
+    expect(loaded.model->imu_mapping().gyro.sensor_id >= 0, "wolf 应映射 imu_gyro");
+    expect(loaded.model->imu_mapping().acc.sensor_id >= 0, "wolf 应映射 imu_acc");
+
+    const auto controller = quadruped::config::load_controller_config(
+        QUADRUPED_WOLF_CONTROLLER_CONFIG_PATH, model.model);
+    const auto retry = quadruped::config::load_retry_config(
+        QUADRUPED_WOLF_RETRY_CONFIG_PATH, model.model);
+    const auto flat = quadruped::config::load_rl_config(
+        QUADRUPED_WOLF_POLICY_FLAT_CONFIG_PATH,
+        QUADRUPED_PROJECT_SOURCE_DIR,
+        model.model);
+    expect(controller.ok(), "加载 wolf 控制器失败：" + controller.error_message);
+    expect(retry.ok(), "加载 wolf Retry 失败：" + retry.error_message);
+    expect(flat.ok(), "加载 wolf flat 配置失败：" + flat.error_message);
+    if (!controller.ok() || !retry.ok() || !flat.ok())
+    {
+        return;
+    }
+
+    auto created = quadruped::backends::mujoco::MujocoRobotIO::create(
+        QUADRUPED_WOLF_SCENE_PATH, model.model, 1);
+    expect(created.ok(), "创建 wolf MuJoCo RobotIO 失败：" + created.error_message);
+    if (!created.ok())
+    {
+        return;
+    }
+    quadruped::backends::mujoco::MujocoRobotIO& io = *created.io;
+
+    // Reset 仍是 MJCF 零位；default_pose keyframe 才是训练侧初始站姿。
+    expect(io.reset(51).ok(), "wolf 初始 reset 应成功");
+    const auto zero_pose = current_positions(io);
+    for (std::size_t i = 0; i < model.model.joint_count; ++i)
+    {
+        expect_close(zero_pose[i], 0.0, 1.0e-12, "wolf Reset 后关节应回到 MJCF 零位");
+    }
+    const int default_pose_id = mj_name2id(io.raw_model(), mjOBJ_KEY, "default_pose");
+    expect(default_pose_id >= 0, "wolf 模型应包含 default_pose keyframe");
+    if (default_pose_id >= 0)
+    {
+        expect(io.reset_simulation_state(default_pose_id).ok(),
+            "wolf 应能加载 default_pose keyframe");
+        const auto stand_pose = current_positions(io);
+        for (std::size_t i = 0; i < model.model.joint_count; ++i)
+        {
+            expect_close(stand_pose[i], controller.config.stand_position[i], 1.0e-9,
+                "wolf default_pose 应与训练侧默认关节姿态一致（关节 " +
+                    std::to_string(i) + "）");
+        }
+        expect_close(io.raw_data()->qpos[2], 0.4432, 1.0e-4,
+            "wolf default_pose root 高度应为 0.4432 m");
+    }
+
+    // 正的 policy 轮速动作必须让机体沿 +x 前进：
+    // dq_target = action_scale × raw = sign × 10 × raw，符号只应用一次。
+    expect(io.reset(52).ok(), "wolf 轮方向测试 reset 应成功");
+    if (default_pose_id >= 0)
+    {
+        expect(io.reset_simulation_state(default_pose_id).ok(),
+            "wolf 轮方向测试应回到 default_pose");
+    }
+    const double start_x = io.raw_data()->qpos[0];
+    const auto wheel_start = current_positions(io);
+    constexpr float kRawAction = 0.2F;
+    std::uint64_t sequence = 0;
+    for (int step = 0; step < 100; ++step)
+    {
+        qc::StateFrame state;
+        expect(io.read_latest(state) == qc::RobotIOCode::Ok, "wolf 轮方向测试应读取状态");
+        qc::CommandFrame command;
+        command.header.startup_id = state.header.startup_id;
+        command.header.session_id = state.header.session_id;
+        command.header.sequence = ++sequence;
+        command.header.timestamp_ns = state.header.timestamp_ns;
+        command.expires_at_ns = state.header.timestamp_ns + 10'000'000;
+        command.target_generated_at_ns = command.header.timestamp_ns;
+        command.target_expires_at_ns = command.expires_at_ns;
+        command.joint_count = model.model.joint_count;
+        command.motion_mode = qc::MotionMode::Running;
+        command.source = qc::CommandSource::Test;
+        for (std::size_t i = 0; i < model.model.joint_count; ++i)
+        {
+            auto& joint = command.joints[i];
+            joint.mode = qc::ControlMode::JointImpedance;
+            joint.feedforward_effort = 0.0;
+            joint.kp = controller.config.fixed_kp[i];
+            joint.kd = controller.config.fixed_kd[i];
+            joint.target_position = controller.config.stand_position[i];
+            joint.target_velocity = 0.0;
+        }
+        for (std::size_t action_index = 0;
+             action_index < flat.config.action_dimension;
+             ++action_index)
+        {
+            const std::size_t joint_index = flat.config.policy_dof_indices[action_index];
+            if (model.model.joints[joint_index].role != qc::JointRole::Wheel)
+            {
+                continue;
+            }
+            command.joints[joint_index].target_velocity =
+                flat.config.action_scale[action_index] * static_cast<double>(kRawAction);
+        }
+        expect(io.submit(command) == qc::RobotIOCode::Ok, "wolf 轮速命令应被接受");
+        expect(io.step() == qc::RobotIOCode::Ok, "wolf 轮速测试应能步进");
+    }
+    const auto wheel_end = current_positions(io);
+    const double forward = io.raw_data()->qpos[0] - start_x;
+    std::cout << "Wolf 轮速闭环：0.5 秒前向位移=" << forward << " m\n";
+    expect(forward > 0.02,
+        "正 policy 轮速动作应产生 +x 前向位移（位移 " + std::to_string(forward) + " m）");
+    for (std::size_t action_index = 0;
+         action_index < flat.config.action_dimension;
+         ++action_index)
+    {
+        const std::size_t joint_index = flat.config.policy_dof_indices[action_index];
+        if (model.model.joints[joint_index].role != qc::JointRole::Wheel)
+        {
+            continue;
+        }
+        const double delta = wheel_end[joint_index] - wheel_start[joint_index];
+        const double expected_sign =
+            flat.config.action_scale[action_index] > 0.0 ? 1.0 : -1.0;
+        expect(delta * expected_sign > 0.0,
+            "wolf 轮关节应按 forward sign 转动（关节 " +
+                std::to_string(joint_index) + "）");
+    }
+
+    // 力矩限幅：腿部 PD 请求远超上限时实际广义力不得超过 RobotModel 上限。
+    expect(io.reset(53).ok(), "wolf 力矩限幅测试 reset 应成功");
+    {
+        qc::StateFrame state;
+        expect(io.read_latest(state) == qc::RobotIOCode::Ok, "wolf 力矩测试应读取状态");
+        qc::CommandFrame command;
+        command.header.startup_id = state.header.startup_id;
+        command.header.session_id = state.header.session_id;
+        command.header.sequence = 1;
+        command.header.timestamp_ns = state.header.timestamp_ns;
+        command.expires_at_ns = state.header.timestamp_ns + 10'000'000;
+        command.target_generated_at_ns = command.header.timestamp_ns;
+        command.target_expires_at_ns = command.expires_at_ns;
+        command.joint_count = model.model.joint_count;
+        command.motion_mode = qc::MotionMode::Running;
+        command.source = qc::CommandSource::Test;
+        for (std::size_t i = 0; i < model.model.joint_count; ++i)
+        {
+            auto& joint = command.joints[i];
+            joint.mode = qc::ControlMode::JointImpedance;
+            joint.kp = controller.config.fixed_kp[i];
+            joint.kd = controller.config.fixed_kd[i];
+            joint.feedforward_effort = 0.0;
+            if (model.model.joints[i].role == qc::JointRole::Wheel)
+            {
+                joint.target_position = state.joints[i].position;
+                joint.target_velocity = model.model.joints[i].limits.max_velocity;
+            }
+            else
+            {
+                // 位置目标取关节上限；宽范围的 thigh / calf 会请求超过 60 N·m 的 PD 力矩。
+                joint.target_position = model.model.joints[i].limits.max_position;
+                joint.target_velocity = 0.0;
+            }
+        }
+        expect(io.submit(command) == qc::RobotIOCode::Ok, "wolf 力矩限幅命令应被接受");
+        expect(io.step() == qc::RobotIOCode::Ok, "wolf 力矩限幅测试应能步进");
+        qc::StateFrame after;
+        expect(io.read_latest(after) == qc::RobotIOCode::Ok, "wolf 力矩测试应读取结果");
+        for (std::size_t i = 0; i < model.model.joint_count; ++i)
+        {
+            const double limit = model.model.joints[i].limits.max_effort;
+            expect(std::abs(after.joints[i].effort) <= limit + 1.0e-9,
+                "wolf 关节力矩不得超过 RobotModel 上限（关节 " + std::to_string(i) + "）");
+        }
+    }
+
+    // GetUp → Stand：控制器配置和 Retry 配置可在 MuJoCo 中执行。
+    auto runtime = qm::MotionRuntime::create(model.model, controller.config);
+    expect(runtime.ok(), "创建 wolf MotionRuntime 失败：" + runtime.error_message);
+    if (!runtime.ok())
+    {
+        return;
+    }
+    std::string behavior_error;
+    expect(runtime.runtime->configure_retry(retry.config, behavior_error),
+        "配置 wolf Retry 失败：" + behavior_error);
+    expect(io.reset(54).ok(), "wolf GetUp 测试 reset 应成功");
+    if (default_pose_id >= 0)
+    {
+        // 启动路径：加载 default_pose 后再 GetUp，避免从贯穿地面的 MJCF 零位直接起立。
+        expect(io.reset_simulation_state(default_pose_id).ok(),
+            "wolf GetUp 前应能加载 default_pose");
+    }
+    SimHarness sim(io, *runtime.runtime, controller.config);
+    sim.run_seconds(0.01);
+    qc::ModeRequest getup;
+    getup.request_id = 201;
+    getup.type = qc::ModeRequestType::GetUp;
+    expect(sim.run_until_completed(4.0, getup),
+        "wolf GetUp 应完成（结果：" + sim.last_output().result.message +
+            "，错误：" + sim.last_output().status.error_message + "）");
+    expect(sim.last_output().status.mode == qc::MotionMode::Stand,
+        "wolf GetUp 后应进入 Stand");
+    sim.run_seconds(0.5);
+    const double stand_height = io.raw_data()->qpos[2];
+    std::cout << "Wolf Stand：躯干高度=" << stand_height << " m\n";
+    expect(stand_height > 0.30, "wolf Stand 期间躯干不应倒地");
+}
+
 }  // namespace
 
 int main()
 {
+    check_wolf_model_and_basic_motion();
+
     check_blackw_model_and_basic_motion();
 
     // 配置统一来自仓库 YAML，与带界面应用使用同一份运动参数。

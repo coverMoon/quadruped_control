@@ -2,10 +2,11 @@
 
 `quadruped_control` 是一个面向四足与轮足机器人的运动控制工程，包含 MuJoCo 仿真、TorchScript 强化学习策略、ROS 2 指令接口和运行时运动控制。
 
-目前支持两套机器人模型：
+目前支持三套机器人模型：
 
 - `black`：12 关节四足机器人；
-- `blackW`：16 关节轮足机器人。
+- `blackW`：16 关节轮足机器人；
+- `wolf`：16 关节轮足机器人（Wolf 原生关节命名）。
 
 工程采用统一的控制核心和配置体系，在相同运行框架下完成基础动作、强化学习运动控制、策略切换和轮足行为。
 
@@ -16,8 +17,9 @@
 - LibTorch 加载 TorchScript 强化学习策略；
 - black 的 flat / obstacle 策略；
 - blackW 的 flat / obstacle / stair 策略；
+- wolf 的 flat PPO 与 flat_him HIM 策略；
 - 运行时策略切换；
-- black/blackW Retry，以及 blackW Event chain 和固定姿态轮驱行为；
+- black/blackW/wolf Retry，以及 blackW Event chain 和固定姿态轮驱行为；
 - 键盘、手柄和 ROS 2 `/cmd_vel` 控制；
 - `ros2_gateway`、`motiond`、`mujoco_backendd` 三进程运行；
 - 单元测试、MuJoCo 集成测试和 ROS 2 headless 端到端测试。
@@ -227,6 +229,16 @@ headless 模式：
 ./scripts/run/motion.sh blackW
 ./scripts/run/command.sh blackW keyboard
 ```
+
+运行 wolf 时，Plain 场景使用 `plain`，策略名称为 `flat` 或 `flat_him`：
+
+```bash
+./scripts/run/backend.sh wolf plain
+./scripts/run/motion.sh wolf flat
+./scripts/run/command.sh wolf keyboard
+```
+
+wolf 策略需要训练导出的 TorchScript 位于 `assets/policies/wolf/<policy>/policy.pt`；缺少该文件时 `motion.sh wolf` 会在加载阶段报错退出，可用 `--no-policy` 仅运行基础动作。
 
 ## Control
 

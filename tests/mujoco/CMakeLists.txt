@@ -36,6 +36,12 @@ target_compile_definitions(quadruped_mujoco_tests PRIVATE
     QUADRUPED_BLACKW_CAR_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/behaviors/blackW/car_drive.yaml"
     QUADRUPED_ROBOT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/robots/black.yaml"
     QUADRUPED_CONTROLLER_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/controllers/black.yaml"
+    QUADRUPED_PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+    QUADRUPED_WOLF_SCENE_PATH="${PROJECT_SOURCE_DIR}/assets/robots/wolf/mujoco/scene.xml"
+    QUADRUPED_WOLF_ROBOT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/robots/wolf.yaml"
+    QUADRUPED_WOLF_CONTROLLER_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/controllers/wolf.yaml"
+    QUADRUPED_WOLF_RETRY_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/behaviors/wolf/retry.yaml"
+    QUADRUPED_WOLF_POLICY_FLAT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/wolf/flat.yaml"
 )
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(quadruped_mujoco_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
@@ -48,7 +54,6 @@ if(QUADRUPED_ENABLE_TORCH)
     target_link_libraries(quadruped_mujoco_tests PRIVATE quadruped::torch_policy)
     target_compile_definitions(quadruped_mujoco_tests PRIVATE
         QUADRUPED_WITH_TORCH=1
-        QUADRUPED_PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
         QUADRUPED_POLICY_FLAT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/black/flat.yaml"
         QUADRUPED_POLICY_OBSTACLE_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/black/obstacle.yaml"
         QUADRUPED_BLACKW_POLICY_FLAT_CONFIG_PATH="${PROJECT_SOURCE_DIR}/configs/policies/blackW/flat.yaml"

@@ -42,6 +42,8 @@ struct Options
     std::string scene_path{kDefaultScenePath};
     std::string robot_config_path{kDefaultRobotConfigPath};
     std::string mode{"headless"};
+    // 可选的初始 keyframe 名称；为空时保持 MJCF 零位启动语义。
+    std::string initial_keyframe{};
     double real_time_factor{kDefaultRealTimeFactor};
     double visual_sync_hz{kDefaultVisualSyncHz};
     bool vsync{true};
@@ -57,7 +59,8 @@ void print_usage(const char* program)
     std::cout << "用法: " << program
               << " [--shm <名称>] [--scene <路径>] [--robot-config <路径>]"
               << " [--mode headless|gui] [--real-time-factor <倍率>]"
-              << " [--visual-sync-hz <频率>] [--vsync true|false]\n";
+              << " [--visual-sync-hz <频率>] [--vsync true|false]"
+              << " [--initial-keyframe <名称>]\n";
 }
 
 bool parse_bool(const std::string& value, bool& output)
@@ -106,6 +109,10 @@ bool parse_args(int argc, char** argv, Options& options)
         else if (arg == "--mode")
         {
             options.mode = value;
+        }
+        else if (arg == "--initial-keyframe")
+        {
+            options.initial_keyframe = value;
         }
         else if (arg == "--real-time-factor")
         {
@@ -536,6 +543,25 @@ int run(const Options& options)
     {
         std::cerr << "建立初始会话失败: " << reset.error_message << '\n';
         return 1;
+    }
+
+    // 可选的初始姿态：把初始会话从 MJCF 零位改到指定 keyframe。未指定时保持
+    // black / blackW 原有的零位启动语义。
+    if (!options.initial_keyframe.empty())
+    {
+        const int keyframe_id = mj_name2id(
+            created.io->raw_model(), mjOBJ_KEY, options.initial_keyframe.c_str());
+        if (keyframe_id < 0)
+        {
+            std::cerr << "初始 keyframe 不存在: " << options.initial_keyframe << '\n';
+            return 1;
+        }
+        const auto pose_reset = created.io->reset_simulation_state(keyframe_id);
+        if (!pose_reset.ok())
+        {
+            std::cerr << "加载初始 keyframe 失败: " << pose_reset.error_message << '\n';
+            return 1;
+        }
     }
 
     qi::SharedLayout& layout = memory.memory->layout();

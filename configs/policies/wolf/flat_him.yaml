@@ -1,0 +1,64 @@
+# 文件：flat_him.yaml
+# 作用：记录 wolf 平地 HIM 策略的输入、输出和动作映射规格。
+#
+# 契约来自 alldog_mjlab tasks/velocity/wolf：actor 历史 6×53，展平为 318-D；
+# estimator 与 actor 均已包含在导出的 TorchScript 内部，部署侧只做一次 forward。
+name: flat_him
+robot_name: wolf
+# 训练导出的 TorchScript 需放在此路径；本地缺失时仅配置可加载，推理不可运行。
+model_path: assets/policies/wolf/flat_him/policy.pt
+
+observation_dimension: 53
+# 部署 HIM 历史为 newest → oldest，按 frame-major 顺序展平为 318-D。
+history_frames: [0, 1, 2, 3, 4, 5]
+inference_input_dimension: 318
+action_dimension: 16
+observation_layout: leg_wheel_split_v1
+observation_order: [commands, angular_velocity, projected_gravity,
+                    joint_position_error, joint_velocity, wheel_velocity, previous_action]
+joint_names:
+  [FL_hip, FL_thigh, FL_calf, FL_foot,
+   FR_hip, FR_thigh, FR_calf, FR_foot,
+   RL_hip, RL_thigh, RL_calf, RL_foot,
+   RR_hip, RR_thigh, RR_calf, RR_foot]
+policy_dof_indices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+wheel_indices: [3, 7, 11, 15]
+
+# 命令上限为 Wolf 训练代码的覆盖范围：vx 课程上界 4.0、vy 与 yaw 训练固定范围。
+command_scale: [2.0, 2.0, 0.25]
+command_limits: [4.0, 1.0, 3.14]
+angular_velocity_scale: 0.25
+joint_position_scale: 1.0
+joint_velocity_scale: 0.05
+# signed_wheel_vel = 关节速度 × forward sign × 0.05（FL/RL 为 +1，FR/RR 为 -1）。
+wheel_velocity_scale: 0.05
+wheel_velocity_signs: [1.0, -1.0, 1.0, -1.0]
+observation_clip: 100.0
+
+default_joint_positions:
+  [0.0, 0.82, 1.43, 0.0,
+   0.0, -0.82, -1.43, 0.0,
+   0.0, -0.82, -1.43, 0.0,
+   0.0, 0.82, 1.43, 0.0]
+kp:
+  [80.0, 80.0, 80.0, 0.0,
+   80.0, 80.0, 80.0, 0.0,
+   80.0, 80.0, 80.0, 0.0,
+   80.0, 80.0, 80.0, 0.0]
+kd:
+  [3.0, 3.0, 3.0, 1.0,
+   3.0, 3.0, 3.0, 1.0,
+   3.0, 3.0, 3.0, 1.0,
+   3.0, 3.0, 3.0, 1.0]
+# 腿动作 q_target = q_default + 0.20 × raw；轮动作 dq_target = sign × 10.0 × raw。
+action_scale:
+  [0.20, 0.20, 0.20, 10.0,
+   0.20, 0.20, 0.20, -10.0,
+   0.20, 0.20, 0.20, 10.0,
+   0.20, 0.20, 0.20, -10.0]
+action_clip: 100.0
+max_position_jump: 1.0
+
+# 腿动作是相对默认姿态的位置残差；轮动作是目标速度，轮位置误差观测固定为 0。
+leg_action_mode: position_residual
+wheel_action_mode: target_velocity

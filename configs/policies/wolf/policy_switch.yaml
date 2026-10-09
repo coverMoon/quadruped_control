@@ -1,0 +1,8 @@
+# 文件：policy_switch.yaml
+# 作用：定义 wolf 运行时策略的循环切换顺序与姿态过渡周期。
+
+wolf:
+  posture_transition_cycles: 200
+  policy_config_cycle:
+    - flat
+    - flat_him

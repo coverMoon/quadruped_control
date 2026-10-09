@@ -1,19 +1,19 @@
 # 机器人模型与行为
 
-black 和 blackW 共用 MotionRuntime、RobotIO 边界和行为实现。机器人差异由 RobotModel、控制器、策略和行为配置表达，不按关节数量推断模型。
+black、blackW 和 wolf 共用 MotionRuntime、RobotIO 边界和行为实现。机器人差异由 RobotModel、控制器、策略和行为配置表达，不按关节数量推断模型。
 
 ## 1. 能力概览
 
-| 项目 | black | blackW |
-| --- | --- | --- |
-| 结构 | 12 关节四足 | 16 关节轮足 |
-| RL 策略 | flat、obstacle | flat、obstacle、stair |
-| Retry | ✓ | ✓ |
-| Event chain | 空事件列表 | 10 段事件链 |
-| 固定姿态轮驱 | — | Bridge、Low-bar、Car |
-| MuJoCo physics | 500 Hz | 500 Hz |
-| MotionRuntime | 200 Hz | 200 Hz |
-| TorchScript policy | 50 Hz | 50 Hz |
+| 项目 | black | blackW | wolf |
+| --- | --- | --- | --- |
+| 结构 | 12 关节四足 | 16 关节轮足 | 16 关节轮足 |
+| RL 策略 | flat、obstacle | flat、obstacle、stair | flat、flat_him |
+| Retry | ✓ | ✓ | ✓ |
+| Event chain | 空事件列表 | 10 段事件链 | — |
+| 固定姿态轮驱 | — | Bridge、Low-bar、Car | — |
+| MuJoCo physics | 500 Hz | 500 Hz | 200 Hz |
+| MotionRuntime | 200 Hz | 200 Hz | 200 Hz |
+| TorchScript policy | 50 Hz | 50 Hz | 50 Hz |
 
 公共基础动作包括 Passive、GetUp、Stand 和 GetDown。RL locomotion、Retry、Event chain 和固定姿态轮驱都使用 `MotionMode::Running`，具体功能由 `behavior_name` 区分。
 
@@ -23,7 +23,7 @@ black 和 blackW 共用 MotionRuntime、RobotIO 边界和行为实现。机器�
 
 关节命令始终显式携带 `ControlMode`。KP/KD 只描述选定模式下的参数，不能用于推断控制模式。内部统一使用 rad、rad/s、N·m 和单调纳秒时间戳，四元数顺序为 `w,x,y,z`。
 
-两个模型的 MuJoCo scene 均提供：
+三个模型的 MuJoCo scene 均提供：
 
 - `imu_quat`：`framequat`，内部顺序 `w,x,y,z`；
 - `imu_gyro`：角速度，单位 rad/s；
@@ -169,7 +169,40 @@ blackW 提供 flat、obstacle 和 stair 三个策略。单帧观测为 57 维，
 使用 `./scripts/run/backend.sh black dog27` 或 `./scripts/run/backend.sh blackW dog27` 启动，
 可追加 `--mode headless`。motion 和 command 的启动方式沿用对应机器人。
 
-## 5. 策略运行与切换
+## 5. wolf
+
+wolf 为 16 关节轮足机器人，关节沿用 Wolf 原生命名，逻辑顺序与训练侧 policy contract 一致：
+
+```text
+FL_hip, FL_thigh, FL_calf, FL_foot,
+FR_hip, FR_thigh, FR_calf, FR_foot,
+RL_hip, RL_thigh, RL_calf, RL_foot,
+RR_hip, RR_thigh, RR_calf, RR_foot
+```
+
+`FL_foot` 等为驱动轮，使用 `JointRole::Wheel` 且无位置限制。位置范围来自 Wolf MJCF；腿部力矩上限 `60 N·m`、轮部 `17 N·m` 来自训练侧 PD 契约。
+
+MuJoCo 入口：
+
+```text
+assets/robots/wolf/mujoco/scene.xml
+assets/robots/wolf/mujoco/scene_terrain.xml
+```
+
+Wolf 模型为本地私有资产（不纳入 Git），并显式提供 `imu_quat`、`imu_gyro`、`imu_acc`（绑定 `imu_site`）、`default_pose` keyframe 和 5 ms 物理步长。`backend.sh wolf` 默认以 `default_pose`（root z=0.4432 m、默认关节姿态）启动；black/blackW 仍保持 MJCF 零位启动语义。
+
+Wolf 策略使用腿轮分离观测布局 `leg_wheel_split_v1`：
+
+- 单帧 53 维：command 3 + IMU 角速度 3 + 投影重力 3 + 腿关节位置 12 + 腿关节速度 12 + signed 轮速 4 + previous raw action 16；
+- 轮速观测量为 `关节速度 × forward sign × 0.05`，forward sign 为 `[+1, -1, +1, -1]`（FL/FR/RL/RR）；
+- 腿位置和腿速度只覆盖 12 个非轮关节；
+- `previous_raw_action` 保留策略原始输出，部署安全裁剪不改变下一帧观测。
+
+动作 16 维：腿 `q_target = q_default + 0.20 × raw`；轮 `dq_target = sign × 10.0 × raw`。腿使用 `Kp=80`、`Kd=3.0`，轮使用 `Kp=0`、`Kd=1.0`，均以 `JointImpedance` 单层 PD 执行。
+
+策略列表由 `configs/policies/wolf/policy_switch.yaml` 定义：`flat`（PPO，53 维单帧）和 `flat_him`（HIM，6 帧展平为 318 维）。命令上限为 `vx=4.0`、`vy=1.0`、`wz=3.14`。训练导出的 TorchScript 需放在 `assets/policies/wolf/<policy>/policy.pt`。
+
+## 6. 策略运行与切换
 
 RL 数据路径为：
 
@@ -191,19 +224,19 @@ MotionRuntime 每 5 ms 生成一次 CommandFrame，策略每 4 个控制周期�
 
 策略列表由 `configs/policies/<robot>/policy_switch.yaml` 定义。切换策略时会重置目标策略的历史和旧动作；默认姿态差异较大时，先按 `posture_transition_cycles` 完成姿态过渡。
 
-## 6. Retry
+## 7. Retry
 
-black 和 blackW 共用 Retry 实现，并分别从 `configs/behaviors/<robot>/retry.yaml` 加载目标姿态和增益：
+black、blackW 和 wolf 共用 Retry 实现，并分别从 `configs/behaviors/<robot>/retry.yaml` 加载目标姿态和增益：
 
 ```text
 prepare → locked
 ```
 
-进入 Retry 后会清零 RL 输出和速度目标，将腿移动到 `retry_default_joint_positions`，并将 blackW 轮速归零。到达 `locked` 后请求结果为 Completed，但运行状态仍保持 `Running / retry / locked`。
+进入 Retry 后会清零 RL 输出和速度目标，将腿移动到 `retry_default_joint_positions`，并将 blackW / wolf 轮速归零。到达 `locked` 后请求结果为 Completed，但运行状态仍保持 `Running / retry / locked`。
 
 后续使用 GetUp 恢复 Stand，或使用 EnterPassive 放松。正式三进程可通过键盘 `5`、手柄 `LB+B` 或 ROS 2 `StartBehavior("retry")` 启动 Retry。
 
-## 7. Event chain
+## 8. Event chain
 
 Event chain 支持三种事件：
 
@@ -217,7 +250,7 @@ blackW 配置包含 10 个事件，轮半径为 `0.103 m`，轮方向为 `[+,-,+
 
 black 的配置使用相同 schema，但当前事件列表为空。
 
-## 8. blackW 固定姿态轮驱
+## 9. blackW 固定姿态轮驱
 
 配置位于：
 
@@ -239,7 +272,7 @@ configs/behaviors/blackW/car_drive.yaml
 
 轮速使用 `10 × x ± 5 × yaw`，并按配置中的 `max_x` 和 `max_yaw` 限幅。左右轮分组和方向均由行为配置明确给出。
 
-## 9. 验证范围
+## 10. 验证范围
 
 单元测试、MuJoCo 集成测试和 black/blackW 三进程 headless 测试覆盖模型加载、关节映射、基础动作、RL、策略切换、Retry 和主要故障退路。以下内容仍适合继续做场景或长时间验证：
 

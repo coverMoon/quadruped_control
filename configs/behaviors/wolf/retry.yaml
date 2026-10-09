@@ -1,0 +1,26 @@
+# 文件：retry.yaml
+# 作用：定义 wolf 共用 Retry 行为的姿态、周期和腿轮混合增益。
+robot_name: wolf
+prepare_cycles: 100
+joint_names:
+  [FL_hip, FL_thigh, FL_calf, FL_foot,
+   FR_hip, FR_thigh, FR_calf, FR_foot,
+   RL_hip, RL_thigh, RL_calf, RL_foot,
+   RR_hip, RR_thigh, RR_calf, RR_foot]
+# Retry 默认姿态使用 Wolf 默认站立姿态，轮子保持零速。
+retry_default_joint_positions:
+  [0.0, 0.82, 1.43, 0.0,
+   0.0, -0.82, -1.43, 0.0,
+   0.0, -0.82, -1.43, 0.0,
+   0.0, 0.82, 1.43, 0.0]
+# 固定增益沿用 Wolf PD 参数：腿 80/3.0，轮 0/1.0。
+kp:
+  [80.0, 80.0, 80.0, 0.0,
+   80.0, 80.0, 80.0, 0.0,
+   80.0, 80.0, 80.0, 0.0,
+   80.0, 80.0, 80.0, 0.0]
+kd:
+  [3.0, 3.0, 3.0, 1.0,
+   3.0, 3.0, 3.0, 1.0,
+   3.0, 3.0, 3.0, 1.0,
+   3.0, 3.0, 3.0, 1.0]

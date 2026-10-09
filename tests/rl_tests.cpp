@@ -52,6 +52,190 @@ quadruped::core::StateFrame make_state(
     return state;
 }
 
+// Wolf 53-D 观测、腿/轮动作、signed 轮速和 HIM 历史展开的参考向量验证。
+// 固定非零 StateFrame 和固定 raw action，不依赖 MuJoCo 或真实策略资产。
+void check_wolf_rl()
+{
+    const auto wolf_model = quadruped::config::load_robot_model(
+        QUADRUPED_WOLF_ROBOT_CONFIG_PATH);
+    expect(wolf_model.ok(), "wolf RobotModel 应加载成功：" + wolf_model.error_message);
+    if (!wolf_model.ok())
+    {
+        return;
+    }
+    const auto wolf_flat = quadruped::config::load_rl_config(
+        QUADRUPED_WOLF_POLICY_FLAT_CONFIG_PATH,
+        QUADRUPED_PROJECT_SOURCE_DIR,
+        wolf_model.model);
+    const auto wolf_him = quadruped::config::load_rl_config(
+        QUADRUPED_WOLF_POLICY_FLAT_HIM_CONFIG_PATH,
+        QUADRUPED_PROJECT_SOURCE_DIR,
+        wolf_model.model);
+    expect(wolf_flat.ok(), "wolf flat 配置应加载成功：" + wolf_flat.error_message);
+    expect(wolf_him.ok(), "wolf flat_him 配置应加载成功：" + wolf_him.error_message);
+    if (!wolf_flat.ok() || !wolf_him.ok())
+    {
+        return;
+    }
+    expect(wolf_flat.config.observation_dimension == 53 &&
+            wolf_flat.config.action_dimension == 16 &&
+            wolf_flat.config.inference_input_dimension == 53,
+        "wolf flat 应为 53-D 单帧输入和 16-D 输出");
+    expect(wolf_him.config.observation_dimension == 53 &&
+            wolf_him.config.history_frame_count == 6 &&
+            wolf_him.config.inference_input_dimension == 318,
+        "wolf HIM 应为 6 帧 53-D 输入和 318-D 展平输入");
+
+    // 固定非零状态：默认姿态上的已知偏差、已知 IMU 角速度和已知四轮速度。
+    auto state = make_state(wolf_model.model, wolf_flat.config);
+    state.imu.angular_velocity = {0.1, 0.2, 0.3};
+    state.joints[0].position = wolf_flat.config.default_joint_positions[0] + 0.1;
+    state.joints[0].velocity = 0.5;
+    state.joints[1].position = wolf_flat.config.default_joint_positions[1] - 0.2;
+    state.joints[1].velocity = -0.4;
+    state.joints[3].velocity = 3.0;
+    state.joints[7].velocity = -4.0;
+    state.joints[11].velocity = 5.0;
+    state.joints[15].velocity = -6.0;
+
+    quadruped::core::BaseCommand command;
+    command.sequence = 1;
+    command.expires_at_ns = 10'000'000;
+    command.source = quadruped::core::CommandSource::Test;
+    command.vx = 1.0;
+    command.vy = 0.5;
+    command.wz = 2.0;
+
+    auto created = quadruped::motion::RlController::create(
+        wolf_model.model, wolf_flat.config);
+    expect(created.ok(), "wolf RlController 应创建成功：" + created.error_message);
+    if (!created.ok())
+    {
+        return;
+    }
+    created.controller->update_command(&command, 0);
+    const auto observation = created.controller->build_observation(state, 0);
+    expect(observation.ok && observation.dimension == 53,
+        "wolf 53 维观测应构造成功：" + observation.error_message);
+    if (observation.ok)
+    {
+        const auto& obs = observation.observation;
+        expect_close(obs[0], 2.0, "wolf vx 应先限幅再缩放");
+        expect_close(obs[1], 1.0, "wolf vy 应缩放");
+        expect_close(obs[2], 0.5, "wolf wz 应缩放");
+        expect_close(obs[3], 0.025, "wolf IMU 角速度应缩放");
+        expect_close(obs[4], 0.05, "wolf IMU 角速度应缩放");
+        expect_close(obs[5], 0.075, "wolf IMU 角速度应缩放");
+        expect_close(obs[6], 0.0, "wolf 单位姿态投影重力 x 应为 0");
+        expect_close(obs[7], 0.0, "wolf 单位姿态投影重力 y 应为 0");
+        expect_close(obs[8], -1.0, "wolf 单位姿态投影重力 z 应为 -1");
+        expect_close(obs[9], 0.1, "wolf 腿位置误差应进入观测");
+        expect_close(obs[10], -0.2, "wolf 腿位置误差应进入观测");
+        expect_close(obs[21], 0.025, "wolf 腿速度应缩放");
+        expect_close(obs[22], -0.02, "wolf 腿速度应缩放");
+        expect_close(obs[33], 0.15, "wolf FL 轮速应乘 +1 符号");
+        expect_close(obs[34], 0.2, "wolf FR 轮速应乘 -1 符号");
+        expect_close(obs[35], 0.25, "wolf RL 轮速应乘 +1 符号");
+        expect_close(obs[36], 0.3, "wolf RR 轮速应乘 -1 符号");
+        expect_close(obs[37], 0.0, "wolf 初始 previous raw action 应为零");
+        expect_close(obs[52], 0.0, "wolf 初始 previous raw action 应为零");
+        expect(created.controller->insert_observation(observation),
+            "wolf 观测应插入历史");
+    }
+
+    quadruped::motion::RlInferenceOutput inference;
+    inference.ok = true;
+    inference.action_dimension = 16;
+    inference.actions.fill(0.2F);
+    std::array<double, quadruped::core::kMaxJoints> positions{};
+    for (std::size_t i = 0; i < wolf_model.model.joint_count; ++i)
+    {
+        positions[i] = state.joints[i].position;
+    }
+    const auto output = created.controller->convert_actions(inference, positions);
+    expect(output.ok, "wolf 动作换算应成功：" + output.error_message);
+    expect_close(output.target_positions[0],
+        wolf_flat.config.default_joint_positions[0] + 0.2 * 0.20,
+        "wolf 腿动作应为 default + 0.20 × raw");
+    expect_close(output.target_velocities[3], 2.0, "wolf FL 轮动作应为 +10 × raw");
+    expect_close(output.target_velocities[7], -2.0, "wolf FR 轮动作应为 -10 × raw");
+    expect_close(output.target_velocities[11], 2.0, "wolf RL 轮动作应为 +10 × raw");
+    expect_close(output.target_velocities[15], -2.0, "wolf RR 轮动作应为 -10 × raw");
+    expect(output.kp[3] == 0.0 && output.kd[3] == 1.0,
+        "wolf 轮应使用 Kp=0 的 JointImpedance 速度 PD");
+    expect(output.kp[0] == 80.0 && output.kd[0] == 3.0,
+        "wolf 腿应使用 Kp=80 / Kd=3.0 的位置 PD");
+
+    // 安全裁剪（action_clip）只作用于控制目标；previous raw action 保留原始输出。
+    auto trimmed = wolf_flat.config;
+    trimmed.action_clip = 1.0;
+    auto trimmed_controller = quadruped::motion::RlController::create(
+        wolf_model.model, trimmed);
+    expect(trimmed_controller.ok(), "wolf 裁剪用例控制器应创建成功");
+    if (trimmed_controller.ok())
+    {
+        std::array<double, quadruped::core::kMaxJoints> trimmed_positions{};
+        for (std::size_t i = 0; i < wolf_model.model.joint_count; ++i)
+        {
+            trimmed_positions[i] = state.joints[i].position;
+        }
+        inference.actions.fill(5.0F);
+        const auto trimmed_output =
+            trimmed_controller.controller->convert_actions(inference, trimmed_positions);
+        expect(trimmed_output.ok, "wolf 裁剪用例换算应成功");
+        expect_close(trimmed_output.target_velocities[3], 10.0,
+            "wolf 轮目标速度应使用裁剪后的 raw action");
+        expect_close(trimmed_controller.controller->previous_actions()[3], 5.0,
+            "wolf previous raw action 不得被 action_clip 污染");
+        expect_close(trimmed_controller.controller->previous_actions()[0], 5.0,
+            "wolf previous raw action 腿通道也应保留原始输出");
+    }
+
+    // HIM history：newest → oldest 按 frame-major 展平，每次插入的 command 不同。
+    auto him_created = quadruped::motion::RlController::create(
+        wolf_model.model, wolf_him.config);
+    expect(him_created.ok(), "wolf HIM RlController 应创建成功：" + him_created.error_message);
+    if (him_created.ok())
+    {
+        for (int frame = 0; frame < 6; ++frame)
+        {
+            quadruped::core::BaseCommand frame_command = command;
+            frame_command.sequence = static_cast<std::uint64_t>(frame + 1);
+            frame_command.vx = 0.1 * static_cast<double>(frame + 1);
+            him_created.controller->update_command(&frame_command, 0);
+            const auto frame_observation = him_created.controller->build_observation(state, 0);
+            expect(frame_observation.ok, "wolf HIM 单帧观测应构造成功");
+            expect(him_created.controller->insert_observation(frame_observation),
+                "wolf HIM 观测应插入历史");
+        }
+        const auto input = him_created.controller->inference_input();
+        expect(input.dimension == 318, "wolf HIM 推理输入应为 318 维");
+        expect_close(input.observation[0], 1.2, "HIM 历史第 0 帧应为最新观测");
+        expect_close(input.observation[53], 1.0, "HIM 历史第 1 帧应为次新观测");
+        expect_close(input.observation[53 * 4], 0.4, "HIM 历史第 4 帧应为次旧观测");
+        expect_close(input.observation[53 * 5], 0.2, "HIM 历史第 5 帧应为最旧观测");
+
+        // reset 后 history 与 previous raw action 必须归零。
+        him_created.controller->reset();
+        const auto after_reset = him_created.controller->inference_input();
+        for (std::size_t i = 0; i < after_reset.dimension; ++i)
+        {
+            if (after_reset.observation[i] != 0.0F)
+            {
+                expect(false, "reset 后 HIM 历史必须全部归零");
+                break;
+            }
+        }
+        const auto reset_observation = him_created.controller->build_observation(state, 0);
+        expect(reset_observation.ok, "reset 后单帧观测应可构造");
+        if (reset_observation.ok)
+        {
+            expect_close(reset_observation.observation[37], 0.0,
+                "reset 后 previous raw action 应归零");
+        }
+    }
+}
+
 }  // namespace
 
 int main()
@@ -220,6 +404,8 @@ int main()
             }
         }
     }
+
+    check_wolf_rl();
 
     if (failures != 0)
     {

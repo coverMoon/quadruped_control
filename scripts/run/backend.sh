@@ -12,6 +12,7 @@ mode="gui"
 shm_name=""
 robot_config=""
 scene_path=""
+initial_keyframe=""
 real_time_factor="1.0"
 visual_sync_hz="60.0"
 vsync="true"
@@ -33,6 +34,7 @@ usage() {
   --mode gui|headless   运行模式，默认 gui
   --shm NAME            共享内存名称，默认 /quadruped_control_<robot>
   --robot-config PATH   机器人配置路径
+  --initial-keyframe N  启动时加载的 MJCF keyframe；默认按机器人选择
   --real-time-factor X  仿真实时倍率
   --visual-sync-hz HZ  GUI 状态同步频率
   --vsync true|false    是否启用 GUI 垂直同步
@@ -68,6 +70,10 @@ while (($# > 0)); do
         --robot-config)
             [[ $# -ge 2 ]] || { echo "--robot-config 缺少参数" >&2; exit 2; }
             robot_config="$2"; shift 2
+            ;;
+        --initial-keyframe)
+            [[ $# -ge 2 ]] || { echo "--initial-keyframe 缺少参数" >&2; exit 2; }
+            initial_keyframe="$2"; shift 2
             ;;
         --real-time-factor)
             [[ $# -ge 2 ]] || { echo "--real-time-factor 缺少参数" >&2; exit 2; }
@@ -132,6 +138,13 @@ fi
 if [[ -z "${robot_config}" ]]; then
     robot_config="${project_dir}/configs/robots/${robot_name}.yaml"
 fi
+# 需要非零启动姿态的机器人：初始 keyframe 名称。black / blackW 默认保持 MJCF 零位。
+if [[ -z "${initial_keyframe}" ]]; then
+    case "${robot_name}" in
+        wolf) initial_keyframe="default_pose" ;;
+        *) initial_keyframe="" ;;
+    esac
+fi
 if [[ -z "${shm_name}" ]]; then
     shm_name="/quadruped_control_${robot_name}"
 fi
@@ -154,6 +167,7 @@ exec "${executable}" \
     --shm "${shm_name}" \
     --scene "${scene_path}" \
     --robot-config "${robot_config}" \
+    --initial-keyframe "${initial_keyframe}" \
     --mode "${mode}" \
     --real-time-factor "${real_time_factor}" \
     --visual-sync-hz "${visual_sync_hz}" \

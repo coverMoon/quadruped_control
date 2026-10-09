@@ -63,7 +63,6 @@ bool validate_rl_config(
     }
     if (config.action_dimension == 0 || config.action_dimension != model.joint_count ||
         config.action_dimension > kMaxRlActionDim ||
-        config.observation_dimension != 9 + 3 * config.action_dimension ||
         config.observation_dimension > kMaxRlObservationDim ||
         config.history_frame_count == 0 ||
         config.history_frame_count > kMaxRlHistoryFrames ||
@@ -72,6 +71,25 @@ bool validate_rl_config(
         config.inference_input_dimension > kMaxRlInputDim)
     {
         error_message = "RL observation, history, input, or action dimensions are inconsistent";
+        return false;
+    }
+    // 观测维度由布局和模型角色共同决定，不从机器人名称或动作维度猜测。
+    std::size_t model_wheel_count = 0;
+    for (std::size_t i = 0; i < model.joint_count; ++i)
+    {
+        if (model.joints[i].role == core::JointRole::Wheel)
+        {
+            ++model_wheel_count;
+        }
+    }
+    const std::size_t leg_count = config.action_dimension - model_wheel_count;
+    const std::size_t expected_observation_dimension =
+        config.observation_layout == RlObservationLayout::LegWheelSplit
+        ? 9 + 2 * leg_count + model_wheel_count + config.action_dimension
+        : 9 + 3 * config.action_dimension;
+    if (config.observation_dimension != expected_observation_dimension)
+    {
+        error_message = "RL observation dimension does not match the configured layout";
         return false;
     }
     std::array<bool, core::kMaxJoints> mapped{};
@@ -125,6 +143,25 @@ bool validate_rl_config(
         error_message = "RL joint action modes or Wheel count are unsupported";
         return false;
     }
+    if (config.observation_layout == RlObservationLayout::LegWheelSplit)
+    {
+        // 腿轮分离布局必须有轮子，且每个轮的符号只能是 ±1。
+        if (model_wheel_count == 0 || !finite_positive(config.wheel_velocity_scale))
+        {
+            error_message =
+                "RL leg/wheel split layout requires wheels and a positive wheel velocity scale";
+            return false;
+        }
+        for (std::size_t i = 0; i < model_wheel_count; ++i)
+        {
+            if (!std::isfinite(config.wheel_velocity_signs[i]) ||
+                std::abs(config.wheel_velocity_signs[i]) != 1.0)
+            {
+                error_message = "RL wheel velocity signs must be -1 or +1";
+                return false;
+            }
+        }
+    }
     if (config.name.empty() || config.model_path.empty() ||
         !finite_positive(config.angular_velocity_scale) ||
         !finite_positive(config.joint_position_scale) ||
@@ -166,6 +203,29 @@ bool validate_rl_config(
             error_message = "RL joint parameters are invalid at action index " +
                 std::to_string(action_index);
             return false;
+        }
+    }
+    if (config.observation_layout == RlObservationLayout::LegWheelSplit)
+    {
+        // 轮速观测符号必须与轮动作缩放符号一致，防止符号被重复或反向应用。
+        std::size_t wheel_index = 0;
+        for (std::size_t action_index = 0;
+             action_index < config.action_dimension;
+             ++action_index)
+        {
+            const std::size_t joint_index = config.policy_dof_indices[action_index];
+            if (model.joints[joint_index].role != core::JointRole::Wheel)
+            {
+                continue;
+            }
+            if (config.action_scale[action_index] * config.wheel_velocity_signs[wheel_index] <=
+                0.0)
+            {
+                error_message =
+                    "RL wheel observation sign must match the wheel action scale sign";
+                return false;
+            }
+            ++wheel_index;
         }
     }
     error_message.clear();
@@ -256,12 +316,20 @@ RlController::ObservationResult RlController::build_observation(
     {
         result.observation[index++] = static_cast<float>(value);
     }
+    const bool split_layout =
+        config_.observation_layout == RlObservationLayout::LegWheelSplit;
     for (std::size_t action_index = 0;
          action_index < config_.action_dimension;
          ++action_index)
     {
         const std::size_t joint_index = config_.policy_dof_indices[action_index];
-        const double error = model_.joints[joint_index].role == core::JointRole::Wheel
+        const bool is_wheel = model_.joints[joint_index].role == core::JointRole::Wheel;
+        // 腿轮分离布局中，轮子不参与腿位置块；旧布局仍写入固定零误差。
+        if (split_layout && is_wheel)
+        {
+            continue;
+        }
+        const double error = is_wheel
             ? 0.0
             : state.joints[joint_index].position -
                 config_.default_joint_positions[action_index];
@@ -273,9 +341,34 @@ RlController::ObservationResult RlController::build_observation(
          ++action_index)
     {
         const std::size_t joint_index = config_.policy_dof_indices[action_index];
+        // 腿轮分离布局中，轮速在独立的带符号块中处理。
+        if (split_layout && model_.joints[joint_index].role == core::JointRole::Wheel)
+        {
+            continue;
+        }
         result.observation[index++] =
             static_cast<float>(
                 state.joints[joint_index].velocity * config_.joint_velocity_scale);
+    }
+    if (split_layout)
+    {
+        // 轮速观测使用动作槽位顺序，并乘 forward sign，使正值表示机身 +x 前进方向。
+        std::size_t wheel_index = 0;
+        for (std::size_t action_index = 0;
+             action_index < config_.action_dimension;
+             ++action_index)
+        {
+            const std::size_t joint_index = config_.policy_dof_indices[action_index];
+            if (model_.joints[joint_index].role != core::JointRole::Wheel)
+            {
+                continue;
+            }
+            result.observation[index++] = static_cast<float>(
+                state.joints[joint_index].velocity *
+                config_.wheel_velocity_signs[wheel_index] *
+                config_.wheel_velocity_scale);
+            ++wheel_index;
+        }
     }
     for (std::size_t i = 0; i < config_.action_dimension; ++i)
     {
@@ -357,7 +450,9 @@ RlController::CommandResult RlController::convert_actions(
         result.target_positions[joint_index] = current_positions[joint_index];
         result.kp[joint_index] = config_.kp[action_index];
         result.kd[joint_index] = config_.kd[action_index];
-        previous_actions_[action_index] = static_cast<float>(action);
+        // previous_raw_action 保留策略原始输出；安全裁剪只作用于本帧控制目标，
+        // 不污染下一帧观测。
+        previous_actions_[action_index] = inference.actions[action_index];
         if (joint.role == core::JointRole::Wheel)
         {
             const double velocity = action * config_.action_scale[action_index];
