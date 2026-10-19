@@ -21,7 +21,7 @@ usage() {
   --backend NAME      backend 类型，目前仅支持 mujoco
   --mujoco            兼容入口，等价 --target backend --backend mujoco
   --rl                兼容入口，构建 backend 和 motion 的 RL profile
-  --clean             清理所选 CMake profile；command 清理固定 ROS 2 工作区
+  --clean             清理所选 CMake profile；command 清理所选 ROS 2 工作区
   --no-test           构建后不运行 CTest
 USAGE
 }
@@ -86,15 +86,11 @@ build_cmake_profile() {
 }
 
 build_command() {
-    local ros_setup="${ROS_SETUP:-/opt/ros/humble/setup.bash}"
-    local workspace_root="${QUADRUPED_ROS2_WORKSPACE_ROOT:-${build_root}/ros2}"
     local clean_option=()
     if [[ "${clean_build}" == true ]]; then
         clean_option=(--clean)
     fi
-    ROS_SETUP="${ros_setup}" \
-        QUADRUPED_ROS2_WORKSPACE_ROOT="${workspace_root}" \
-        "${project_dir}/scripts/setup/ros2.sh" "${clean_option[@]}"
+    "${project_dir}/scripts/setup/ros2.sh" "${clean_option[@]}"
 }
 
 case "${target}" in

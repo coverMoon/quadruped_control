@@ -74,8 +74,7 @@ quadruped_control/
 
 推荐环境：
 
-- Ubuntu 22.04 x86_64；
-- ROS 2 Humble；
+- Ubuntu 24.04 x86_64 + ROS 2 Jazzy，或 Ubuntu 22.04 x86_64 + ROS 2 Humble；
 - GCC / Clang with C++17；
 - CMake 3.16+。
 
@@ -97,7 +96,16 @@ sudo apt install -y \
     python3-yaml
 ```
 
-ROS 2 默认从 `/opt/ros/humble/setup.bash` 加载。如果安装在其他位置，可以设置：
+根目录的本地文件 `rosconfig` 统一选择 ROS 2 发行版，不提交到 Git。首次使用时创建：
+
+```bash
+printf 'jazzy\n' > rosconfig
+```
+
+使用 Humble 时将文件内容改为 `humble`。构建和运行入口均读取该文件，默认工作区为
+`.build/ros2/<发行版>/`。
+环境加载、路径覆盖和切换方式见 [ROS 2 环境配置](docs/ros2_interface.md#ros-2-环境配置)。
+如果 ROS 2 安装在其他位置，可以设置（发行版仍须与 `rosconfig` 一致）：
 
 ```bash
 export ROS_SETUP=/path/to/ros/setup.bash
@@ -331,8 +339,8 @@ assets/policies/<robot>/<policy>/
 运行 ROS 2 CLI 前加载环境：
 
 ```bash
-source /opt/ros/humble/setup.bash
-source .build/ros2/install/setup.bash
+source scripts/ros2_env.sh
+quadruped_source_ros_workspace
 ```
 
 发送速度指令示例：

@@ -4,6 +4,9 @@
 cmake_minimum_required(VERSION 3.8)
 project(quadruped_gateway)
 
+get_filename_component(QUADRUPED_GATEWAY_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}" REALPATH)
+include("${QUADRUPED_GATEWAY_SOURCE_DIR}/../../../cmake/Ros2Config.cmake")
+
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
@@ -11,8 +14,6 @@ find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(quadruped_interfaces REQUIRED)
 
-file(REAL_PATH "${CMAKE_CURRENT_SOURCE_DIR}" QUADRUPED_GATEWAY_SOURCE_DIR)
-set(QUADRUPED_SOURCE_ROOT "${QUADRUPED_GATEWAY_SOURCE_DIR}/../../..")
 set(QUADRUPED_PROJECT_ROOT "${QUADRUPED_SOURCE_ROOT}")
 set(QUADRUPED_BACKEND_EXECUTABLE "${QUADRUPED_SOURCE_ROOT}/.build/rl/apps/runtime_daemons/quadruped_mujoco_backendd")
 set(QUADRUPED_MOTION_EXECUTABLE "${QUADRUPED_SOURCE_ROOT}/.build/rl/apps/runtime_daemons/quadruped_motiond")

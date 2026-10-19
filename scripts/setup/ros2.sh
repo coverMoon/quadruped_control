@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # 文件：ros2.sh
-# 作用：构建并安装仓库的 ROS 2 接口和网关包到固定工程构建目录。
+# 作用：按仓库 ROS 2 配置构建接口和网关包到对应发行版的工作区。
 
 set -euo pipefail
 
 project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
-ros_setup="${ROS_SETUP:-/opt/ros/humble/setup.bash}"
-workspace_root="${QUADRUPED_ROS2_WORKSPACE_ROOT:-${project_dir}/.build/ros2}"
+source "${project_dir}/scripts/ros2_env.sh"
+quadruped_load_ros_config
+workspace_root="${quadruped_ros_workspace}"
 clean_build=false
 
 while (($# > 0)); do
@@ -36,13 +37,18 @@ build_dir="${workspace_root}/build"
 install_dir="${workspace_root}/install"
 log_dir="${workspace_root}/log"
 
-if [[ ! -f "${ros_setup}" ]]; then
-    echo "未找到 ROS 2 环境脚本: ${ros_setup}" >&2
-    exit 1
-fi
+quadruped_source_ros_base
 
 if [[ "${clean_build}" == true && -d "${workspace_root}" ]]; then
     cmake -E remove_directory "${workspace_root}"
+fi
+
+if [[ -f "${install_dir}/setup.bash" ]]; then
+    if [[ ! -f "${install_dir}/.quadruped_ros_distro" ]] ||
+        [[ "$(<"${install_dir}/.quadruped_ros_distro")" != "${QUADRUPED_ROS_DISTRO}" ]]; then
+        echo "ROS 2 工作区包含旧版或其他发行版产物，请使用 --clean 重新构建。" >&2
+        exit 1
+    fi
 fi
 
 mkdir -p "${src_dir}"
@@ -50,12 +56,6 @@ ln -sfn "${project_dir}/adapters/ros2/quadruped_interfaces" \
     "${src_dir}/quadruped_interfaces"
 ln -sfn "${project_dir}/adapters/ros2/quadruped_gateway" \
     "${src_dir}/quadruped_gateway"
-
-# ROS 环境脚本可能读取未预先定义的变量，source 期间暂时关闭 nounset。
-set +u
-# shellcheck disable=SC1090
-source "${ros_setup}"
-set -u
 
 package_types="$(colcon list --base-paths "${src_dir}")"
 if grep -q 'ros.catkin' <<< "${package_types}"; then
@@ -69,12 +69,11 @@ colcon --log-base "${log_dir}" build \
     --build-base "${build_dir}" \
     --install-base "${install_dir}" \
     --packages-select quadruped_interfaces quadruped_gateway \
-    --symlink-install
+    --symlink-install \
+    --cmake-args -DPython3_EXECUTABLE=/usr/bin/python3
 
-set +u
-# shellcheck disable=SC1090
-source "${install_dir}/setup.bash"
-set -u
+printf '%s\n' "${QUADRUPED_ROS_DISTRO}" >"${install_dir}/.quadruped_ros_distro"
+quadruped_source_ros_workspace "${install_dir}/setup.bash"
 ros2 pkg prefix quadruped_interfaces >/dev/null
 ros2 pkg prefix quadruped_gateway >/dev/null
 launch_file="${install_dir}/quadruped_gateway/share/quadruped_gateway/launch/black_simulation.launch.py"

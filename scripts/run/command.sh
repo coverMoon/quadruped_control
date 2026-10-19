@@ -108,22 +108,16 @@ esac
 if [[ -z "${shm_name}" ]]; then
     shm_name="/quadruped_control_${robot_name}"
 fi
-ros_setup="${ROS_SETUP:-/opt/ros/humble/setup.bash}"
-ros_workspace_root="${QUADRUPED_ROS2_WORKSPACE_ROOT:-${project_dir}/.build/ros2}"
+source "${project_dir}/scripts/ros2_env.sh"
+quadruped_source_ros_base
+ros_workspace_root="${quadruped_ros_workspace}"
 ros_install_setup="${QUADRUPED_ROS2_INSTALL_SETUP:-${ros_workspace_root}/install/setup.bash}"
 ros_install_dir="$(dirname "${ros_install_setup}")"
 gateway="${ros_install_dir}/quadruped_gateway/lib/quadruped_gateway/ros2_gateway"
 
-if [[ ! -f "${ros_setup}" ]]; then
-    echo "未找到系统 ROS 2 基础环境: ${ros_setup}" >&2
-    echo "请先安装 ROS 2 Humble，或通过 ROS_SETUP 指定 setup.bash。" >&2
-    exit 1
-fi
-
 if [[ ! -f "${ros_install_setup}" || ! -x "${gateway}" ]]; then
     echo "[command] ROS 2 工程环境不存在或不完整，开始自动构建安装。"
-    ROS_SETUP="${ros_setup}" \
-        QUADRUPED_ROS2_WORKSPACE_ROOT="${ros_workspace_root}" \
+    QUADRUPED_ROS2_WORKSPACE_ROOT="${ros_workspace_root}" \
         "${project_dir}/scripts/setup/ros2.sh"
 fi
 
@@ -132,10 +126,7 @@ if [[ ! -f "${ros_install_setup}" || ! -x "${gateway}" ]]; then
     exit 1
 fi
 
-set +u
-source "${ros_setup}"
-source "${ros_install_setup}"
-set -u
+quadruped_source_ros_workspace "${ros_install_setup}"
 export ROS_LOG_DIR="${ROS_LOG_DIR:-/tmp/quadruped_control_ros2_logs}"
 mkdir -p "${ROS_LOG_DIR}"
 

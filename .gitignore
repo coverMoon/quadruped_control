@@ -9,6 +9,7 @@ __pycache__/
 /.ai/
 /.build/
 /.runtime/
+/rosconfig
 
 # 私有资产
 assets/robots/wolf/

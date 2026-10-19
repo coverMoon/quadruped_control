@@ -213,14 +213,14 @@ public:
         cmd_vel_subscription_ = create_subscription<geometry_msgs::msg::Twist>(
             "/cmd_vel",
             rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile(),
-            [this](const geometry_msgs::msg::Twist::SharedPtr message)
+            [this](geometry_msgs::msg::Twist::ConstSharedPtr message)
             {
                 handle_cmd_vel(*message);
             });
         joy_subscription_ = create_subscription<sensor_msgs::msg::Joy>(
             joy_topic_,
             rclcpp::QoS(rclcpp::KeepLast(1)).best_effort(),
-            [this](const sensor_msgs::msg::Joy::SharedPtr message)
+            [this](sensor_msgs::msg::Joy::ConstSharedPtr message)
             {
                 handle_joy(*message);
             });

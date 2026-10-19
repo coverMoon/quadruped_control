@@ -4,15 +4,16 @@
 
 set -euo pipefail
 project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
-ros_setup="${ROS_SETUP:-/opt/ros/humble/setup.bash}"
-workspace_root="${QUADRUPED_ROS2_WORKSPACE_ROOT:-${project_dir}/.build/ros2}"
+source "${project_dir}/scripts/ros2_env.sh"
+quadruped_load_ros_config
+workspace_root="${quadruped_ros_workspace}"
 ros_install="${QUADRUPED_ROS2_INSTALL:-${workspace_root}/install}"
-for required in "${ros_setup}" "${ros_install}/setup.bash" \
+for required in "${ros_install}/setup.bash" \
     "${project_dir}/.build/rl/apps/runtime_daemons/quadruped_mujoco_backendd" \
     "${project_dir}/.build/rl/apps/runtime_daemons/quadruped_motiond"; do
     [[ -e "${required}" ]] || { echo "缺少测试依赖: ${required}" >&2; exit 1; }
 done
-set +u; source "${ros_setup}"; source "${ros_install}/setup.bash"; set -u
+quadruped_source_ros_workspace "${ros_install}/setup.bash"
 export ROS_LOG_DIR="${QUADRUPED_ROS2_LOG_DIR:-/tmp/quadruped_control_ros2_logs}"
 mkdir -p "${ROS_LOG_DIR}"
 exec /usr/bin/python3 "${project_dir}/scripts/test/ros2_headless_test.py" \

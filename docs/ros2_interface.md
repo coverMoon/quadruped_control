@@ -14,6 +14,42 @@ quadruped_gateway ── shared memory ──► motiond ──► mujoco_backen
 
 ## 1. 启动与环境
 
+### ROS 2 环境配置
+
+根目录的本地文件 `rosconfig` 是发行版选择的唯一来源，只填写一行 `jazzy` 或 `humble`，
+不提交到 Git。首次使用时执行 `printf 'jazzy\n' > rosconfig`，使用 Humble 时改填 `humble`。
+Shell 公共入口 `scripts/ros2_env.sh` 和两个 ROS 包共用的
+`cmake/Ros2Config.cmake` 均读取该文件；纯 C++ 核心及运动、后端模块不依赖此配置。
+
+修改后，在新终端中构建 ROS 2 包：
+
+```bash
+./scripts/build.sh --target command
+```
+
+基础环境默认从 `/opt/ros/<发行版>/setup.bash` 加载，构建工作区默认使用
+`.build/ros2/<发行版>/`，两个发行版的生成消息、Python 扩展及二进制分别构建。
+构建脚本为消息生成器指定系统 `/usr/bin/python3`，与运行入口使用的解释器保持一致。
+原来的 `.build/ros2/install/` 不再作为默认安装目录，也不需要手动修改其中的生成文件。
+
+保留以下路径覆盖变量，它们只改变路径，不改变 `rosconfig` 选定的发行版：
+
+| 变量 | 用途 |
+| --- | --- |
+| `ROS_SETUP` | 自定义 ROS 2 基础环境脚本 |
+| `QUADRUPED_ROS2_WORKSPACE_ROOT` | 构建与运行共用的工作区根目录 |
+| `QUADRUPED_ROS2_INSTALL_SETUP` | command 和交互终端使用的安装环境脚本 |
+| `QUADRUPED_ROS2_INSTALL` | 无界面测试入口使用的安装目录 |
+
+脚本校验基础环境、安装目录中的发行版标记和配置一致；CMake 校验 `ROS_DISTRO` 与
+配置一致，并在修改配置后重新配置。已加载其他发行版的终端会被拒绝，请使用新终端。
+自定义工作区包含旧产物或其他发行版产物时，使用
+`./scripts/build.sh --target command --clean` 重建该工作区。
+直接使用 colcon 前，先执行 `source scripts/ros2_env.sh` 和
+`quadruped_source_ros_base`；安装环境的加载入口使用上述构建脚本生成的发行版标记。
+
+### 启动与 CLI
+
 gateway 启动时会打开已经存在的共享内存，因此应依次启动 backend、motion、gateway：
 
 ```bash
@@ -30,8 +66,8 @@ gateway 启动时会打开已经存在的共享内存，因此应依次启动 ba
 在新的 CLI 终端中加载 ROS 2 环境：
 
 ```bash
-source /opt/ros/humble/setup.bash
-source .build/ros2/install/setup.bash
+source scripts/ros2_env.sh
+quadruped_source_ros_workspace
 
 ros2 node list
 ros2 topic list -t
@@ -481,7 +517,7 @@ ros2 run quadruped_gateway ros2_gateway --ros-args \
 
 ### 看不到接口
 
-确认 gateway 正在运行，当前终端已加载 `.build/ros2/install/setup.bash`。如果 gateway 无法
+确认 gateway 正在运行，当前终端已执行 `quadruped_source_ros_workspace`。如果 gateway 无法
 打开共享内存，应先启动 backend，并确认 `shared_memory_name` 一致。
 
 ### `/cmd_vel` 有数据但机器人不动

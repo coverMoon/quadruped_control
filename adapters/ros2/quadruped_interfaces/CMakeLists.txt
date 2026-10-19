@@ -5,6 +5,9 @@ cmake_minimum_required(VERSION 3.8)
 
 project(quadruped_interfaces)
 
+get_filename_component(QUADRUPED_INTERFACES_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}" REALPATH)
+include("${QUADRUPED_INTERFACES_SOURCE_DIR}/../../../cmake/Ros2Config.cmake")
+
 find_package(ament_cmake REQUIRED)
 find_package(action_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
