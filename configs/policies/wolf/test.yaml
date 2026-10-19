@@ -21,7 +21,7 @@ wheel_indices: [3, 7, 11, 15]
 
 # 命令上限为 Wolf 训练代码的覆盖范围：vx 课程上界 4.0、vy 与 yaw 训练固定范围。
 command_scale: [2.0, 2.0, 0.25]
-command_limits: [4.0, 1.0, 3.14]
+command_limits: [3.0, 1.0, 3.14]
 angular_velocity_scale: 0.25
 joint_position_scale: 1.0
 joint_velocity_scale: 0.05
@@ -47,10 +47,10 @@ kd:
    3.0, 3.0, 3.0, 1.0]
 # 腿动作 q_target = q_default + 0.20 × raw；轮动作 dq_target = sign × 10.0 × raw。
 action_scale:
-  [0.20, 0.20, 0.20, 10.0,
-   0.20, 0.20, 0.20, -10.0,
-   0.20, 0.20, 0.20, 10.0,
-   0.20, 0.20, 0.20, -10.0]
+  [0.25, 0.25, 0.25, 10.0,
+   0.25, 0.25, 0.25, -10.0,
+   0.25, 0.25, 0.25, 10.0,
+   0.25, 0.25, 0.25, -10.0]
 action_clip: 100.0
 max_position_jump: 1.0
 
